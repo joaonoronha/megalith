@@ -1,0 +1,30 @@
+# Local Ingress Testing Docker Compose Overlay for Megalith Edge Ingress
+# Applied with: docker compose -f compose.yaml -f compose.local-ingress.yaml
+
+services:
+  caddy:
+    image: caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
+    restart: unless-stopped
+    ports:
+      - "${INGRESS_PORT:-18082}:80"
+    environment:
+      DEMO_HOSTNAME: ${DEMO_HOSTNAME:-demo.example.com}
+    volumes:
+      - ./caddy/Caddyfile.local:/etc/caddy/Caddyfile:ro
+    networks:
+      - edge-network
+    depends_on:
+      demo-web:
+        condition: service_healthy
+      demo-api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+  demo-web:
+    # Reset host port in local ingress test stack so Caddy is tested exclusively.
+    ports: !reset []

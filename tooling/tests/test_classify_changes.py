@@ -200,3 +200,21 @@ def test_postgres_changes_trigger_containers():
     assert res.demo_web is False
     assert res.terraform is False
     assert res.docs_only is False
+
+
+def test_ingress_changes_trigger_containers():
+    res = classify_files([
+        "platform/deploy/caddy/Caddyfile",
+        "platform/deploy/caddy/Caddyfile.local",
+        "platform/deploy/compose.local-ingress.yaml",
+        "platform/deploy/compose.prod.yaml",
+        "tooling/verify_ingress.py",
+    ])
+    assert res.platform is True
+    assert res.container_smoke is True
+    assert res.container_api is True
+    assert res.container_web is True
+    assert res.demo_api is False
+    assert res.demo_web is False
+    assert res.terraform is False
+    assert res.docs_only is False

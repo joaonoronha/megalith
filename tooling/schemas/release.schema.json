@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MegalithReleaseManifest",
+  "description": "Schema for immutable Megalith release manifests.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "release_id",
+    "git_sha",
+    "created_at",
+    "environment",
+    "config_version",
+    "services",
+    "images"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Release manifest format version."
+    },
+    "release_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{2,63}$",
+      "description": "Unique release identifier."
+    },
+    "git_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{40}$",
+      "description": "40-character source Git commit SHA."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of release creation."
+    },
+    "environment": {
+      "type": "string",
+      "enum": ["production", "staging", "test"],
+      "description": "Target deployment environment."
+    },
+    "config_version": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)*$",
+      "description": "Deployment topology configuration version."
+    },
+    "services": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["demo-api", "demo-web"]
+      },
+      "description": "List of services deployed by this release."
+    },
+    "images": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "type": "string",
+          "pattern": "^.+@sha256:[0-9a-fA-F]{64}$",
+          "description": "Immutable container image reference pinned to cryptographic sha256 digest."
+        }
+      },
+      "description": "Mapping of service names to immutable image digests."
+    },
+    "migrations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["service", "applied", "command", "backward_compatible"],
+        "additionalProperties": false,
+        "properties": {
+          "service": {
+            "type": "string",
+            "enum": ["demo-api"]
+          },
+          "applied": {
+            "type": "boolean"
+          },
+          "command": {
+            "type": "string",
+            "enum": ["alembic upgrade head"]
+          },
+          "backward_compatible": {
+            "type": "boolean",
+            "description": "True if the migration is backward-compatible with the previous application release."
+          }
+        }
+      },
+      "description": "Database migration requirements for this release."
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional metadata such as author, CI run ID, and release notes."
+    },
+    "approval": {
+      "type": "object",
+      "required": ["authorized_by", "authorized_at", "release_id", "target_environment", "intent"],
+      "additionalProperties": false,
+      "properties": {
+        "authorized_by": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorized_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "release_id": {
+          "type": "string"
+        },
+        "target_environment": {
+          "type": "string",
+          "enum": ["production", "staging", "test"]
+        },
+        "intent": {
+          "type": "string",
+          "const": "deploy"
+        }
+      },
+      "description": "Explicit human authorization metadata required for deployment."
+    }
+  }
+}

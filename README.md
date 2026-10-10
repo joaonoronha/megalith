@@ -238,14 +238,30 @@ For details, see [AI Instruction Architecture](docs/architecture/ai-instructions
   - Automated backup (`backup.py` / `pg_dump`) and isolated restore testing (`restore.py` / `pg_restore` into temporary database).
   - Data durability verified across container restart and Compose stack recreation without volume loss.
   - End-to-end verification suite (`tooling/verify_postgres.py`), architecture documentation ([`docs/architecture/persistence.md`](docs/architecture/persistence.md)), and operations guide ([`docs/operations/postgres-operations.md`](docs/operations/postgres-operations.md)).
+- [x] **Production Edge Ingress with Caddy (`platform/deploy/caddy/`, `platform/deploy/compose.prod.yaml`)**:
+  - Hard-pinned multi-arch Caddy v2.9 Alpine container (`caddy:2.9-alpine@sha256:b4e3...`) with minimal capabilities (`cap_drop: [ALL]`, `cap_add: [NET_BIND_SERVICE]`, `security_opt: [no-new-privileges:true]`).
+  - Production-ready edge ingress topology where Caddy publishes ports 80 and 443 while all upstream services (`demo-web`, `demo-api`, `postgres`) remain private.
+  - Strict network segmentation across `edge-network` and `data-network`, guaranteeing Caddy has zero network access to PostgreSQL.
+  - Direct route segregation: `/api*` proxies directly to `demo-api:8000`, while static assets and SPA fallback route to `demo-web:8080`. API failures cleanly return 502 Bad Gateway without leaking HTML SPA fallbacks.
+  - Defense-in-depth security headers (CSP, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Server` header suppression, and HSTS for HTTPS).
+  - Forwarded header security via Uvicorn proxy CIDR trust restrictions narrowed to loopback and dedicated edge network (`127.0.0.1, 172.28.0.0/24`).
+  - Safe local testing mode (`compose.local-ingress.yaml`, `Caddyfile.local`) on collision-resistant test ports with automatic HTTPS disabled and HSTS omitted.
+  - Automated end-to-end verification suite (`tooling/verify_ingress.py`), architecture documentation ([`docs/architecture/ingress.md`](docs/architecture/ingress.md)), and operational runbook ([`docs/operations/ingress.md`](docs/operations/ingress.md)).
+- [x] **Controlled Deployment Pipeline, Immutable Releases, and Safe Rollback (`platform/deploy/scripts/`, `.github/workflows/`)**:
+  - Release manifest schema with versioning, strict validation, and human authorization metadata ([`tooling/schemas/release.schema.json`](tooling/schemas/release.schema.json), [`platform/deploy/scripts/release.py`](platform/deploy/scripts/release.py)).
+  - Cryptographic digest pinning: deployment strictly requires immutable `@sha256:...` image references; mutable tags (`:latest`, `:v1.0`) are unconditionally rejected.
+  - Two-stage GitHub Actions workflows: release packaging ([`.github/workflows/release.yaml`](.github/workflows/release.yaml)) verifying exact-commit `CI / required` gate, building multi-arch images, and emitting sealed release manifests; controlled deployment workflow ([`.github/workflows/deploy.yaml`](.github/workflows/deploy.yaml)) with dual-confirmation inputs (`confirm_release_id == release_id`).
+  - Host-side deployment engine ([`platform/deploy/scripts/deploy.py`](platform/deploy/scripts/deploy.py)) featuring non-blocking concurrency locking (`fcntl.flock`), atomic state tracking (`/var/lib/megalith/state.json`), pre-deploy database migrations (`role_demo_migrate`), and selective container recreation (preserving unchanged PostgreSQL and Caddy instances).
+  - Conservative rollback mechanics: automated rollback on health probe failure, manual rollback command, and strict blockage of automated container rollback when non-backward-compatible database migrations were applied.
+  - Task 008 follow-ups addressed: narrowed proxy CIDR trust (`127.0.0.1, 172.28.0.0/24`), host-scoped HSTS, test port collision resilience (`find_available_port`), and automated merged compose topology test ([`tooling/tests/test_merged_compose.py`](tooling/tests/test_merged_compose.py)).
+  - Automated 16-scenario deployment & rollback verification suite ([`tooling/verify_deployment.py`](tooling/verify_deployment.py)), architecture documentation ([`docs/architecture/deployment.md`](docs/architecture/deployment.md)), deployment runbook ([`docs/operations/deployment.md`](docs/operations/deployment.md)), and rollback runbook ([`docs/operations/rollback.md`](docs/operations/rollback.md)).
 
 ---
 
 ## 9. What Is Planned but Not Implemented
 The following components are deferred to subsequent tasks in accordance with scope restrictions:
-- **Continuous Deployment (CD)**: Automated production release and deployment pipelines.
-- **Production Edge Ingress**: No host Caddy reverse proxy or public TLS certificate configuration exists yet.
-- **Production Database Hosting**: Local persistence verified; no production database has been provisioned on OCI.
+- **Production Public TLS Issuance**: Caddy automatic HTTPS configuration is implemented; public ACME issuance will occur upon production deployment once public DNS points to OCI.
+- **Production Hosting on OCI**: Local deployment pipeline, ingress, and persistence verified; no production workloads or databases have been deployed to OCI.
 - **Shared Libraries**: No code exists yet in `packages/`.
 - **Actual Cloud Infrastructure Provisioning**: Real OCI resources have not been created; provisioning requires manual execution with authenticated credentials.
 

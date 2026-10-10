@@ -1,0 +1,36 @@
+# Global configuration for local development / testing
+{
+	# Disable administration API
+	admin off
+	# Disable automatic HTTPS, Let's Encrypt, and ZeroSSL
+	auto_https off
+}
+
+# Local HTTP listener on port 80 (matches any host or explicit test hostname)
+:80, {$DEMO_HOSTNAME:demo.example.com} {
+	# Security headers (excluding HSTS since local mode is HTTP-only)
+	header {
+		# Prevent MIME type sniffing
+		X-Content-Type-Options "nosniff"
+		# Prevent clickjacking / framing
+		X-Frame-Options "DENY"
+		# Restrict referrer disclosure
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Restrict access to sensitive browser features
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# Content Security Policy: robust baseline for Vite React single page application
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none';"
+		# Hide Caddy server software token
+		-Server
+	}
+
+	# Route API requests directly to FastAPI backend (preserving /api path)
+	handle /api* {
+		reverse_proxy demo-api:8000
+	}
+
+	# Route all remaining requests to React web frontend (Nginx)
+	handle {
+		reverse_proxy demo-web:8080
+	}
+}

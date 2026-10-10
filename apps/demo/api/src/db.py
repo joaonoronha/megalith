@@ -95,24 +95,20 @@ def get_db_session() -> Generator[Session, None, None]:
 
 def check_readiness() -> tuple[bool, str]:
     """
-    Verifies that the database is reachable and the required schema (counter table) is present.
-    Returns (is_ready, message). Never leaks sensitive connection details.
+    Verifies that the database is reachable, required application schema is migrated,
+    and application role has necessary DML permissions. Executes a lightweight read
+    directly on the counter table without mutating data.
+    Returns (is_ready, message). Never leaks sensitive connection or SQL details.
     """
     try:
         engine = get_engine()
         with engine.connect() as conn:
-            # Check basic query connectivity
-            conn.execute(text("SELECT 1"))
-            # Check counter table existence
-            result = conn.execute(
-                text("SELECT 1 FROM information_schema.tables WHERE table_name = 'counter'")
-            ).scalar()
-            if not result:
-                return False, "Database reachable but counter schema not ready"
+            # Query the required application table directly with the application role
+            conn.execute(text("SELECT id, value FROM counter WHERE id = 1 LIMIT 1")).fetchone()
             return True, "Database and schema ready"
     except (SQLAlchemyError, OSError) as exc:
         logger.warning("Database readiness check failed: %s", type(exc).__name__)
-        return False, "Database unavailable"
+        return False, "Database or required schema unavailable"
 
 
 def get_counter_value() -> int | None:
