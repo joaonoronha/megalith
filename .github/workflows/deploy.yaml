@@ -1,0 +1,127 @@
+name: Deployment Authorization & Execution
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: "Exact Release ID to deploy (must match prepared manifest)"
+        required: true
+        type: string
+      confirm_release_id:
+        description: "Type the Release ID again to confirm deployment authorization"
+        required: true
+        type: string
+      environment:
+        description: "Target deployment environment"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - production
+          - staging
+          - test
+      action:
+        description: "Deployment action"
+        required: true
+        default: "deploy"
+        type: choice
+        options:
+          - deploy
+          - rollback
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  authorize-and-deploy:
+    name: "Authorize & Dispatch Deployment"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify explicit human authorization match
+        run: |
+          REL_ID="${{ github.event.inputs.release_id }}"
+          CONFIRM_ID="${{ github.event.inputs.confirm_release_id }}"
+          if [[ "$REL_ID" != "$CONFIRM_ID" ]]; then
+            echo "::error::Deployment authorization failed: release_id ('$REL_ID') does not match confirm_release_id ('$CONFIRM_ID')."
+            exit 1
+          fi
+          echo "Authorization confirmed for release: $REL_ID"
+
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+
+      - name: Validate release manifest and approval boundary
+        env:
+          REL_ID: ${{ github.event.inputs.release_id }}
+          ENV_TARGET: ${{ github.event.inputs.environment }}
+          ACTION: ${{ github.event.inputs.action }}
+          AUTHORIZER: ${{ github.actor }}
+        run: |
+          python3 - << 'EOF'
+          import json
+          import os
+          import sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          sys.path.insert(0, "platform/deploy/scripts")
+          from release import ReleaseManifest, ReleaseValidationError
+
+          rel_id = os.environ["REL_ID"]
+          env_target = os.environ["ENV_TARGET"]
+          action = os.environ["ACTION"]
+          authorizer = os.environ["AUTHORIZER"]
+
+          manifest_path = Path("platform/deploy/releases") / f"{rel_id}.json"
+          if not manifest_path.is_file():
+              print(f"[Notice] Release manifest '{manifest_path}' not found in repo tree.")
+              print(f"When running on host, manifest must be delivered via /opt/megalith/deploy/releases/{rel_id}.json.")
+          else:
+              manifest = ReleaseManifest.from_file(manifest_path, require_approval=False)
+              print(f"Successfully loaded manifest for release: {manifest.release_id}")
+
+              # Attach explicit human authorization
+              approval_data = {
+                  "authorized_by": authorizer,
+                  "authorized_at": datetime.now(timezone.utc).isoformat(),
+                  "release_id": rel_id,
+                  "target_environment": env_target,
+                  "intent": "deploy",
+              }
+              manifest_dict = manifest.to_dict()
+              manifest_dict["approval"] = approval_data
+
+              # Validate with approval requirement enforced
+              approved_manifest = ReleaseManifest.from_dict(manifest_dict, require_approval=True)
+              print(f"Manifest validated with human authorization from: {authorizer}")
+          EOF
+
+      - name: Deployment transport audit
+        run: |
+          echo "============================================================"
+          echo " Megalith Deployment Transport Audit & Execution Notice"
+          echo "============================================================"
+          echo "Target Environment : ${{ github.event.inputs.environment }}"
+          echo "Release ID         : ${{ github.event.inputs.release_id }}"
+          echo "Action             : ${{ github.event.inputs.action }}"
+          echo "Authorized By      : ${{ github.actor }}"
+          echo "Timestamp          : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo ""
+          echo "Transport Policy:"
+          echo "In accordance with ADR-005, Task 006, and Task 009 security constraints,"
+          echo "OCI host SSH access is strictly restricted to administrator CIDRs."
+          echo "GitHub-hosted runners are NOT granted direct SSH access to the host VM."
+          echo ""
+          echo "Host Execution Command:"
+          echo "  python3 /opt/megalith/deploy/scripts/deploy.py apply /opt/megalith/deploy/releases/${{ github.event.inputs.release_id }}.json"
+          echo "============================================================"

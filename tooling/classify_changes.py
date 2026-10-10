@@ -74,6 +74,8 @@ CONTAINER_INFRA_PATTERNS = [
     "platform/deploy/**",
     "tooling/verify_containers.py",
     "tooling/verify_postgres.py",
+    "tooling/verify_ingress.py",
+    "tooling/verify_deployment.py",
     "docs/operations/container-verification.md",
 ]
 

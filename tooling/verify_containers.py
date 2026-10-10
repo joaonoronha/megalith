@@ -17,7 +17,9 @@ Validates:
 from __future__ import annotations
 
 import json
+import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -28,13 +30,32 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 COMPOSE_FILE = REPO_ROOT / "platform" / "deploy" / "compose.yaml"
 
+
+def find_available_port(preferred_port: int) -> int:
+    """Check if preferred port is free on 127.0.0.1; if busy, allocate a free loopback port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind(("127.0.0.1", preferred_port))
+            return preferred_port
+        except OSError:
+            pass
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+TEST_PORT = os.environ.get("VERIFY_PORT") or str(find_available_port(18080))
 COMPOSE_PROJECT = "megalith-verify"
 COMPOSE_BASE = ["docker", "compose", "-p", COMPOSE_PROJECT, "-f", str(COMPOSE_FILE)]
 
 
+
 def run_cmd(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess[str]:
     print(f"--> Running: {' '.join(cmd)}")
-    result = subprocess.run(cmd, cwd=REPO_ROOT, text=True, capture_output=True)
+    env = os.environ.copy()
+    env.setdefault("PORT", TEST_PORT)
+    result = subprocess.run(cmd, cwd=REPO_ROOT, env=env, text=True, capture_output=True)
     if check and result.returncode != 0:
         print(f"FAILED (exit code {result.returncode}):\n{result.stderr}\n{result.stdout}")
         sys.exit(result.returncode)
@@ -145,21 +166,21 @@ def main():
             print(f"  -> Confirmed: Host access to port 8000 refused as expected ({e})")
 
         # 8. Verify HTTP endpoints
-        print("\n[6/7] Verifying HTTP endpoints via frontend proxy (port 8080)...")
+        print(f"\n[6/7] Verifying HTTP endpoints via frontend proxy (port {TEST_PORT})...")
         # Frontend root
-        with urllib.request.urlopen("http://localhost:8080/", timeout=5.0) as resp:
+        with urllib.request.urlopen(f"http://localhost:{TEST_PORT}/", timeout=5.0) as resp:
             assert resp.status == 200
             html = resp.read().decode()
             assert "Megalith Demo" in html or 'id="root"' in html
-            print("  -> GET http://localhost:8080/ returned frontend HTML (HTTP 200)")
+            print(f"  -> GET http://localhost:{TEST_PORT}/ returned frontend HTML (HTTP 200)")
 
         # Proxied backend message
         try:
-            with urllib.request.urlopen("http://localhost:8080/api/message", timeout=5.0) as resp:
+            with urllib.request.urlopen(f"http://localhost:{TEST_PORT}/api/message", timeout=5.0) as resp:
                 assert resp.status == 200
                 data = json.loads(resp.read().decode())
                 assert data == {"message": "Hello from Megalith API", "service": "demo/api"}
-                print("  -> GET http://localhost:8080/api/message returned expected JSON payload:", data)
+                print(f"  -> GET http://localhost:{TEST_PORT}/api/message returned expected JSON payload:", data)
         except urllib.error.HTTPError as e:
             if e.code in (502, 504):
                 print(
@@ -182,13 +203,13 @@ def main():
         run_cmd(COMPOSE_BASE + ["stop", "demo-api"])
 
         # Frontend should still serve static files
-        with urllib.request.urlopen("http://localhost:8080/", timeout=5.0) as resp:
+        with urllib.request.urlopen(f"http://localhost:{TEST_PORT}/", timeout=5.0) as resp:
             assert resp.status == 200
             print("  -> Frontend continues serving static HTML while API is down.")
 
         # Proxied request should fail with 502 Bad Gateway or 504 Gateway Timeout
         try:
-            urllib.request.urlopen("http://localhost:8080/api/message", timeout=10.0)
+            urllib.request.urlopen(f"http://localhost:{TEST_PORT}/api/message", timeout=10.0)
             print("ERROR: Expected request to fail with 502/504 while API is down")
             sys.exit(1)
         except urllib.error.HTTPError as e:
@@ -201,11 +222,11 @@ def main():
         assert wait_for_healthy("demo-api")
 
         # Verify recovery
-        with urllib.request.urlopen("http://localhost:8080/api/message", timeout=5.0) as resp:
+        with urllib.request.urlopen(f"http://localhost:{TEST_PORT}/api/message", timeout=5.0) as resp:
             assert resp.status == 200
             recovered_data = json.loads(resp.read().decode())
             assert recovered_data == {"message": "Hello from Megalith API", "service": "demo/api"}
-            print("  -> Proxied request successfully recovered (HTTP 200):", recovered_data)
+            print(f"  -> Proxied request successfully recovered (HTTP 200):", recovered_data)
 
     finally:
         print("\n[Teardown] Stopping and removing Compose resources...")

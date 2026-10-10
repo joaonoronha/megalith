@@ -287,6 +287,10 @@ jobs:
         run: |
           python3 tooling/verify_postgres.py
 
+      - name: Run Caddy edge ingress verification
+        run: |
+          python3 tooling/verify_ingress.py
+
   required:
     name: "CI / required"
     needs:

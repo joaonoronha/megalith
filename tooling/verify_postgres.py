@@ -12,6 +12,7 @@ import concurrent.futures
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -24,13 +25,32 @@ COMPOSE_FILE = REPO_ROOT / "platform" / "deploy" / "compose.yaml"
 BACKUP_SCRIPT = REPO_ROOT / "platform" / "deploy" / "postgres" / "backup.py"
 RESTORE_SCRIPT = REPO_ROOT / "platform" / "deploy" / "postgres" / "restore.py"
 
+
+def find_available_port(preferred_port: int) -> int:
+    """Check if preferred port is free on 127.0.0.1; if busy, allocate a free loopback port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind(("127.0.0.1", preferred_port))
+            return preferred_port
+        except OSError:
+            pass
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+TEST_PORT = os.environ.get("VERIFY_PORT") or str(find_available_port(18081))
 PROJECT_NAME = "megalith-pg-verify"
 COMPOSE_CMD = ["docker", "compose", "-p", PROJECT_NAME, "-f", str(COMPOSE_FILE)]
 
 
 def run_cmd(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess[str]:
     print(f"--> Running: {' '.join(cmd)}")
-    result = subprocess.run(cmd, cwd=REPO_ROOT, text=True, capture_output=True)
+    env = os.environ.copy()
+    env.setdefault("PORT", TEST_PORT)
+
+    result = subprocess.run(cmd, cwd=REPO_ROOT, env=env, text=True, capture_output=True)
     if check and result.returncode != 0:
         print(f"FAILED (exit code {result.returncode}):\n{result.stderr}\n{result.stdout}", file=sys.stderr)
         sys.exit(result.returncode)
@@ -161,6 +181,56 @@ def test_role_isolation():
     res = compose_exec_psql("postgres", "postgres", "postgres", "SELECT rolsuper FROM pg_roles WHERE rolname = 'role_demo_app';")
     assert res.stdout.strip() == "f", f"Security violation: role_demo_app is superuser! {res.stdout}"
     print("  -> Confirmed: role_demo_app is not a superuser (rolsuper=f).")
+
+    # 7. Verify future migration table privilege durability and least-privilege DML access
+    # Migration role creates a new table simulating future migration
+    res = compose_exec_psql(
+        "postgres", "role_demo_migrate", "db_demo",
+        "CREATE TABLE test_future_migration (id INT PRIMARY KEY, name TEXT);"
+    )
+    assert res.returncode == 0, f"role_demo_migrate failed to create future migration table: {res.stderr}"
+
+    # Application role performs DML operations (INSERT, SELECT, UPDATE, DELETE)
+    res = compose_exec_psql(
+        "postgres", "role_demo_app", "db_demo",
+        "INSERT INTO test_future_migration (id, name) VALUES (1, 'item1');"
+    )
+    assert res.returncode == 0, f"role_demo_app failed DML insert: {res.stderr}"
+
+    res = compose_exec_psql(
+        "postgres", "role_demo_app", "db_demo",
+        "SELECT name FROM test_future_migration WHERE id = 1;"
+    )
+    assert res.stdout.strip() == "item1", f"role_demo_app failed DML select: {res.stdout}"
+
+    res = compose_exec_psql(
+        "postgres", "role_demo_app", "db_demo",
+        "UPDATE test_future_migration SET name = 'item2' WHERE id = 1;"
+    )
+    assert res.returncode == 0, f"role_demo_app failed DML update: {res.stderr}"
+
+    res = compose_exec_psql(
+        "postgres", "role_demo_app", "db_demo",
+        "DELETE FROM test_future_migration WHERE id = 1;"
+    )
+    assert res.returncode == 0, f"role_demo_app failed DML delete: {res.stderr}"
+
+    # Application role is strictly forbidden from dropping the table
+    res = compose_exec_psql(
+        "postgres", "role_demo_app", "db_demo",
+        "DROP TABLE test_future_migration;"
+    )
+    assert res.returncode != 0 and "must be owner" in res.stderr.lower(), (
+        f"Security violation: role_demo_app was able to DROP TABLE! {res.stderr}"
+    )
+
+    # Migration role cleans up the temporary table
+    res = compose_exec_psql(
+        "postgres", "role_demo_migrate", "db_demo",
+        "DROP TABLE test_future_migration;"
+    )
+    assert res.returncode == 0, f"role_demo_migrate failed to drop table: {res.stderr}"
+    print("  -> Confirmed: Objects created by role_demo_migrate automatically grant DML to role_demo_app, and DDL is strictly denied to role_demo_app.")
 
 
 def main():

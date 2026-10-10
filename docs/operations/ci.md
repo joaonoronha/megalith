@@ -69,9 +69,10 @@ Path classification is governed by `tooling/classify_changes.py`, implementing a
 | `tooling/validate.py` | Global validation and all services / container builds |
 | `platform/cli/**` | Platform tests and all services / container builds |
 | `platform/infra/oci/**` | `terraform` formatting, initialization, and validation |
-| `platform/deploy/**` (including `postgres/**`) | `container-build-api`, `container-build-web`, `container-smoke` |
+| `platform/deploy/**` (including `postgres/**`, `caddy/**`) | `container-build-api`, `container-build-web`, `container-smoke` |
 | `tooling/verify_containers.py` | `container-build-api`, `container-build-web`, `container-smoke` |
 | `tooling/verify_postgres.py` | `container-build-api`, `container-build-web`, `container-smoke` |
+| `tooling/verify_ingress.py` | `container-build-api`, `container-build-web`, `container-smoke` |
 | `.github/workflows/**` | Full verification of all services and container builds |
 | Documentation-only (`docs/**`, `*.md`) | Lightweight `platform` validation; expensive service & container builds skipped |
 | Unrecognized / unmatched paths | **Conservative fallback**: Triggers all validation and builds |
@@ -121,7 +122,7 @@ Services are invoked strictly via the Megalith CLI harness (`megalith run`):
 - **Base Image Immutability**: All Dockerfiles preserve strict cryptographic base-image digests (`sha256:...`).
 
 ### Integration Smoke Tests (`container-smoke`)
-When triggered, the `container-smoke` job executes two end-to-end verification suites on the runner:
+When triggered, the `container-smoke` job executes three end-to-end verification suites on the runner:
 1. **Container Network & Reverse Proxy Smoke Test (`tooling/verify_containers.py`)**:
    - Validates Compose syntax, builds local images, and starts the stack.
    - Verifies health probes, non-root container users (UID 10001, UID 101), and port 8000 isolation.
@@ -134,6 +135,14 @@ When triggered, the `container-smoke` job executes two end-to-end verification s
    - Verifies atomic concurrency under parallel increments.
    - Verifies logical backup creation (`pg_dump`) and isolated restore (`pg_restore` into temporary database).
    - Verifies durability across PostgreSQL container restart and stack recreation (`docker compose down` and `docker compose up -d`).
+3. **Caddy Edge Ingress & Routing Test (`tooling/verify_ingress.py`)**:
+   - Validates production and local Caddyfile syntax via `caddy validate`.
+   - Starts dedicated stack on collision-resistant port 18082 with Caddy edge ingress.
+   - Validates frontend routing, client-side SPA routing fallback, direct `/api/*` backend routing, and counter state mutations.
+   - Validates security headers (CSP, nosniff, DENY, Referrer-Policy, Server header suppression) and omission of HSTS in local HTTP mode.
+   - Confirms host port privacy (only Caddy port exposed; backend and database unexposed).
+   - Validates container network segmentation (Caddy on `edge-network` cannot reach `postgres` on `data-network`).
+   - Verifies API failure handling (clean 502 Bad Gateway without HTML SPA leak) and automatic recovery upon restart.
 
 
 ---
@@ -254,3 +263,21 @@ When a new product or service is added (e.g., `apps/fitness/api`):
 4. **Gate Update**: Add `fitness-api` to the `needs` list and validation checks in `CI / required`.
 
 This explicit approach prevents hidden magic, ensuring every service's CI requirements remain visible, auditable, and testable.
+
+---
+
+## 14. Release Packaging & Controlled Deployment Workflows
+
+In addition to PR and push validation (`ci.yaml`), Megalith provides two dedicated deployment workflows:
+
+### Release Packaging (`.github/workflows/release.yaml`)
+- **Trigger**: `workflow_dispatch` with `git_sha`, `environment`, and optional `release_id`.
+- **Preflight Verification**: Automatically queries the GitHub Checks API to verify that the canonical status check `CI / required` has completed with `conclusion: success` for the exact commit SHA before any build begins.
+- **Multi-Architecture Builds**: Builds container images for both `linux/amd64` and `linux/arm64` using Docker Buildx and QEMU.
+- **Digest Pinning**: Emits cryptographic digest-pinned references (`image@sha256:...`) and generates a sealed `release.json` manifest conforming to `tooling/schemas/release.schema.json`.
+- **Artifact Upload**: Publishes `release.json` as a workflow artifact for review and authorization.
+
+### Controlled Deployment (`.github/workflows/deploy.yaml`)
+- **Trigger**: `workflow_dispatch` requiring dual input confirmation (`release_id` and `confirm_release_id` must match).
+- **Schema Validation**: Validates the release manifest against JSON schema and verifies immutable digests.
+- **Authorization Audit**: Seals human operator identity, timestamp, and environment into the deployment audit record.

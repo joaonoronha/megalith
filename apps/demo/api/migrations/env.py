@@ -6,10 +6,13 @@ from sqlalchemy import engine_from_config, pool
 
 from src.db import Base
 
-# Alembic Config object
-config = context.config
+# Alembic Config object (available when invoked via Alembic runner)
+try:
+    config = context.config
+except (NameError, AttributeError):
+    config = None
 
-if config.config_file_name is not None:
+if config is not None and config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Model metadata for autogenerate support
@@ -17,14 +20,18 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    """Retrieves migration database connection URL with migration role credentials."""
-    return os.environ.get(
-        "DATABASE_MIGRATE_URL",
-        os.environ.get(
-            "DATABASE_URL",
-            "postgresql+psycopg://role_demo_migrate:demo_migrate_dev_password@localhost:5432/db_demo",
-        ),
-    )
+    """
+    Retrieves migration database connection URL with migration role credentials.
+    Strictly requires DATABASE_MIGRATE_URL. Implicit fallback to application runtime
+    credentials (DATABASE_URL) is prohibited to prevent running DDL with runtime roles.
+    """
+    migrate_url = os.environ.get("DATABASE_MIGRATE_URL")
+    if not migrate_url:
+        raise RuntimeError(
+            "DATABASE_MIGRATE_URL environment variable is required to execute Alembic migrations. "
+            "Implicit fallback to application runtime credentials (DATABASE_URL) is prohibited."
+        )
+    return migrate_url
 
 
 def run_migrations_offline() -> None:
@@ -62,7 +69,8 @@ def run_migrations_online() -> None:
             context.run_migrations()
 
 
-if context.is_offline_mode():
-    run_migrations_offline()
-else:
-    run_migrations_online()
+if config is not None:
+    if context.is_offline_mode():
+        run_migrations_offline()
+    else:
+        run_migrations_online()

@@ -15,7 +15,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     networks:
-      - demo-network
+      - data-network
     healthcheck:
       test:
         - CMD-SHELL
@@ -38,7 +38,7 @@ services:
     build:
       context: ../../apps/demo/api
       dockerfile: Dockerfile
-    image: megalith-demo-api:local
+    image: ${IMAGE_DEMO_API:-megalith-demo-api:local}
     restart: "no"
     command:
       - alembic
@@ -50,7 +50,7 @@ services:
     environment:
       DATABASE_MIGRATE_URL: ${DATABASE_MIGRATE_URL:-postgresql+psycopg://role_demo_migrate:demo_migrate_dev_password@postgres:5432/db_demo}
     networks:
-      - demo-network
+      - data-network
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -65,7 +65,7 @@ services:
     build:
       context: ../../apps/demo/api
       dockerfile: Dockerfile
-    image: megalith-demo-api:local
+    image: ${IMAGE_DEMO_API:-megalith-demo-api:local}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -74,8 +74,10 @@ services:
         condition: service_completed_successfully
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://role_demo_app:demo_app_dev_password@postgres:5432/db_demo}
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1,172.28.0.0/24}
     networks:
-      - demo-network
+      - edge-network
+      - data-network
     healthcheck:
       test:
         - CMD
@@ -98,7 +100,7 @@ services:
     build:
       context: ../../apps/demo/web
       dockerfile: Dockerfile
-    image: megalith-demo-web:local
+    image: ${IMAGE_DEMO_WEB:-megalith-demo-web:local}
     restart: unless-stopped
     depends_on:
       demo-api:
@@ -106,7 +108,7 @@ services:
     ports:
       - "${PORT:-8080}:8080"
     networks:
-      - demo-network
+      - edge-network
     healthcheck:
       test:
         - CMD
@@ -131,5 +133,11 @@ volumes:
   postgres-data:
 
 networks:
-  demo-network:
+  edge-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/24
+  data-network:
     driver: bridge

@@ -186,3 +186,27 @@ python3 tooling/verify_containers.py
 docker compose -f platform/deploy/compose.yaml down
 ```
 
+### 5. Caddy Edge Ingress Workflow
+To test the production-oriented topology with Caddy edge ingress, host routing, and network isolation:
+
+```bash
+# Start with local ingress overlay (Caddy on port 18082, private web and API)
+docker compose \
+  -f platform/deploy/compose.yaml \
+  -f platform/deploy/compose.local-ingress.yaml \
+  up -d
+
+# Test frontend and direct API routing via Caddy
+curl http://localhost:18082/
+curl -H "Host: demo.example.com" http://localhost:18082/api/message
+curl -H "Host: demo.example.com" -X POST http://localhost:18082/api/counter/increment
+
+# Run automated ingress verification suite
+python3 tooling/verify_ingress.py
+
+# Stop local ingress stack
+docker compose \
+  -f platform/deploy/compose.yaml \
+  -f platform/deploy/compose.local-ingress.yaml \
+  down
+```
