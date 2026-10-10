@@ -1,0 +1,370 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: "Detect Changes"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      platform: ${{ steps.classifier.outputs.platform }}
+      demo_api: ${{ steps.classifier.outputs.demo_api }}
+      demo_web: ${{ steps.classifier.outputs.demo_web }}
+      container_api: ${{ steps.classifier.outputs.container_api }}
+      container_web: ${{ steps.classifier.outputs.container_web }}
+      container_smoke: ${{ steps.classifier.outputs.container_smoke }}
+      docs_only: ${{ steps.classifier.outputs.docs_only }}
+      all_triggered: ${{ steps.classifier.outputs.all_triggered }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+
+      - name: Classify changed files
+        id: classifier
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "Manual workflow dispatch: triggering all jobs conservatively."
+            python3 tooling/classify_changes.py --force-all
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "Pull request targeting $BASE_REF: diffing against origin/$BASE_REF."
+            python3 tooling/classify_changes.py --diff-base "origin/$BASE_REF"
+          elif [ "$EVENT_NAME" = "push" ]; then
+            if [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+              echo "Push event: diffing against previous commit $BEFORE_SHA."
+              python3 tooling/classify_changes.py --diff-base "$BEFORE_SHA"
+            else
+              echo "Push event without valid before SHA: forcing all checks."
+              python3 tooling/classify_changes.py --force-all
+            fi
+          else
+            echo "Unrecognized event $EVENT_NAME: forcing all checks."
+            python3 tooling/classify_changes.py --force-all
+          fi
+
+  platform:
+    name: "Platform Validation"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install platform dependencies and CLI
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install -r platform/cli/requirements.txt
+          pip install -e platform/cli
+
+      - name: Validate repository manifests
+        run: |
+          python3 tooling/validate.py
+
+      - name: Run platform and tooling tests
+        run: |
+          pytest tooling/tests platform/cli/tests
+
+  demo-api:
+    name: "Service / demo-api"
+    needs: [changes]
+    if: needs.changes.outputs.demo_api == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+
+      - name: Install Megalith CLI
+        run: |
+          pip install -e platform/cli
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1edb52594c857e2b5b13128931090f0640537287 # v5.3.0
+        with:
+          enable-cache: true
+
+      - name: Install locked API dependencies
+        run: |
+          cd apps/demo/api
+          uv sync --frozen --extra dev
+          echo "$GITHUB_WORKSPACE/apps/demo/api/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Run demo-api static checks
+        run: |
+          megalith run demo/api check
+
+      - name: Run demo-api test suite
+        run: |
+          megalith run demo/api test
+
+  demo-web:
+    name: "Service / demo-web"
+    needs: [changes]
+    if: needs.changes.outputs.demo_web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+
+      - name: Install Megalith CLI
+        run: |
+          pip install -e platform/cli
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
+        with:
+          version: "12.3.4"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+        with:
+          node-version: "22"
+          cache: "pnpm"
+          cache-dependency-path: "apps/demo/web/pnpm-lock.yaml"
+
+      - name: Install frozen web dependencies
+        run: |
+          cd apps/demo/web
+          pnpm install --frozen-lockfile
+
+      - name: Run demo-web static type checks
+        run: |
+          megalith run demo/web check
+
+      - name: Run demo-web test suite
+        run: |
+          megalith run demo/web test
+
+      - name: Build demo-web production assets
+        run: |
+          megalith run demo/web build
+
+  container-build-api:
+    name: "Container Build / demo-api"
+    needs: [changes]
+    if: needs.changes.outputs.container_api == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Build multi-arch demo-api image (amd64 + arm64)
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --file apps/demo/api/Dockerfile \
+            --cache-from type=gha,scope=demo-api \
+            --cache-to type=gha,mode=max,scope=demo-api \
+            apps/demo/api
+
+  container-build-web:
+    name: "Container Build / demo-web"
+    needs: [changes]
+    if: needs.changes.outputs.container_web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Build multi-arch demo-web image (amd64 + arm64)
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --file apps/demo/web/Dockerfile \
+            --cache-from type=gha,scope=demo-web \
+            --cache-to type=gha,mode=max,scope=demo-web \
+            apps/demo/web
+
+  container-smoke:
+    name: "Container Smoke Test"
+    needs: [changes]
+    if: needs.changes.outputs.container_smoke == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+
+      - name: Run container stack verification
+        run: |
+          python3 tooling/verify_containers.py
+
+  required:
+    name: "CI / required"
+    needs:
+      - changes
+      - platform
+      - demo-api
+      - demo-web
+      - container-build-api
+      - container-build-web
+      - container-smoke
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Evaluate Required Checks Gate
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          PLATFORM_RESULT: ${{ needs.platform.result }}
+          DEMO_API_RESULT: ${{ needs.demo-api.result }}
+          DEMO_WEB_RESULT: ${{ needs.demo-web.result }}
+          CONTAINER_API_RESULT: ${{ needs.container-build-api.result }}
+          CONTAINER_WEB_RESULT: ${{ needs.container-build-web.result }}
+          CONTAINER_SMOKE_RESULT: ${{ needs.container-smoke.result }}
+          TRIGGER_DEMO_API: ${{ needs.changes.outputs.demo_api }}
+          TRIGGER_DEMO_WEB: ${{ needs.changes.outputs.demo_web }}
+          TRIGGER_CONTAINER_API: ${{ needs.changes.outputs.container_api }}
+          TRIGGER_CONTAINER_WEB: ${{ needs.changes.outputs.container_web }}
+          TRIGGER_CONTAINER_SMOKE: ${{ needs.changes.outputs.container_smoke }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+        run: |
+          python3 - << 'EOF'
+          import os
+          import sys
+
+          changes_res = os.environ.get("CHANGES_RESULT", "")
+          platform_res = os.environ.get("PLATFORM_RESULT", "")
+          demo_api_res = os.environ.get("DEMO_API_RESULT", "")
+          demo_web_res = os.environ.get("DEMO_WEB_RESULT", "")
+          container_api_res = os.environ.get("CONTAINER_API_RESULT", "")
+          container_web_res = os.environ.get("CONTAINER_WEB_RESULT", "")
+          container_smoke_res = os.environ.get("CONTAINER_SMOKE_RESULT", "")
+
+          trigger_demo_api = os.environ.get("TRIGGER_DEMO_API", "false") == "true"
+          trigger_demo_web = os.environ.get("TRIGGER_DEMO_WEB", "false") == "true"
+          trigger_container_api = os.environ.get("TRIGGER_CONTAINER_API", "false") == "true"
+          trigger_container_web = os.environ.get("TRIGGER_CONTAINER_WEB", "false") == "true"
+          trigger_container_smoke = os.environ.get("TRIGGER_CONTAINER_SMOKE", "false") == "true"
+          docs_only = os.environ.get("DOCS_ONLY", "false") == "true"
+
+          checks = [
+              ("Change Detection", "Always", changes_res, True),
+              ("Platform Validation", "Always", platform_res, True),
+              ("Service / demo-api", "Selective" if not trigger_demo_api else "Yes", demo_api_res, trigger_demo_api),
+              ("Service / demo-web", "Selective" if not trigger_demo_web else "Yes", demo_web_res, trigger_demo_web),
+              ("Container Build / demo-api", "Selective" if not trigger_container_api else "Yes", container_api_res, trigger_container_api),
+              ("Container Build / demo-web", "Selective" if not trigger_container_web else "Yes", container_web_res, trigger_container_web),
+              ("Container Smoke Test", "Selective" if not trigger_container_smoke else "Yes", container_smoke_res, trigger_container_smoke),
+          ]
+
+          failed_reasons = []
+
+          # 1. Base prerequisites: changes and platform MUST succeed
+          if changes_res != "success":
+              failed_reasons.append(f"Change Detection did not succeed (status: '{changes_res}').")
+          if platform_res != "success":
+              failed_reasons.append(f"Platform Validation did not succeed (status: '{platform_res}').")
+
+          # 2. Check selective jobs
+          for name, trigger_desc, result, should_run in checks[2:]:
+              if should_run:
+                  if result != "success":
+                      failed_reasons.append(f"Required job '{name}' was triggered but resulted in '{result}'.")
+              else:
+                  if result != "skipped":
+                      failed_reasons.append(f"Job '{name}' was not triggered but has unexpected status '{result}'.")
+
+          # Render Markdown summary for $GITHUB_STEP_SUMMARY
+          summary_lines = [
+              "## Megalith CI Execution Summary",
+              "",
+              f"**Documentation Only:** `{'Yes' if docs_only else 'No'}`",
+              "",
+              "| Stage / Job | Triggered | Result | Status |",
+              "| :--- | :--- | :--- | :--- |",
+          ]
+
+          for name, trigger_desc, result, should_run in checks:
+              if should_run:
+                  status_icon = "✅ Passed" if result == "success" else f"❌ Failed ({result})"
+              else:
+                  status_icon = "⚪ Skipped (Intentional)" if result == "skipped" else f"⚠️ Unexpected ({result})"
+              summary_lines.append(f"| {name} | {trigger_desc} | `{result}` | {status_icon} |")
+
+          summary_lines.append("")
+          if failed_reasons:
+              summary_lines.append("### ❌ Validation Gate: FAILED")
+              for r in failed_reasons:
+                  summary_lines.append(f"- {r}")
+          else:
+              summary_lines.append("### ✅ Validation Gate: PASSED")
+              summary_lines.append("All required platform checks and triggered service verifications succeeded.")
+
+          summary_md = "\n".join(summary_lines)
+          print(summary_md)
+
+          summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary_file:
+              with open(summary_file, "a", encoding="utf-8") as f:
+                  f.write(summary_md + "\n")
+
+          if failed_reasons:
+              sys.exit(1)
+          sys.exit(0)
+          EOF
