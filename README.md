@@ -214,15 +214,23 @@ For details, see [AI Instruction Architecture](docs/architecture/ai-instructions
   - Private container bridge network with backend host port isolation.
   - Health checks, non-root user enforcement (UID 10001, UID 101), read-only root filesystems, and dropped capabilities.
   - Automated verification script (`tooling/verify_containers.py`) and documentation (`docs/architecture/containerization.md`).
+- [x] **Continuous Integration & Selective Execution (`.github/workflows/ci.yaml`)**:
+  - Secure, selective GitHub Actions CI pipeline running on pull requests, pushes to `main`, and manual dispatch.
+  - Least-privilege permissions (`contents: read`) and immutable third-party action SHAs.
+  - Deterministic change classification engine (`tooling/classify_changes.py`) triggering only affected services and container builds.
+  - Multi-architecture container image build verification (`linux/amd64`, `linux/arm64`) using Docker Buildx and QEMU.
+  - Automated manifest validation, platform tests, locked backend (`uv`) and frontend (`pnpm`) checks.
+  - Predictable required gate job (`CI / required`) generating Markdown summaries for branch protection.
+  - Operations documentation in [`docs/operations/ci.md`](docs/operations/ci.md) and [`docs/operations/container-verification.md`](docs/operations/container-verification.md).
 
 ---
 
 ## 9. What Is Planned but Not Implemented
 The following components are deferred to subsequent tasks in accordance with scope restrictions:
+- **Continuous Deployment (CD)**: Automated production release and deployment pipelines.
 - **Production Edge Ingress**: No host Caddy reverse proxy or public TLS certificate configuration exists yet.
 - **OCI Infrastructure**: No OCI Terraform or host provisioning recipes exist yet in `platform/infra/oci/`.
 - **Database Provisioning**: No PostgreSQL container or database/role provisioning scripts exist yet.
-- **CI/CD Pipelines**: No GitHub Actions workflows exist yet in `.github/workflows/`.
 - **Shared Libraries**: No code exists yet in `packages/`.
 
 ---
