@@ -11,26 +11,29 @@ Megalith uses a single, maintainable GitHub Actions workflow (`.github/workflows
 ```text
  Stage A: Detect Changes (tooling/classify_changes.py)
    │
-   ├───► Stage B: Platform Validation (Manifests & Tooling tests) ─────┐
-   │                                                                    │
-   ├───► Stage C1: Service / demo-api (uv sync --frozen; ruff & pytest) ┤
-   │                                                                    │
-   ├───► Stage C2: Service / demo-web (pnpm frozen; tsc, vitest, vite) ─┤
-   │                                                                    │
-   ├───► Stage D1: Container Build / demo-api (Buildx amd64 + arm64) ───┤
-   │                                                                    │
-   ├───► Stage D2: Container Build / demo-web (Buildx amd64 + arm64) ───┤
-   │                                                                    │
-   └───► Stage D3: Container Smoke Test (tooling/verify_containers.py) ─┤
-                                                                        ▼
+   ├───► Stage B1: Platform Validation (Manifests & Tooling tests) ─────┐
+   │                                                                     │
+   ├───► Stage B2: Terraform Validation (fmt, init, validate) ──────────┤
+   │                                                                     │
+   ├───► Stage C1: Service / demo-api (uv sync --frozen; ruff & pytest) ─┤
+   │                                                                     │
+   ├───► Stage C2: Service / demo-web (pnpm frozen; tsc, vitest, vite) ──┤
+   │                                                                     │
+   ├───► Stage D1: Container Build / demo-api (Buildx amd64 + arm64) ────┤
+   │                                                                     │
+   ├───► Stage D2: Container Build / demo-web (Buildx amd64 + arm64) ────┤
+   │                                                                     │
+   └───► Stage D3: Container & DB Smoke (verify_containers & verify_pg) ─┤
+                                                                         ▼
                                                    Stage E: CI / required (Gate Job)
 ```
 
 1. **Stage A (`changes`)**: Detects changed paths using a lightweight Python engine (`tooling/classify_changes.py`) and outputs boolean execution flags.
-2. **Stage B (`platform`)**: Validates repository manifests and executes platform/CLI tests on every run.
-3. **Stage C (`demo-api`, `demo-web`)**: Executes language-native checks and tests only when relevant code or shared contracts change.
-4. **Stage D (`container-build-api`, `container-build-web`, `container-smoke`)**: Builds multi-arch container images (`linux/amd64`, `linux/arm64`) using Docker Buildx and executes the sanitized integration smoke test.
-5. **Stage E (`required`)**: Canonical gate job named `CI / required` that enforces branch protection, verifies job outcomes, accepts intentional skips, and rejects unexpected failures or skips.
+2. **Stage B1 (`platform`)**: Validates repository manifests and executes platform/CLI tests on every run.
+3. **Stage B2 (`terraform`)**: Validates OCI Terraform formatting, initialization, and syntax when infrastructure files change.
+4. **Stage C (`demo-api`, `demo-web`)**: Executes language-native checks and tests only when relevant code or shared contracts change.
+5. **Stage D (`container-build-api`, `container-build-web`, `container-smoke`)**: Builds multi-arch container images (`linux/amd64`, `linux/arm64`) using Docker Buildx and executes the sanitized integration smoke tests for container networking and PostgreSQL persistence & recovery.
+6. **Stage E (`required`)**: Canonical gate job named `CI / required` that enforces branch protection, verifies job outcomes, accepts intentional skips, and rejects unexpected failures or skips.
 
 ---
 
@@ -65,8 +68,10 @@ Path classification is governed by `tooling/classify_changes.py`, implementing a
 | `tooling/schemas/**` | Global validation and all services / container builds |
 | `tooling/validate.py` | Global validation and all services / container builds |
 | `platform/cli/**` | Platform tests and all services / container builds |
-| `platform/deploy/**` | `container-build-api`, `container-build-web`, `container-smoke` |
+| `platform/infra/oci/**` | `terraform` formatting, initialization, and validation |
+| `platform/deploy/**` (including `postgres/**`) | `container-build-api`, `container-build-web`, `container-smoke` |
 | `tooling/verify_containers.py` | `container-build-api`, `container-build-web`, `container-smoke` |
+| `tooling/verify_postgres.py` | `container-build-api`, `container-build-web`, `container-smoke` |
 | `.github/workflows/**` | Full verification of all services and container builds |
 | Documentation-only (`docs/**`, `*.md`) | Lightweight `platform` validation; expensive service & container builds skipped |
 | Unrecognized / unmatched paths | **Conservative fallback**: Triggers all validation and builds |
@@ -115,6 +120,22 @@ Services are invoked strictly via the Megalith CLI harness (`megalith run`):
 - **No Embedded Secrets**: Build arguments and environment variables contain zero credentials.
 - **Base Image Immutability**: All Dockerfiles preserve strict cryptographic base-image digests (`sha256:...`).
 
+### Integration Smoke Tests (`container-smoke`)
+When triggered, the `container-smoke` job executes two end-to-end verification suites on the runner:
+1. **Container Network & Reverse Proxy Smoke Test (`tooling/verify_containers.py`)**:
+   - Validates Compose syntax, builds local images, and starts the stack.
+   - Verifies health probes, non-root container users (UID 10001, UID 101), and port 8000 isolation.
+   - Verifies frontend HTTP delivery (port 8080) and API reverse proxying (`/api/message`).
+   - Verifies backend outage handling (504 Gateway Timeout) and automatic recovery upon restart.
+2. **PostgreSQL Persistence & Recovery Test (`tooling/verify_postgres.py`)**:
+   - Validates startup sequencing (`postgres` healthy -> `demo-migrate` successful -> `demo-api` healthy).
+   - Verifies ADR-007 role isolation (application role denied DDL and cross-database access).
+   - Verifies persistent endpoints (`GET /ready`, `GET /api/counter`, `POST /api/counter/increment`).
+   - Verifies atomic concurrency under parallel increments.
+   - Verifies logical backup creation (`pg_dump`) and isolated restore (`pg_restore` into temporary database).
+   - Verifies durability across PostgreSQL container restart and stack recreation (`docker compose down` and `docker compose up -d`).
+
+
 ---
 
 ## 7. ARM64 Verification Policy
@@ -146,6 +167,7 @@ Least-privilege security standards are strictly applied:
    - `astral-sh/setup-uv@1edb52594c857e2b5b13128931090f0640537287` (`v5.3.0`)
    - `docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392` (`v3.6.0`)
    - `docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2` (`v3.10.0`)
+   - `hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd` (`v3.1.2`)
 4. **No Secrets in CI**: No cloud credentials, SSH keys, or registry tokens exist in the workflow.
 
 ---

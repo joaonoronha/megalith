@@ -28,9 +28,11 @@ ENV PYTHONUNBUFFERED=1 \
 RUN groupadd -g 10001 appgroup && \
     useradd -u 10001 -g appgroup -s /bin/false -d /app appuser
 
-# Copy virtual environment and application source
+# Copy virtual environment, application source, and migrations
 COPY --from=builder --chown=appuser:appgroup /app/.venv /app/.venv
 COPY --chown=appuser:appgroup src /app/src
+COPY --chown=appuser:appgroup alembic.ini /app/alembic.ini
+COPY --chown=appuser:appgroup migrations /app/migrations
 
 # Switch to non-root user
 USER appuser

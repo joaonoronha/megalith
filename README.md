@@ -222,6 +222,22 @@ For details, see [AI Instruction Architecture](docs/architecture/ai-instructions
   - Automated manifest validation, platform tests, locked backend (`uv`) and frontend (`pnpm`) checks.
   - Predictable required gate job (`CI / required`) generating Markdown summaries for branch protection.
   - Operations documentation in [`docs/operations/ci.md`](docs/operations/ci.md) and [`docs/operations/container-verification.md`](docs/operations/container-verification.md).
+- [x] **OCI Always Free ARM64 Infrastructure Foundation (`platform/infra/oci/`)**:
+  - Declarative Terraform configuration for OCI Virtual Cloud Network, public subnet, internet gateway, and instance-level Network Security Groups.
+  - Hard-pinned `VM.Standard.A1.Flex` ARM64 compute instance with conservative Always Free sizing (2 OCPUs, 12 GB RAM, 50 GB boot volume) and zero paid fallback shapes.
+  - Strict administrative SSH security requiring explicit administrator CIDR blocks (forbidding `0.0.0.0/0`) and key-based authentication.
+  - Automated cloud-init bootstrap configuring Ubuntu 24.04 LTS ARM64, non-root user (`ubuntu`), UFW firewall, Docker Engine & Compose plugin, and Docker daemon log rotation (max 20MB, 3 files per ADR-010).
+  - Provider dependency lockfile (`.terraform.lock.hcl`), variable examples, non-sensitive outputs, and strict state/secret git exclusions.
+  - Automated safety tests (`tooling/tests/test_terraform_safety.py`), CI validation integration (`.github/workflows/ci.yaml`), architecture reference ([`docs/architecture/infrastructure.md`](docs/architecture/infrastructure.md)), and operational runbook ([`docs/operations/oci-provisioning.md`](docs/operations/oci-provisioning.md)).
+- [x] **PostgreSQL Persistence Foundation & Product Isolation (`platform/deploy/`)**:
+  - Shared PostgreSQL 16 Alpine container pinned to multi-arch digest (`postgres:16-alpine@sha256:7218...`), private to internal Compose network (port 5432 unexposed).
+  - Strict ADR-007 role isolation: separate administrative (`postgres`), schema migration (`role_demo_migrate`), and runtime application (`role_demo_app`) roles with least privilege.
+  - Idempotent cluster initialization script (`01-init-demo-db.sh`) and standalone administrative provisioning utility (`provision.py`).
+  - Production-grade Alembic migrations for `demo/api` executed deterministically via one-shot Compose service `demo-migrate`.
+  - Persistent atomic counter endpoints (`GET /api/counter`, `POST /api/counter/increment`) and database readiness probe (`GET /ready`).
+  - Automated backup (`backup.py` / `pg_dump`) and isolated restore testing (`restore.py` / `pg_restore` into temporary database).
+  - Data durability verified across container restart and Compose stack recreation without volume loss.
+  - End-to-end verification suite (`tooling/verify_postgres.py`), architecture documentation ([`docs/architecture/persistence.md`](docs/architecture/persistence.md)), and operations guide ([`docs/operations/postgres-operations.md`](docs/operations/postgres-operations.md)).
 
 ---
 
@@ -229,9 +245,9 @@ For details, see [AI Instruction Architecture](docs/architecture/ai-instructions
 The following components are deferred to subsequent tasks in accordance with scope restrictions:
 - **Continuous Deployment (CD)**: Automated production release and deployment pipelines.
 - **Production Edge Ingress**: No host Caddy reverse proxy or public TLS certificate configuration exists yet.
-- **OCI Infrastructure**: No OCI Terraform or host provisioning recipes exist yet in `platform/infra/oci/`.
-- **Database Provisioning**: No PostgreSQL container or database/role provisioning scripts exist yet.
+- **Production Database Hosting**: Local persistence verified; no production database has been provisioned on OCI.
 - **Shared Libraries**: No code exists yet in `packages/`.
+- **Actual Cloud Infrastructure Provisioning**: Real OCI resources have not been created; provisioning requires manual execution with authenticated credentials.
 
 ---
 

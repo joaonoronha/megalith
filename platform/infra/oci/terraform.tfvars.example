@@ -1,0 +1,51 @@
+# Example Terraform Variables for Megalith OCI Always Free ARM64 Foundation
+# Copy this file to terraform.tfvars and populate with your tenancy values.
+# NEVER commit terraform.tfvars containing real environment details or keys.
+
+# -----------------------------------------------------------------------------
+# Tenancy and Authentication
+# -----------------------------------------------------------------------------
+# Compartment OCID (can be the root tenancy OCID or a dedicated compartment)
+compartment_ocid = "ocid1.compartment.oc1..aaaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# OCI region (e.g., us-ashburn-1, us-phoenix-1, sa-saopaulo-1, eu-frankfurt-1)
+region = "us-ashburn-1"
+
+# -----------------------------------------------------------------------------
+# Compute Configuration (Always Free Ampere A1 Flex)
+# -----------------------------------------------------------------------------
+instance_name = "megalith-host"
+
+# Ampere A1 OCPUs (Always Free pool: up to 4 total across tenancy)
+ocpus = 2
+
+# Memory in GB (Always Free pool: up to 24 GB total across tenancy)
+memory_in_gbs = 12
+
+# Boot volume size in GB (Always Free pool: up to 200 GB total storage)
+boot_volume_size_in_gbs = 50
+
+# Availability domain index (1, 2, or 3) or set availability_domain_name directly
+availability_domain_number = 1
+# availability_domain_name   = "UwhS:US-ASHBURN-AD-1"
+
+# Operating system image filters (retrieves official Canonical Ubuntu 24.04 ARM64)
+operating_system         = "Canonical Ubuntu"
+operating_system_version = "24.04"
+# image_ocid             = "ocid1.image.oc1..aaaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# -----------------------------------------------------------------------------
+# Security & Access Controls (CRITICAL)
+# -----------------------------------------------------------------------------
+# Trusted administrator CIDR block allowed to access SSH (port 22).
+# MUST NOT be 0.0.0.0/0. Specify your public IP as a /32.
+ssh_admin_cidr = "203.0.113.50/32"
+
+# OpenSSH public key for administrative authentication
+ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyDoNotUseRealKeysInTemplates0000 admin@workstation"
+
+# -----------------------------------------------------------------------------
+# Networking
+# -----------------------------------------------------------------------------
+vcn_cidr    = "10.0.0.0/16"
+subnet_cidr = "10.0.1.0/24"

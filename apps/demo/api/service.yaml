@@ -21,9 +21,16 @@ commands:
     - check
     - src/
     - tests/
+  migrate:
+    - alembic
+    - upgrade
+    - head
 artifact:
   type: docker
   image_name: megalith-demo-api
 deployment:
   deployable: true
   target: oci-vm
+dependencies:
+  external:
+    - postgresql

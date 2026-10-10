@@ -1,10 +1,79 @@
 services:
+  postgres:
+    image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev_password}
+      POSTGRES_DB: postgres
+      DEMO_DB_NAME: ${DEMO_DB_NAME:-db_demo}
+      DEMO_DB_MIGRATE_USER: ${DEMO_DB_MIGRATE_USER:-role_demo_migrate}
+      DEMO_DB_MIGRATE_PASSWORD: ${DEMO_DB_MIGRATE_PASSWORD:-demo_migrate_dev_password}
+      DEMO_DB_APP_USER: ${DEMO_DB_APP_USER:-role_demo_app}
+      DEMO_DB_APP_PASSWORD: ${DEMO_DB_APP_PASSWORD:-demo_app_dev_password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - demo-network
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U postgres -d postgres
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+
+  demo-migrate:
+    build:
+      context: ../../apps/demo/api
+      dockerfile: Dockerfile
+    image: megalith-demo-api:local
+    restart: "no"
+    command:
+      - alembic
+      - upgrade
+      - head
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_MIGRATE_URL: ${DATABASE_MIGRATE_URL:-postgresql+psycopg://role_demo_migrate:demo_migrate_dev_password@postgres:5432/db_demo}
+    networks:
+      - demo-network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      disable: true
+
   demo-api:
     build:
       context: ../../apps/demo/api
       dockerfile: Dockerfile
     image: megalith-demo-api:local
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      demo-migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://role_demo_app:demo_app_dev_password@postgres:5432/db_demo}
     networks:
       - demo-network
     healthcheck:
@@ -12,7 +81,7 @@ services:
         - CMD
         - python3
         - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready').read()"
       interval: 10s
       timeout: 3s
       retries: 3
@@ -57,6 +126,9 @@ services:
       - /tmp
       - /var/cache/nginx
       - /var/run
+
+volumes:
+  postgres-data:
 
 networks:
   demo-network:

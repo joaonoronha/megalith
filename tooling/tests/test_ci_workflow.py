@@ -83,6 +83,7 @@ def test_required_gate_architecture(workflow_data):
     expected_jobs = {
         "changes",
         "platform",
+        "terraform",
         "demo-api",
         "demo-web",
         "container-build-api",
