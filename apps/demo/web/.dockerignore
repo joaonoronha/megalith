@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.pnpm-store/
+*.log
+.git/
+.gitignore
+README.md
+AGENTS.md
+.env*
+Dockerfile

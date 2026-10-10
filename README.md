@@ -131,7 +131,7 @@ megalith --help
 - **Service details**:
   ```bash
   megalith info <product>/<service>
-  # Example: megalith info fitness/api
+  # Example: megalith info demo/api
   ```
   Displays validated service configuration (runtime, working directory, lifecycle commands, dependencies, build artifact, deployment eligibility).
 - **Validate repository manifests**:
@@ -143,8 +143,8 @@ megalith --help
   ```bash
   megalith run <product>/<service> <command>
   # Examples:
-  megalith run fitness/api test
-  megalith run fitness/web build
+  megalith run demo/api test
+  megalith run demo/web build
   ```
   Executes the declared command within the service's working directory, streaming output live and propagating exit codes.
 
@@ -204,14 +204,23 @@ For details, see [AI Instruction Architecture](docs/architecture/ai-instructions
 - [x] **Platform CLI (`megalith`)** under `platform/cli/` supporting `list`, `info`, `validate`, and `run`.
 - [x] Comprehensive CLI test suite in `platform/cli/tests/test_cli.py` (24 passing automated tests).
 - [x] CLI architecture documentation in `docs/architecture/cli.md`.
+- [x] **First Polyglot Product (`apps/demo`)**:
+  - `demo/web`: TypeScript / React 19 / Vite frontend with local proxy, error resilience, and Vitest suite.
+  - `demo/api`: Python / FastAPI backend with health and message endpoints, Pydantic models, and pytest suite.
+  - Manifest contracts, product/service AI instructions (`AGENTS.md`), and end-to-end integration verification.
+- [x] **Containerization & Local Compose (`platform/deploy/compose.yaml`)**:
+  - Multi-stage, non-root Dockerfiles with pinned multi-arch digests for `demo/api` (Python 3.12 / uv) and `demo/web` (Node 22 / pnpm / Nginx unprivileged).
+  - Production reverse proxy configuration mapping `/api/*` to private backend service `demo-api:8000`.
+  - Private container bridge network with backend host port isolation.
+  - Health checks, non-root user enforcement (UID 10001, UID 101), read-only root filesystems, and dropped capabilities.
+  - Automated verification script (`tooling/verify_containers.py`) and documentation (`docs/architecture/containerization.md`).
 
 ---
 
 ## 9. What Is Planned but Not Implemented
 The following components are deferred to subsequent tasks in accordance with scope restrictions:
-- **Applications & Products**: No demo or production applications exist yet in `apps/` (Task 003).
-- **Deployment & Compose**: No Dockerfiles, Compose files, or Caddy configuration exist yet in `platform/deploy/`.
-- **OCI Infrastructure**: No OCI Terraform or provisioning scripts exist yet in `platform/infra/oci/`.
+- **Production Edge Ingress**: No host Caddy reverse proxy or public TLS certificate configuration exists yet.
+- **OCI Infrastructure**: No OCI Terraform or host provisioning recipes exist yet in `platform/infra/oci/`.
 - **Database Provisioning**: No PostgreSQL container or database/role provisioning scripts exist yet.
 - **CI/CD Pipelines**: No GitHub Actions workflows exist yet in `.github/workflows/`.
 - **Shared Libraries**: No code exists yet in `packages/`.

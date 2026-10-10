@@ -1,0 +1,63 @@
+services:
+  demo-api:
+    build:
+      context: ../../apps/demo/api
+      dockerfile: Dockerfile
+    image: megalith-demo-api:local
+    restart: unless-stopped
+    networks:
+      - demo-network
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  demo-web:
+    build:
+      context: ../../apps/demo/web
+      dockerfile: Dockerfile
+    image: megalith-demo-web:local
+    restart: unless-stopped
+    depends_on:
+      demo-api:
+        condition: service_healthy
+    ports:
+      - "${PORT:-8080}:8080"
+    networks:
+      - demo-network
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -qO-
+        - "http://127.0.0.1:8080/"
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+
+networks:
+  demo-network:
+    driver: bridge

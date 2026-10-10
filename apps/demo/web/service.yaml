@@ -1,0 +1,27 @@
+id: web
+product: demo
+type: web
+runtime:
+  language: typescript
+  version: "5.x"
+  framework: React
+path: apps/demo/web
+commands:
+  dev:
+    - pnpm
+    - dev
+  test:
+    - pnpm
+    - test
+  build:
+    - pnpm
+    - build
+  check:
+    - pnpm
+    - check
+artifact:
+  type: docker
+  image_name: megalith-demo-web
+deployment:
+  deployable: true
+  target: oci-vm
