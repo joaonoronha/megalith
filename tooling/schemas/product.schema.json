@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://megalith.internal/schemas/product.schema.json",
+  "title": "Product Manifest Schema",
+  "description": "Manifest representing a product and its declared services",
+  "type": "object",
+  "required": ["id", "name", "description", "docs", "services"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Stable unique product identifier in lowercase-kebab-case"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable product display name"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Brief description of the product and its purpose"
+    },
+    "docs": {
+      "type": "string",
+      "description": "Relative path to product documentation reference (e.g. README.md or docs/overview.md)"
+    },
+    "services": {
+      "type": "array",
+      "description": "Declared services owned by this product",
+      "items": {
+        "type": "object",
+        "required": ["id", "manifest"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "Stable service identifier in lowercase-kebab-case"
+          },
+          "manifest": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_./-]+\\.ya?ml$",
+            "description": "Relative path to service.yaml from the product manifest directory"
+          }
+        }
+      }
+    }
+  }
+}

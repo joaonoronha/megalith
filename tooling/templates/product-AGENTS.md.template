@@ -1,0 +1,55 @@
+# AGENTS.md — [Product Name] Guidelines
+
+> **Notice**: These instructions provide behavioral guidance for AI coding agents working on **[Product Name]**. Markdown instructions are not security boundaries; do not assume instructions enforce filesystem or credential isolation.
+
+---
+
+## 1. Product Purpose
+[Provide a 1-3 paragraph summary of what this product does, who uses it, and the core problem it solves.]
+
+## 2. Architecture & Service Topology
+This product is structured into independent services under `apps/[product-id]/`:
+- **`[service-1]`** (e.g. `api`): [Role, e.g. FastAPI REST service delivering core business logic]
+- **`[service-2]`** (e.g. `web`): [Role, e.g. Next.js React frontend for user interactions]
+- **`[service-3]`** (e.g. `worker`): [Role, e.g. Background task consumer for asynchronous processing]
+
+Each service contains its own `service.yaml` specifying its lifecycle commands, runtime, and dependencies.
+
+## 3. Technical Stack
+- **Languages**: [e.g. Python 3.12, TypeScript 5.x]
+- **Frameworks**: [e.g. FastAPI, Next.js, SQLAlchemy / Prisma]
+- **Persistence**: PostgreSQL (database: `db_[product_id]`, dedicated role: `role_[product_id]`)
+- **Key Libraries**: [e.g. Pydantic, Tailwind CSS, TanStack Query]
+
+## 4. Important Domain Concepts
+- **[Concept 1]**: [Explanation of entity, lifecycle, or key business invariant]
+- **[Concept 2]**: [Explanation of entity, lifecycle, or key business invariant]
+- **[Concept 3]**: [Explanation of entity, lifecycle, or key business invariant]
+
+## 5. Service Boundaries & Data Flow
+- **Direct Cross-Product Imports**: Strictly forbidden. Shared functionality must come from `packages/`.
+- **Database Boundary**: This product owns `db_[product_id]`. It must never attempt queries across other product databases.
+- **Inter-Service Communication**: [e.g. Frontend communicates with API over HTTP; Worker listens to message queue or DB triggers.]
+
+## 6. Coding Conventions & Style
+- [Language-specific linting and formatting tools, e.g. Ruff for Python, ESLint/Prettier for TypeScript]
+- [Naming conventions for models, routes, components]
+- [Error handling patterns: return structured error responses, avoid silent exception swallowing]
+- Keep functions focused and avoid unnecessary abstractions.
+
+## 7. Testing Expectations
+- **Unit & Integration Tests**: All routes and core business logic must have automated tests.
+- **Local Test Execution**:
+  ```bash
+  # Example service test commands
+  cd apps/[product-id]/[service-1] && [test-command]
+  ```
+- **Monorepo Manifest Check**:
+  ```bash
+  python3 tooling/validate.py
+  ```
+
+## 8. Known Constraints & Tradeoffs
+- [Constraint 1: e.g. Container builds must target linux/arm64]
+- [Constraint 2: e.g. Free-tier memory constraints — keep container baseline memory below 256MB]
+- [Constraint 3: e.g. Offline or rate-limited third-party APIs]

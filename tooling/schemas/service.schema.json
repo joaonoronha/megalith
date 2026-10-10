@@ -1,0 +1,160 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://megalith.internal/schemas/service.schema.json",
+  "title": "Service Manifest Schema",
+  "description": "Manifest representing an independently executable or deployable service",
+  "type": "object",
+  "required": [
+    "id",
+    "product",
+    "type",
+    "runtime",
+    "path",
+    "commands",
+    "artifact",
+    "deployment"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Stable service identifier in lowercase-kebab-case (e.g., api, web, worker)"
+    },
+    "product": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Parent product identifier matching the owning product"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["web", "api", "worker", "mobile", "cli", "library", "other"],
+      "description": "Service architectural role"
+    },
+    "runtime": {
+      "type": "object",
+      "required": ["language"],
+      "additionalProperties": false,
+      "properties": {
+        "language": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]+$",
+          "description": "Primary programming language (e.g. typescript, python, go, swift, kotlin)"
+        },
+        "version": {
+          "type": "string",
+          "description": "Language runtime or toolchain version (e.g. 3.12, 20.x, 1.22)"
+        },
+        "framework": {
+          "type": "string",
+          "description": "Primary application framework (e.g. FastAPI, Next.js, Gin, Expo)"
+        }
+      }
+    },
+    "path": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_./-]+$",
+      "description": "Working directory of the service relative to repository root"
+    },
+    "commands": {
+      "type": "object",
+      "description": "Supported lifecycle commands for local development and build pipelines (string or argument array)",
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "string" },
+          { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+        ]
+      },
+      "properties": {
+        "dev": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+          ],
+          "description": "Local development server command"
+        },
+        "build": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+          ],
+          "description": "Build command"
+        },
+        "test": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+          ],
+          "description": "Test command"
+        },
+        "lint": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+          ],
+          "description": "Linting and static analysis command"
+        },
+        "typecheck": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+          ],
+          "description": "Type check command"
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["docker", "binary", "bundle", "static", "package", "none"],
+          "description": "Build artifact format"
+        },
+        "image_name": {
+          "type": "string",
+          "description": "Container image name if artifact type is docker"
+        }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "required": ["deployable", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "deployable": {
+          "type": "boolean",
+          "description": "Whether this service is eligible for standalone deployment"
+        },
+        "target": {
+          "type": "string",
+          "enum": ["oci-vm", "static", "mobile-store", "none"],
+          "description": "Target deployment environment"
+        }
+      }
+    },
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "services": {
+          "type": "array",
+          "description": "List of internal service dependencies formatted as qualified IDs (<product>/<service>)",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*/[a-z0-9]+(-[a-z0-9]+)*$"
+          }
+        },
+        "external": {
+          "type": "array",
+          "description": "External platform or third-party dependencies (e.g. postgresql, caddy, redis)",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
