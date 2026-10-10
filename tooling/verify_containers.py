@@ -17,6 +17,7 @@ Validates:
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import time
@@ -26,6 +27,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 COMPOSE_FILE = REPO_ROOT / "platform" / "deploy" / "compose.yaml"
+
+COMPOSE_PROJECT = "megalith-verify"
+COMPOSE_BASE = ["docker", "compose", "-p", COMPOSE_PROJECT, "-f", str(COMPOSE_FILE)]
 
 
 def run_cmd(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -37,12 +41,43 @@ def run_cmd(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess[s
     return result
 
 
+def check_preflight_environment() -> None:
+    """
+    Verifies that the runtime environment meets container verification requirements
+    without performing privileged host or firewall mutations.
+    """
+    print("[Preflight] Checking Docker availability and environment...")
+    if not shutil.which("docker"):
+        print("ERROR: 'docker' CLI not found on PATH. Docker is required for container verification.")
+        sys.exit(1)
+
+    daemon_res = subprocess.run(
+        ["docker", "info"],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if daemon_res.returncode != 0:
+        print(
+            "ERROR: Docker daemon is not running or the current user cannot access the Docker socket.\n"
+            f"Details: {daemon_res.stderr.strip()}"
+        )
+        sys.exit(1)
+
+    print("  -> Docker daemon is reachable.")
+    print("  -> Host firewall policy: Unmodified (privileged host changes disabled).")
+    print(
+        "  -> Note: Container integration requires bridge forwarding. In nested DinD environments\n"
+        "     where host firewall policies drop bridge traffic, consult docs/operations/container-verification.md."
+    )
+
+
 def wait_for_healthy(service_name: str, timeout: float = 30.0) -> bool:
     start = time.time()
     print(f"Waiting for {service_name} to reach healthy status...")
     while time.time() - start < timeout:
         res = run_cmd(
-            ["docker", "compose", "-f", str(COMPOSE_FILE), "ps", service_name, "--format", "json"],
+            COMPOSE_BASE + ["ps", service_name, "--format", "json"],
             check=False,
         )
         if res.returncode == 0 and res.stdout.strip():
@@ -66,25 +101,21 @@ def main():
     print(" Megalith Container Stack Automated Verification")
     print("============================================================")
 
-    # 1. Ensure bridge forwarding is enabled (handling Docker-in-Docker / Codespaces legacy iptables)
-    subprocess.run(
-        ["sudo", "iptables-legacy", "-I", "FORWARD", "1", "-i", "br+", "-o", "br+", "-j", "ACCEPT"],
-        check=False,
-        capture_output=True,
-    )
+    # 1. Non-privileged preflight diagnostic
+    check_preflight_environment()
 
     try:
         # 2. Config validation
         print("\n[1/7] Validating Compose configuration syntax...")
-        run_cmd(["docker", "compose", "-f", str(COMPOSE_FILE), "config"])
+        run_cmd(COMPOSE_BASE + ["config"])
 
         # 3. Build images
         print("\n[2/7] Building container images...")
-        run_cmd(["docker", "compose", "-f", str(COMPOSE_FILE), "build"])
+        run_cmd(COMPOSE_BASE + ["build"])
 
         # 4. Start stack
         print("\n[3/7] Starting Compose stack...")
-        run_cmd(["docker", "compose", "-f", str(COMPOSE_FILE), "up", "-d"])
+        run_cmd(COMPOSE_BASE + ["up", "-d"])
 
         # 5. Check health
         if not wait_for_healthy("demo-api") or not wait_for_healthy("demo-web"):
@@ -94,10 +125,10 @@ def main():
         # 6. Verify non-root users
         print("\n[4/7] Verifying non-root runtime users...")
         api_user = run_cmd(
-            ["docker", "compose", "-f", str(COMPOSE_FILE), "exec", "demo-api", "id", "-u"]
+            COMPOSE_BASE + ["exec", "demo-api", "id", "-u"]
         ).stdout.strip()
         web_user = run_cmd(
-            ["docker", "compose", "-f", str(COMPOSE_FILE), "exec", "demo-web", "id", "-u"]
+            COMPOSE_BASE + ["exec", "demo-web", "id", "-u"]
         ).stdout.strip()
         print(f"  -> demo-api UID: {api_user} (expected non-root 10001)")
         print(f"  -> demo-web UID: {web_user} (expected non-root 101)")
@@ -123,16 +154,32 @@ def main():
             print("  -> GET http://localhost:8080/ returned frontend HTML (HTTP 200)")
 
         # Proxied backend message
-        with urllib.request.urlopen("http://localhost:8080/api/message", timeout=5.0) as resp:
-            assert resp.status == 200
-            data = json.loads(resp.read().decode())
-            assert data == {"message": "Hello from Megalith API", "service": "demo/api"}
-            print("  -> GET http://localhost:8080/api/message returned expected JSON payload:", data)
+        try:
+            with urllib.request.urlopen("http://localhost:8080/api/message", timeout=5.0) as resp:
+                assert resp.status == 200
+                data = json.loads(resp.read().decode())
+                assert data == {"message": "Hello from Megalith API", "service": "demo/api"}
+                print("  -> GET http://localhost:8080/api/message returned expected JSON payload:", data)
+        except urllib.error.HTTPError as e:
+            if e.code in (502, 504):
+                print(
+                    f"\nERROR: Inter-container communication failed with HTTP {e.code} ({e.reason}).\n"
+                    "This environment cannot support container-to-container bridge forwarding.\n"
+                    "In nested container / DinD environments (such as Codespaces), host firewall rules\n"
+                    "may drop bridge traffic. Consult docs/operations/container-verification.md\n"
+                    "for manual administrative remediation."
+                )
+            else:
+                print(f"\nERROR: Unexpected HTTP error from proxied endpoint: {e}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"\nERROR: Failed to contact proxied backend endpoint: {e}")
+            sys.exit(1)
 
         # 9. Verify outage resilience and recovery
         print("\n[7/7] Verifying backend outage resilience and recovery...")
         print("  -> Stopping demo-api...")
-        run_cmd(["docker", "compose", "-f", str(COMPOSE_FILE), "stop", "demo-api"])
+        run_cmd(COMPOSE_BASE + ["stop", "demo-api"])
 
         # Frontend should still serve static files
         with urllib.request.urlopen("http://localhost:8080/", timeout=5.0) as resp:
@@ -150,7 +197,7 @@ def main():
 
         # Restart backend
         print("  -> Restarting demo-api...")
-        run_cmd(["docker", "compose", "-f", str(COMPOSE_FILE), "start", "demo-api"])
+        run_cmd(COMPOSE_BASE + ["start", "demo-api"])
         assert wait_for_healthy("demo-api")
 
         # Verify recovery
@@ -162,7 +209,7 @@ def main():
 
     finally:
         print("\n[Teardown] Stopping and removing Compose resources...")
-        run_cmd(["docker", "compose", "-f", str(COMPOSE_FILE), "down"])
+        run_cmd(COMPOSE_BASE + ["down", "-v"], check=False)
         print("Stack teardown complete.")
 
     print("\n============================================================")
