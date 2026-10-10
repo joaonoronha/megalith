@@ -63,6 +63,7 @@ def test_demo_product_manifest_changes():
 def test_global_infrastructure_triggers_all(shared_file: str):
     res = classify_files([shared_file])
     assert res.platform is True
+    assert res.terraform is True
     assert res.demo_api is True
     assert res.demo_web is True
     assert res.container_api is True
@@ -114,9 +115,39 @@ def test_mixed_docs_and_code():
     assert res.docs_only is False
 
 
+def test_terraform_only_changes():
+    res = classify_files([
+        "platform/infra/oci/versions.tf",
+        "platform/infra/oci/network.tf",
+        "platform/infra/oci/compute.tf",
+    ])
+    assert res.platform is True
+    assert res.terraform is True
+    assert res.demo_api is False
+    assert res.demo_web is False
+    assert res.container_api is False
+    assert res.container_web is False
+    assert res.container_smoke is False
+    assert res.docs_only is False
+    assert res.all_triggered is False
+
+
+def test_terraform_docs_only_changes():
+    res = classify_files(["platform/infra/oci/README.md"])
+    assert res.platform is True
+    assert res.docs_only is True
+    assert res.terraform is False
+    assert res.demo_api is False
+    assert res.demo_web is False
+    assert res.container_api is False
+    assert res.container_web is False
+    assert res.container_smoke is False
+
+
 def test_unmatched_file_triggers_conservative_fallback():
     res = classify_files(["packages/unknown/file.txt"])
     assert res.platform is True
+    assert res.terraform is True
     assert res.all_triggered is True
     assert res.demo_api is True
     assert res.demo_web is True
@@ -129,6 +160,7 @@ def test_unmatched_file_triggers_conservative_fallback():
 def test_force_all_triggers_everything():
     res = classify_files([], force_all=True)
     assert res.platform is True
+    assert res.terraform is True
     assert res.all_triggered is True
     assert res.demo_api is True
     assert res.demo_web is True
@@ -145,9 +177,26 @@ def test_github_output_writing(tmp_path: Path):
 
     content = output_file.read_text(encoding="utf-8")
     assert "platform=true\n" in content
+    assert "terraform=false\n" in content
     assert "demo_api=true\n" in content
     assert "demo_web=false\n" in content
     assert "container_api=true\n" in content
     assert "container_web=false\n" in content
     assert "container_smoke=true\n" in content
     assert "docs_only=false\n" in content
+
+
+def test_postgres_changes_trigger_containers():
+    res = classify_files([
+        "platform/deploy/postgres/init/01-init-demo-db.sh",
+        "platform/deploy/postgres/provision.py",
+        "tooling/verify_postgres.py",
+    ])
+    assert res.platform is True
+    assert res.container_smoke is True
+    assert res.container_api is True
+    assert res.container_web is True
+    assert res.demo_api is False
+    assert res.demo_web is False
+    assert res.terraform is False
+    assert res.docs_only is False

@@ -68,3 +68,18 @@ out/
 tmp/
 temp/
 scratch/
+
+# Database dumps & backups
+*.dump
+backups/
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfplan
+*.tfvars
+*.tfvars.json
+!terraform.tfvars.example

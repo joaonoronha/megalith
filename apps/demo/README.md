@@ -65,17 +65,39 @@ apps/demo/
 
 ### API Contract
 
-- **`GET /health`**:
+- **`GET /health`** (Liveness check):
   ```json
   {
     "status": "ok",
     "service": "demo/api"
   }
   ```
+- **`GET /ready`** (Readiness check - checks PostgreSQL connectivity):
+  ```json
+  {
+    "status": "ready",
+    "service": "demo/api",
+    "database": "connected"
+  }
+  ```
 - **`GET /api/message`**:
   ```json
   {
     "message": "Hello from Megalith API",
+    "service": "demo/api"
+  }
+  ```
+- **`GET /api/counter`** (Persistent counter state):
+  ```json
+  {
+    "value": 0,
+    "service": "demo/api"
+  }
+  ```
+- **`POST /api/counter/increment`** (Atomic increment with PostgreSQL transaction):
+  ```json
+  {
+    "value": 1,
     "service": "demo/api"
   }
   ```

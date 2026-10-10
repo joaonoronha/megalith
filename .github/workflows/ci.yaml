@@ -23,6 +23,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       platform: ${{ steps.classifier.outputs.platform }}
+      terraform: ${{ steps.classifier.outputs.terraform }}
       demo_api: ${{ steps.classifier.outputs.demo_api }}
       demo_web: ${{ steps.classifier.outputs.demo_web }}
       container_api: ${{ steps.classifier.outputs.container_api }}
@@ -94,6 +95,34 @@ jobs:
       - name: Run platform and tooling tests
         run: |
           pytest tooling/tests platform/cli/tests
+
+  terraform:
+    name: "Terraform Validation"
+    needs: [changes]
+    if: needs.changes.outputs.terraform == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.10.5"
+          terraform_wrapper: false
+
+      - name: Check Terraform formatting
+        run: |
+          terraform -chdir=platform/infra/oci fmt -check -recursive
+
+      - name: Initialize Terraform (no backend, no credentials)
+        run: |
+          terraform -chdir=platform/infra/oci init -backend=false
+
+      - name: Validate Terraform configuration
+        run: |
+          terraform -chdir=platform/infra/oci validate
 
   demo-api:
     name: "Service / demo-api"
@@ -254,11 +283,16 @@ jobs:
         run: |
           python3 tooling/verify_containers.py
 
+      - name: Run PostgreSQL persistence and recovery verification
+        run: |
+          python3 tooling/verify_postgres.py
+
   required:
     name: "CI / required"
     needs:
       - changes
       - platform
+      - terraform
       - demo-api
       - demo-web
       - container-build-api
@@ -272,11 +306,13 @@ jobs:
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           PLATFORM_RESULT: ${{ needs.platform.result }}
+          TERRAFORM_RESULT: ${{ needs.terraform.result }}
           DEMO_API_RESULT: ${{ needs.demo-api.result }}
           DEMO_WEB_RESULT: ${{ needs.demo-web.result }}
           CONTAINER_API_RESULT: ${{ needs.container-build-api.result }}
           CONTAINER_WEB_RESULT: ${{ needs.container-build-web.result }}
           CONTAINER_SMOKE_RESULT: ${{ needs.container-smoke.result }}
+          TRIGGER_TERRAFORM: ${{ needs.changes.outputs.terraform }}
           TRIGGER_DEMO_API: ${{ needs.changes.outputs.demo_api }}
           TRIGGER_DEMO_WEB: ${{ needs.changes.outputs.demo_web }}
           TRIGGER_CONTAINER_API: ${{ needs.changes.outputs.container_api }}
@@ -290,12 +326,14 @@ jobs:
 
           changes_res = os.environ.get("CHANGES_RESULT", "")
           platform_res = os.environ.get("PLATFORM_RESULT", "")
+          terraform_res = os.environ.get("TERRAFORM_RESULT", "")
           demo_api_res = os.environ.get("DEMO_API_RESULT", "")
           demo_web_res = os.environ.get("DEMO_WEB_RESULT", "")
           container_api_res = os.environ.get("CONTAINER_API_RESULT", "")
           container_web_res = os.environ.get("CONTAINER_WEB_RESULT", "")
           container_smoke_res = os.environ.get("CONTAINER_SMOKE_RESULT", "")
 
+          trigger_terraform = os.environ.get("TRIGGER_TERRAFORM", "false") == "true"
           trigger_demo_api = os.environ.get("TRIGGER_DEMO_API", "false") == "true"
           trigger_demo_web = os.environ.get("TRIGGER_DEMO_WEB", "false") == "true"
           trigger_container_api = os.environ.get("TRIGGER_CONTAINER_API", "false") == "true"
@@ -306,6 +344,7 @@ jobs:
           checks = [
               ("Change Detection", "Always", changes_res, True),
               ("Platform Validation", "Always", platform_res, True),
+              ("Terraform Validation", "Selective" if not trigger_terraform else "Yes", terraform_res, trigger_terraform),
               ("Service / demo-api", "Selective" if not trigger_demo_api else "Yes", demo_api_res, trigger_demo_api),
               ("Service / demo-web", "Selective" if not trigger_demo_web else "Yes", demo_web_res, trigger_demo_web),
               ("Container Build / demo-api", "Selective" if not trigger_container_api else "Yes", container_api_res, trigger_container_api),

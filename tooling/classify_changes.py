@@ -9,6 +9,7 @@ Rules:
 - apps/demo/api/**         -> demo_api, container_api, container_smoke
 - apps/demo/web/**         -> demo_web, container_web, container_smoke
 - apps/demo/product.yaml   -> demo_api, demo_web, container_api, container_web, container_smoke
+- platform/infra/oci/**    -> terraform
 - projects.yaml            -> all services & container builds
 - tooling/schemas/**       -> all services & container builds
 - tooling/validate.py      -> all services & container builds
@@ -36,6 +37,7 @@ from typing import Iterable, List, Sequence
 @dataclass
 class ClassificationResult:
     platform: bool = True
+    terraform: bool = False
     demo_api: bool = False
     demo_web: bool = False
     container_api: bool = False
@@ -71,7 +73,12 @@ GLOBAL_INFRA_PATTERNS = [
 CONTAINER_INFRA_PATTERNS = [
     "platform/deploy/**",
     "tooling/verify_containers.py",
+    "tooling/verify_postgres.py",
     "docs/operations/container-verification.md",
+]
+
+TERRAFORM_INFRA_PATTERNS = [
+    "platform/infra/oci/**",
 ]
 
 DEMO_PRODUCT_MANIFEST = "apps/demo/product.yaml"
@@ -98,6 +105,7 @@ def classify_files(files: Sequence[str], force_all: bool = False) -> Classificat
         # Default conservative behavior
         return ClassificationResult(
             platform=True,
+            terraform=True,
             demo_api=True,
             demo_web=True,
             container_api=True,
@@ -112,6 +120,7 @@ def classify_files(files: Sequence[str], force_all: bool = False) -> Classificat
     if all(is_doc_file(f) for f in cleaned):
         return ClassificationResult(
             platform=True,
+            terraform=False,
             demo_api=False,
             demo_web=False,
             container_api=False,
@@ -129,6 +138,7 @@ def classify_files(files: Sequence[str], force_all: bool = False) -> Classificat
     trigger_api = False
     trigger_web = False
     trigger_container_infra = False
+    trigger_terraform = False
     unmatched_files: List[str] = []
 
     for f in code_files:
@@ -142,6 +152,9 @@ def classify_files(files: Sequence[str], force_all: bool = False) -> Classificat
             matched = True
         if _matches_any(f, CONTAINER_INFRA_PATTERNS):
             trigger_container_infra = True
+            matched = True
+        if _matches_any(f, TERRAFORM_INFRA_PATTERNS):
+            trigger_terraform = True
             matched = True
         if _matches_any(f, DEMO_API_PATTERNS):
             trigger_api = True
@@ -157,6 +170,7 @@ def classify_files(files: Sequence[str], force_all: bool = False) -> Classificat
     if trigger_global or unmatched_files:
         return ClassificationResult(
             platform=True,
+            terraform=True,
             demo_api=True,
             demo_web=True,
             container_api=True,
@@ -176,6 +190,7 @@ def classify_files(files: Sequence[str], force_all: bool = False) -> Classificat
 
     return ClassificationResult(
         platform=True,
+        terraform=trigger_terraform,
         demo_api=api_active,
         demo_web=web_active,
         container_api=container_api_active,
@@ -221,6 +236,7 @@ def write_github_outputs(result: ClassificationResult, output_path: str) -> None
     """Appends classification outputs to GITHUB_OUTPUT environment file."""
     lines = [
         f"platform={'true' if result.platform else 'false'}\n",
+        f"terraform={'true' if result.terraform else 'false'}\n",
         f"demo_api={'true' if result.demo_api else 'false'}\n",
         f"demo_web={'true' if result.demo_web else 'false'}\n",
         f"container_api={'true' if result.container_api else 'false'}\n",
