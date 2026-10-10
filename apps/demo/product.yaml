@@ -1,0 +1,9 @@
+id: demo
+name: Megalith Demo
+description: Polyglot demonstration product verifying independent frontend and backend service communication.
+docs: README.md
+services:
+  - id: web
+    manifest: web/service.yaml
+  - id: api
+    manifest: api/service.yaml

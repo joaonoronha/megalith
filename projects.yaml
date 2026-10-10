@@ -11,4 +11,7 @@
 # product.yaml and service.yaml manifests. See docs/architecture/manifests.md.
 
 version: 1
-products: []
+products:
+  - id: demo
+    manifest: apps/demo/product.yaml
+

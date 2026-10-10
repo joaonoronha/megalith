@@ -1,0 +1,29 @@
+id: api
+product: demo
+type: api
+runtime:
+  language: python
+  version: "3.11+"
+  framework: FastAPI
+path: apps/demo/api
+commands:
+  dev:
+    - uvicorn
+    - src.main:app
+    - --port
+    - "8000"
+    - --reload
+  test:
+    - pytest
+    - tests/
+  check:
+    - ruff
+    - check
+    - src/
+    - tests/
+artifact:
+  type: docker
+  image_name: megalith-demo-api
+deployment:
+  deployable: true
+  target: oci-vm
