@@ -1,5 +1,6 @@
 """
 FastAPI application for Megalith Demo API service.
+Service scope: demo/api
 """
 
 from fastapi import FastAPI
