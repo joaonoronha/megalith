@@ -1,0 +1,14 @@
+# Root Project Catalog
+#
+# This file is the top-level registry for products in the monorepo.
+# To register a new product, add an entry under products pointing to the product's manifest:
+#
+# products:
+#   - id: fitness
+#     manifest: apps/fitness/product.yaml
+#
+# Product details and service topologies are maintained exclusively in their respective
+# product.yaml and service.yaml manifests. See docs/architecture/manifests.md.
+
+version: 1
+products: []

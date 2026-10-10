@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://megalith.internal/schemas/projects.schema.json",
+  "title": "Projects Catalog Schema",
+  "description": "Root catalog registering all products in the monorepo",
+  "type": "object",
+  "required": ["version", "products"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Schema format version"
+    },
+    "products": {
+      "type": "array",
+      "description": "List of registered products in the monorepo",
+      "items": {
+        "type": "object",
+        "required": ["id", "manifest"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "Stable unique product identifier in lowercase-kebab-case"
+          },
+          "manifest": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_./-]+\\.ya?ml$",
+            "description": "Relative path to product.yaml from repository root"
+          }
+        }
+      }
+    }
+  }
+}
