@@ -54,6 +54,7 @@ def run_migrations_online() -> None:
     env_name = os.environ.get("ENVIRONMENT", os.environ.get("MEGALITH_ENV", "development")).lower()
     if env_name == "production":
         from pathlib import Path
+
         from sqlalchemy.engine import make_url
 
         u = make_url(target_url)

@@ -30,6 +30,8 @@ from unittest.mock import patch
 
 import pytest
 import yaml
+
+pytest.importorskip("sqlalchemy")
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import DBAPIError, OperationalError
 from sqlalchemy.pool import NullPool
