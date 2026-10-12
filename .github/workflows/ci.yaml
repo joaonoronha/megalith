@@ -115,14 +115,17 @@ jobs:
       - name: Check Terraform formatting
         run: |
           terraform -chdir=platform/infra/oci fmt -check -recursive
+          terraform -chdir=platform/infra/gcp fmt -check -recursive
 
       - name: Initialize Terraform (no backend, no credentials)
         run: |
           terraform -chdir=platform/infra/oci init -backend=false
+          terraform -chdir=platform/infra/gcp init -backend=false
 
       - name: Validate Terraform configuration
         run: |
           terraform -chdir=platform/infra/oci validate
+          terraform -chdir=platform/infra/gcp validate
 
   demo-api:
     name: "Service / demo-api"

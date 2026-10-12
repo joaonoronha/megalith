@@ -50,13 +50,36 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
+    target_url = get_url()
+    env_name = os.environ.get("ENVIRONMENT", os.environ.get("MEGALITH_ENV", "development")).lower()
+    if env_name == "production":
+        from pathlib import Path
+        from sqlalchemy.engine import make_url
+
+        u = make_url(target_url)
+        if u.host in ("localhost", "127.0.0.1", "::1", "0.0.0.0", "postgres"):
+            raise ValueError(f"Production migration connection cannot target local/internal host '{u.host}'.")
+        sslmode = u.query.get("sslmode")
+        if sslmode != "verify-full":
+            safe_str = u.render_as_string(hide_password=True)
+            raise ValueError(
+                f"External production migration connection strictly requires sslmode=verify-full (got '{sslmode or 'missing'}'): {safe_str}"
+            )
+        sslrootcert = u.query.get("sslrootcert")
+        if sslrootcert and not Path(sslrootcert).exists():
+            raise ValueError(f"DATABASE_MIGRATE_URL specifies sslrootcert='{sslrootcert}' which does not exist on disk.")
+
     configuration = config.get_section(config.config_ini_section, {})
-    configuration["sqlalchemy.url"] = get_url()
+    configuration["sqlalchemy.url"] = target_url
 
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args={
+            "connect_timeout": int(os.environ.get("DB_CONNECT_TIMEOUT", "10")),
+            "prepare_threshold": None,
+        },
     )
 
     with connectable.connect() as connection:

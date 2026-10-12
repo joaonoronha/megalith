@@ -26,8 +26,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "platform" / "deploy" / "scripts"))
 
 from release import (  # type: ignore
+    AuthorizationValidationError,
+    DeploymentAuthorization,
     ReleaseManifest,
     ReleaseValidationError,
+    create_deployment_authorization,
     create_release_manifest,
     validate_release_dict,
 )
@@ -80,8 +83,8 @@ def test_valid_manifest_passes_validation(valid_manifest_dict: dict):
 
 
 def test_invalid_schema_version(valid_manifest_dict: dict):
-    valid_manifest_dict["schema_version"] = 2
-    with pytest.raises(ReleaseValidationError, match="Unsupported schema_version: 2"):
+    valid_manifest_dict["schema_version"] = 3
+    with pytest.raises(ReleaseValidationError, match="Unsupported schema_version: 3"):
         validate_release_dict(valid_manifest_dict)
 
 
@@ -205,3 +208,123 @@ def test_create_release_manifest_helper():
     assert manifest.release_id == "rel-20261010-helper"
     assert manifest.services == ["demo-api", "demo-web"]
     assert manifest.images == images
+    assert manifest.schema_version == 2
+
+
+def test_schema_v2_manifest_forbids_embedded_approval():
+    images = {
+        "demo-api": "ghcr.io/example/demo-api@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258",
+        "demo-web": "ghcr.io/example/demo-web@sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2a1b2c3d4e5f6a1b2c3d4e5f6",
+    }
+    raw = {
+        "schema_version": 2,
+        "release_id": "rel-20261010-v2",
+        "git_sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+        "created_at": "2026-10-10T12:00:00Z",
+        "environment": "production",
+        "config_version": "1.0",
+        "services": ["demo-api", "demo-web"],
+        "images": images,
+        "approval": {
+            "authorized_by": "attacker",
+            "authorized_at": "2026-10-10T12:05:00Z",
+            "release_id": "rel-20261010-v2",
+            "target_environment": "production",
+            "intent": "deploy",
+        },
+    }
+    with pytest.raises(ReleaseValidationError, match="Embedded 'approval' object is strictly forbidden in Release Manifest v2"):
+        validate_release_dict(raw)
+
+
+def test_canonical_digest_determinism():
+    images = {
+        "demo-api": "ghcr.io/example/demo-api@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258",
+        "demo-web": "ghcr.io/example/demo-web@sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2a1b2c3d4e5f6a1b2c3d4e5f6",
+    }
+    m1 = create_release_manifest(
+        release_id="rel-20261010-det",
+        git_sha="a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+        environment="production",
+        images=images,
+        schema_version=2,
+    )
+    m2 = create_release_manifest(
+        release_id="rel-20261010-det",
+        git_sha="a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+        environment="production",
+        images=images,
+        schema_version=2,
+    )
+    # Ensure timestamps match for determinism test
+    m2.created_at = m1.created_at
+    assert m1.canonical_digest() == m2.canonical_digest()
+    assert m1.canonical_digest().startswith("sha256:")
+
+
+def test_canonical_digest_tamper_detection():
+    images = {
+        "demo-api": "ghcr.io/example/demo-api@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258",
+        "demo-web": "ghcr.io/example/demo-web@sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2a1b2c3d4e5f6a1b2c3d4e5f6",
+    }
+    m1 = create_release_manifest(
+        release_id="rel-20261010-tamper",
+        git_sha="a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+        environment="production",
+        images=images,
+        schema_version=2,
+    )
+    digest1 = m1.canonical_digest()
+
+    # Tampering with an image digest changes canonical digest
+    m1.images["demo-api"] = "ghcr.io/example/demo-api@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    digest2 = m1.canonical_digest()
+    assert digest1 != digest2
+
+
+def test_deployment_authorization_success_and_validation():
+    images = {
+        "demo-api": "ghcr.io/example/demo-api@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258",
+        "demo-web": "ghcr.io/example/demo-web@sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2a1b2c3d4e5f6a1b2c3d4e5f6",
+    }
+    manifest = create_release_manifest(
+        release_id="rel-20261010-auth",
+        git_sha="a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+        environment="production",
+        images=images,
+        schema_version=2,
+    )
+    auth = create_deployment_authorization(
+        operator="platform-admin",
+        manifest=manifest,
+        environment="production",
+        notes="Pre-approved production launch",
+    )
+    assert auth.operator == "platform-admin"
+    assert auth.release_id == manifest.release_id
+    assert auth.target_environment == "production"
+    assert auth.manifest_digest == manifest.canonical_digest()
+
+    # Validates cleanly
+    auth.validate_against_manifest(manifest, "production")
+
+    # Rejects mismatched release
+    other_manifest = create_release_manifest(
+        release_id="rel-20261010-other",
+        git_sha="a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+        environment="production",
+        images=images,
+        schema_version=2,
+    )
+    with pytest.raises(AuthorizationValidationError, match="release_id mismatch"):
+        auth.validate_against_manifest(other_manifest, "production")
+
+    # Rejects mismatched environment
+    with pytest.raises(AuthorizationValidationError, match="environment mismatch"):
+        auth.validate_against_manifest(manifest, "staging")
+
+    # Rejects modified manifest content (tamper detection)
+    manifest.images["demo-api"] = "ghcr.io/example/demo-api@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    with pytest.raises(AuthorizationValidationError, match="Cryptographic digest mismatch"):
+        auth.validate_against_manifest(manifest, "production")
+

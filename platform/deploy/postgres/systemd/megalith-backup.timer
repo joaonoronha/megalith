@@ -1,0 +1,14 @@
+[Unit]
+Description=Daily Megalith PostgreSQL Encrypted Backup Timer
+Documentation=https://github.com/megalith/megalith
+
+[Timer]
+# Trigger daily at 03:00 UTC (low-traffic window)
+OnCalendar=*-*-* 03:00:00 UTC
+# Run immediately upon boot if previous schedule was missed due to host downtime
+Persistent=true
+RandomizedDelaySec=300
+Unit=megalith-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MegalithDeploymentAuthorization",
+  "description": "Schema for trusted host-side operator deployment authorizations.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "authorization_id",
+    "operator",
+    "release_id",
+    "target_environment",
+    "manifest_digest",
+    "authorized_at",
+    "intent"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Authorization record format version."
+    },
+    "authorization_id": {
+      "type": "string",
+      "pattern": "^auth-[a-zA-Z0-9._-]+$",
+      "description": "Unique authorization record identifier."
+    },
+    "operator": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Authenticated human operator initiating deployment."
+    },
+    "release_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{2,63}$",
+      "description": "Exact release identifier authorized for deployment."
+    },
+    "target_environment": {
+      "type": "string",
+      "enum": ["production", "staging", "test"],
+      "description": "Target environment authorized for deployment."
+    },
+    "manifest_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-fA-F]{64}$",
+      "description": "Cryptographic SHA-256 digest of the immutable release manifest."
+    },
+    "authorized_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of authorization."
+    },
+    "intent": {
+      "type": "string",
+      "const": "deploy",
+      "description": "Operation intent (must be 'deploy')."
+    },
+    "hostname": {
+      "type": "string",
+      "description": "Host where authorization was issued."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional operator audit notes."
+    }
+  }
+}

@@ -42,8 +42,10 @@ sys.path.insert(0, str(REPO_ROOT / "platform" / "deploy" / "scripts"))
 
 from release import (  # type: ignore
     ApprovalDeclaration,
+    DeploymentAuthorization,
     ReleaseManifest,
     ReleaseValidationError,
+    create_deployment_authorization,
     create_release_manifest,
     validate_release_dict,
 )
@@ -211,7 +213,13 @@ def main() -> None:
         # 5. Apply initial release
         # -----------------------------------------------------------------
         print("\n[Scenario 5] Applying initial release (rel-001-init)...")
-        deployer.apply_release(manifest_v1)
+        auth_v1 = create_deployment_authorization(
+            operator="lead-platform-engineer",
+            manifest=manifest_v1,
+            environment="production",
+        )
+        auth_v1.save(temp_state_dir / "auth-001.json")
+        deployer.apply_release(manifest_v1, auth_v1)
 
         # -----------------------------------------------------------------
         # 6. Verify health and mutate counter to test persistence later
@@ -279,7 +287,13 @@ def main() -> None:
         manifest_v2_path = temp_state_dir / "rel-002-update.json"
         manifest_v2.save(manifest_v2_path)
 
-        deployer.apply_release(manifest_v2)
+        auth_v2 = create_deployment_authorization(
+            operator="lead-platform-engineer",
+            manifest=manifest_v2,
+            environment="production",
+        )
+        auth_v2.save(temp_state_dir / "auth-002.json")
+        deployer.apply_release(manifest_v2, auth_v2)
 
         # -----------------------------------------------------------------
         # 8. Confirm selective service update (Postgres and Caddy NOT recreated)
@@ -351,8 +365,15 @@ def main() -> None:
         }
         manifest_broken = validate_release_dict(manifest_broken_raw, require_approval=True)
 
+        auth_broken = create_deployment_authorization(
+            operator="lead-platform-engineer",
+            manifest=manifest_broken,
+            environment="production",
+        )
+        auth_broken.save(temp_state_dir / "auth-broken.json")
+
         try:
-            deployer.apply_release(manifest_broken)
+            deployer.apply_release(manifest_broken, auth_broken)
             raise AssertionError("Broken release erroneously succeeded!")
         except Exception as err:
             print(f"  -> Broken release failed as expected and triggered rollback: {err}")

@@ -1,0 +1,38 @@
+# External Database Compose Overlay for Megalith
+#
+# Applied with:
+#   Development: docker compose -f compose.yaml -f compose.external-db.yaml up -d
+#   Production:  docker compose -f compose.yaml -f compose.prod.yaml -f compose.external-db.yaml up -d
+#
+# Purpose:
+# Disables the local containerized PostgreSQL service and removes container dependencies
+# on local postgres, directing application and migration containers to externally configured
+# connection URLs:
+#   - DATABASE_URL         (least-privilege runtime DML role)
+#   - DATABASE_MIGRATE_URL (dedicated migration DDL role)
+
+services:
+  postgres:
+    # Assigning an inactive profile prevents Compose from starting or deploying local postgres.
+    profiles:
+      - external-mode-disabled
+
+  demo-migrate:
+    # Remove dependency on local postgres container
+    depends_on: !reset []
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    environment:
+      DATABASE_MIGRATE_URL: ${DATABASE_MIGRATE_URL:?DATABASE_MIGRATE_URL must be explicitly provided in external database mode}
+
+  demo-api:
+    # Remove dependency on local postgres container; preserve ordering after migrations
+    depends_on: !override
+      demo-migrate:
+        condition: service_completed_successfully
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be explicitly provided in external database mode}
