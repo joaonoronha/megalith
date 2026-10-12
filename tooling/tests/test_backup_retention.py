@@ -35,6 +35,9 @@ def temp_dir():
 
 
 def test_age_keypair_generation(temp_dir: Path):
+    import shutil
+    if shutil.which("age-keygen") is None:
+        pytest.skip("age-keygen not installed on system")
     key_path = temp_dir / "backup_key.txt"
     pub, path = generate_keypair(key_path)
     assert pub.startswith("age1")

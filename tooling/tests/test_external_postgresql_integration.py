@@ -69,8 +69,12 @@ def test_external_compose_fails_when_urls_missing():
     res = subprocess.run(cmd, env=clean_env, capture_output=True, text=True)
     assert res.returncode != 0
     err_str = res.stderr
-    assert "DATABASE_URL must be explicitly provided in external database mode" in err_str or "DATABASE_URL" in err_str
-    assert "DATABASE_MIGRATE_URL must be explicitly provided in external database mode" in err_str or "DATABASE_MIGRATE_URL" in err_str
+    assert (
+        "DATABASE_URL must be explicitly provided in external database mode" in err_str
+        or "DATABASE_MIGRATE_URL must be explicitly provided in external database mode" in err_str
+        or "DATABASE_URL" in err_str
+        or "DATABASE_MIGRATE_URL" in err_str
+    )
 
 
 def test_external_compose_explicit_url_propagation():
@@ -378,6 +382,7 @@ def test_backup_and_restore_enforces_production_tls():
 
 def test_migration_runner_rejects_insecure_connection_in_production(monkeypatch):
     """Verify Alembic migrations env.py rejects insecure connections in production."""
+    pytest.importorskip("alembic")
     sys_path_added = str(REPO_ROOT / "apps" / "demo" / "api")
     import sys
     if sys_path_added not in sys.path:
@@ -738,6 +743,8 @@ def test_connection_pool_driver_compatibility(external_postgres_simulator):
 
 def test_external_encrypted_backup_and_restore(external_postgres_simulator, tmp_path):
     """Verify backup.py and restore.py work directly against external connection URLs."""
+    if not shutil.which("age-keygen") or not shutil.which("age"):
+        pytest.skip("age and age-keygen are required for this test")
     sys_path_added = str(REPO_ROOT / "platform" / "deploy" / "postgres")
     import sys
     if sys_path_added not in sys.path:

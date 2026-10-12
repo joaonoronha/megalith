@@ -117,6 +117,7 @@ def test_uvicorn_proxy_header_trust_and_spoof_rejection():
     Direct ASGI test verifying that Uvicorn ProxyHeadersMiddleware honors headers
     from trusted Caddy IP (172.28.0.10) while rejecting spoofed headers from untrusted origins.
     """
+    pytest.importorskip("uvicorn")
     from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
     async def dummy_app(scope, receive, send):
