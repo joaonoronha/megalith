@@ -218,3 +218,76 @@ def test_ingress_changes_trigger_containers():
     assert res.demo_web is False
     assert res.terraform is False
     assert res.docs_only is False
+
+
+def test_template_changes_trigger_global():
+    res = classify_files(["platform/templates/fastapi/service.yaml.tpl"])
+    assert res.platform is True
+    assert res.all_triggered is True
+    assert res.docs_only is False
+
+
+def test_dynamic_service_discovery_in_ci(tmp_path: Path):
+    # Set up mock repository with dynamic product
+    projects_content = """version: 1
+products:
+  - id: demo
+    manifest: apps/demo/product.yaml
+  - id: fitness
+    manifest: apps/fitness/product.yaml
+"""
+    (tmp_path / "projects.yaml").write_text(projects_content, encoding="utf-8")
+    fit_dir = tmp_path / "apps" / "fitness"
+    fit_dir.mkdir(parents=True)
+    (fit_dir / "product.yaml").write_text(
+        "id: fitness\nname: Fitness\ndescription: Test\ndocs: README.md\nservices:\n  - id: api\n    manifest: api/service.yaml\n",
+        encoding="utf-8",
+    )
+    (fit_dir / "api").mkdir(parents=True)
+    (fit_dir / "api" / "service.yaml").write_text(
+        "id: api\nproduct: fitness\ntype: api\nruntime:\n  language: python\npath: apps/fitness/api\ncommands: {}\nartifact:\n  type: docker\ndeployment:\n  deployable: true\n  target: oci-vm\n",
+        encoding="utf-8",
+    )
+
+    res = classify_files(["apps/fitness/api/src/main.py"], repo_root=tmp_path)
+    assert res.platform is True
+    assert "fitness/api" in res.triggered_services
+    assert "fitness" in res.triggered_products
+    assert res.docs_only is False
+
+
+def test_deleted_or_unregistered_service_triggers_conservative_fallback(tmp_path: Path):
+    # Setup mock repo with only demo product
+    projects_content = """version: 1
+products:
+  - id: demo
+    manifest: apps/demo/product.yaml
+"""
+    (tmp_path / "projects.yaml").write_text(projects_content, encoding="utf-8")
+    demo_dir = tmp_path / "apps" / "demo"
+    demo_dir.mkdir(parents=True)
+    (demo_dir / "product.yaml").write_text("id: demo\nservices: []\n", encoding="utf-8")
+
+    # A deleted or unregistered product/service path was touched
+    res = classify_files(["apps/removed_product/old_service/main.py"], repo_root=tmp_path)
+    assert res.platform is True
+    assert res.terraform is True
+    assert res.all_triggered is True
+    assert res.docs_only is False
+
+
+def test_malformed_catalog_handled_gracefully(tmp_path: Path):
+    # Corrupted projects.yaml
+    (tmp_path / "projects.yaml").write_text("invalid: [unclosed yaml", encoding="utf-8")
+
+    # Should not crash on classification
+    res = classify_files(["apps/some/file.py"], repo_root=tmp_path)
+    assert res.platform is True
+    assert res.all_triggered is True
+
+    # When projects.yaml itself is the changed file, global triggers activate
+    res_catalog = classify_files(["projects.yaml"], repo_root=tmp_path)
+    assert res_catalog.platform is True
+    assert res_catalog.all_triggered is True
+
+
