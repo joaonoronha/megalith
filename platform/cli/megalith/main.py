@@ -4,9 +4,8 @@ Megalith CLI main entry point.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import typer
 
@@ -17,6 +16,7 @@ from megalith.discovery import (
     get_validator,
 )
 from megalith.runner import CommandExecutionError, execute_service_command
+from megalith.staging import staging_app
 from megalith.ui import (
     print_error,
     render_project_list,
@@ -30,10 +30,11 @@ app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
 )
+app.add_typer(staging_app, name="staging")
 
 
 def _resolve_env(
-    repo_root: Optional[Path] = None,
+    repo_root: Path | None = None,
 ) -> tuple[Path, Any]:
     """Helper to discover repository root and instantiate the validator."""
     try:
@@ -50,7 +51,7 @@ def _resolve_env(
 
 @app.command(name="list")
 def list_projects(
-    repo_root: Optional[Path] = typer.Option(
+    repo_root: Path | None = typer.Option(
         None, "--repo-root", help="Explicit path to repository root"
     ),
     catalog: str = typer.Option(
@@ -75,7 +76,7 @@ def service_info(
     service: str = typer.Argument(
         ..., help="Qualified service identifier in format <product>/<service>"
     ),
-    repo_root: Optional[Path] = typer.Option(
+    repo_root: Path | None = typer.Option(
         None, "--repo-root", help="Explicit path to repository root"
     ),
     catalog: str = typer.Option(
@@ -107,7 +108,7 @@ def service_info(
 
 @app.command(name="validate")
 def validate_manifests(
-    repo_root: Optional[Path] = typer.Option(
+    repo_root: Path | None = typer.Option(
         None, "--repo-root", help="Explicit path to repository root"
     ),
     catalog: str = typer.Option(
@@ -131,7 +132,7 @@ def run_command(
     command: str = typer.Argument(
         ..., help="Declared lifecycle command to execute (e.g. test, dev, build)"
     ),
-    repo_root: Optional[Path] = typer.Option(
+    repo_root: Path | None = typer.Option(
         None, "--repo-root", help="Explicit path to repository root"
     ),
     catalog: str = typer.Option(
