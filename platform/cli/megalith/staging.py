@@ -113,6 +113,7 @@ def staging_preflight(
     typer.echo(f"Deployment Mode : {report.mode}")
     typer.echo(f"Target Arch     : {report.target_arch}")
     typer.echo(f"Classification  : {report.operation_classification} (Read-Only)")
+    typer.echo(f"Evidence Level  : {report.evidence_classification}")
     typer.echo("-" * 70)
 
     for c in report.checks:
@@ -122,10 +123,16 @@ def staging_preflight(
             "FAIL": "[ FAIL ]",
             "INFO": "[ INFO ]",
         }.get(c.status, f"[{c.status}]")
-        typer.echo(f"{badge} {c.name}: {c.message}")
+        ev_tag = f"[{c.verification_status}]"
+        typer.echo(f"{badge} {ev_tag} {c.name}: {c.message}")
         if c.details:
             for line in c.details.splitlines():
                 typer.echo(f"         {line}")
+
+    typer.echo("-" * 70)
+    typer.echo("Unverified Aspects Notice (Requires separate live read-only verification):")
+    for u in report.unverified_aspects:
+        typer.echo(f"  * {u}")
 
     typer.echo("-" * 70)
     if report.all_passed:
@@ -195,22 +202,27 @@ def staging_dry_run(
     typer.echo(f"Deployment Mode : {dry_run.mode}")
     typer.echo(f"Target Arch     : {dry_run.target_arch}")
     typer.echo(f"Classification  : {dry_run.operation_classification} (Read-Only)")
+    typer.echo(f"Evidence Level  : {dry_run.evidence_classification}")
     typer.echo(f"Compose Syntax  : {'VALID' if dry_run.syntax_valid else 'INVALID'}")
     typer.echo(f"Terraform State : {'VALID' if dry_run.terraform_valid else 'INVALID'}")
     typer.echo("-" * 70)
-    typer.echo("Command Preview (All secrets masked):")
+    typer.echo("Command Preview (All secrets masked, explicit project names, non-destructive defaults):")
     for cmd in dry_run.command_preview:
         typer.echo(f"  {cmd}")
     typer.echo("-" * 70)
-    typer.echo("Resource Inventory:")
+    typer.echo("Resource Inventory (Distinguishing Ephemeral vs Persistent User Data):")
     for category, items in dry_run.resource_inventory.items():
         typer.echo(f"  {category.upper()}:")
         for item in items:
             typer.echo(f"    - {item}")
     typer.echo("-" * 70)
-    typer.echo("Cleanup Plan:")
+    typer.echo("Cleanup Plan (Non-destructive by default):")
     for step in dry_run.cleanup_plan:
         typer.echo(f"  {step}")
+    typer.echo("-" * 70)
+    typer.echo("Unverified Aspects Notice (Requires separate live read-only verification):")
+    for u in dry_run.unverified_aspects:
+        typer.echo(f"  * {u}")
     typer.echo("=" * 70)
 
     if not (dry_run.syntax_valid and dry_run.terraform_valid):

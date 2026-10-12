@@ -384,8 +384,9 @@ class TestMegalithCLI(unittest.TestCase):
         result = self.runner.invoke(app, ["staging", "dry-run", "--mode", "local", "--repo-root", str(repo_actual)])
         self.assertEqual(result.exit_code, 0)
         self.assertIn("Dry-Run Summary", result.output)
-        self.assertIn("Resource Inventory:", result.output)
-        self.assertIn("Cleanup Plan:", result.output)
+        self.assertIn("Resource Inventory", result.output)
+        self.assertIn("Cleanup Plan", result.output)
+        self.assertIn("OFFLINE_VALIDATED", result.output)
 
     def test_staging_invalid_mode(self) -> None:
         repo_actual = Path(__file__).resolve().parent.parent.parent.parent
