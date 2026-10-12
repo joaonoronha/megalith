@@ -60,6 +60,7 @@ def validate_production_connection(db_url: str) -> None:
         return
 
     from pathlib import Path
+
     from sqlalchemy.engine import make_url
 
     u = make_url(db_url)

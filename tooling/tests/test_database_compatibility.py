@@ -21,6 +21,8 @@ import time
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+
+pytest.importorskip("sqlalchemy")
 from sqlalchemy import create_engine, make_url, text
 from sqlalchemy.exc import DBAPIError, ProgrammingError
 from sqlalchemy.pool import NullPool
