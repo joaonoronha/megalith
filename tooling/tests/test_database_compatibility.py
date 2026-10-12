@@ -162,9 +162,24 @@ def postgres_container():
         pytest.fail("PostgreSQL container failed to become ready in time")
 
     admin_url = f"postgresql+psycopg://postgres:{superuser_password}@127.0.0.1:{port}/postgres"
+    admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT", poolclass=NullPool)
+
+    # Wait for PostgreSQL host port to accept connections (handles entrypoint initial restart)
+    connected = False
+    for _ in range(30):
+        try:
+            with admin_engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            connected = True
+            break
+        except Exception:
+            time.sleep(0.5)
+
+    if not connected:
+        subprocess.run(["docker", "rm", "-f", container_name], check=False, stdout=subprocess.DEVNULL)
+        pytest.fail("PostgreSQL container failed to accept external connections on host port")
 
     # Set up users, databases, and permissions simulating multi-tenant / multi-role topology
-    admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT", poolclass=NullPool)
     with admin_engine.connect() as conn:
         # 1. Create two distinct application databases
         conn.execute(text("CREATE DATABASE db_demo;"))

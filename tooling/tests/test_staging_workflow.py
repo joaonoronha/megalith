@@ -418,6 +418,7 @@ def test_safe_offline_handling_when_terraform_uninitialized_offline(monkeypatch)
 
     monkeypatch.setattr(subprocess, "run", mock_subprocess_run)
     monkeypatch.setattr(staging.subprocess, "run", mock_subprocess_run)
+    monkeypatch.setattr(staging.shutil, "which", lambda cmd: "/usr/bin/terraform" if cmd == "terraform" else None)
 
     workflow = StagingWorkflow(
         repo_root=REPO_ROOT,
