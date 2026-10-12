@@ -504,6 +504,52 @@ class TestMegalithCLI(unittest.TestCase):
         self.assertNotEqual(result.exit_code, 0)
         self.assertIn("already registered", result.output)
 
+    def test_product_db_init_dry_run(self) -> None:
+        self.runner.invoke(
+            app,
+            ["product", "create", "testprod", "--name", "Test Product", "--repo-root", str(self.repo_root)],
+        )
+        self.runner.invoke(
+            app,
+            ["service", "add", "testprod", "api", "--template", "fastapi", "--port", "8001", "--database", "--repo-root", str(self.repo_root)],
+        )
+        result = self.runner.invoke(
+            app,
+            ["product", "db-init", "testprod", "--dry-run", "--repo-root", str(self.repo_root)],
+        )
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("PostgreSQL Database Onboarding for 'testprod'", result.output)
+        self.assertIn("Dry-run mode", result.output)
+
+    def test_product_db_init_missing_script(self) -> None:
+        result = self.runner.invoke(
+            app,
+            ["product", "db-init", "nonexistent-prod", "--dry-run", "--repo-root", str(self.repo_root)],
+        )
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("No PostgreSQL initialization script found", result.output)
+
+    def test_product_db_init_no_server_detected(self) -> None:
+        self.runner.invoke(
+            app,
+            ["product", "create", "testprod", "--name", "Test Product", "--repo-root", str(self.repo_root)],
+        )
+        self.runner.invoke(
+            app,
+            ["service", "add", "testprod", "api", "--template", "fastapi", "--port", "8001", "--database", "--repo-root", str(self.repo_root)],
+        )
+        # Without docker or psql running against the target test environment
+        import unittest.mock
+        with unittest.mock.patch("subprocess.check_output", side_effect=Exception("Docker unavailable")), \
+             unittest.mock.patch("subprocess.run", side_effect=Exception("psql unavailable")):
+            result = self.runner.invoke(
+                app,
+                ["product", "db-init", "testprod", "--repo-root", str(self.repo_root)],
+            )
+            self.assertNotEqual(result.exit_code, 0)
+            self.assertIn("No running local PostgreSQL server detected", result.output)
+
+
 
 if __name__ == "__main__":
     unittest.main()

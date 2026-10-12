@@ -154,3 +154,16 @@ def service_add(
         print_success(
             f"Service '{product_id}/{service_id}' is ready. Test it with 'megalith run {product_id}/{service_id} test'."
         )
+        console.print(f"\n[cyan]Deployment Snippets Generated:[/cyan]")
+        console.print(f"  • Compose: apps/{product_id}/{service_id}/compose.snippet.yaml")
+        if service_type in ("api", "web"):
+            console.print(f"  • Caddy Ingress: apps/{product_id}/{service_id}/caddy.snippet.txt")
+        console.print(
+            "[dim]Note: Standalone snippets generated. To integrate into local staging, "
+            "include in platform/deploy/compose.yaml and platform/deploy/caddy/Caddyfile.[/dim]"
+        )
+        if database:
+            console.print(
+                f"[dim]Note: PostgreSQL script generated. If your local container is already running, "
+                f"apply with 'megalith product db-init {product_id}'.[/dim]"
+            )

@@ -255,3 +255,39 @@ products:
     assert "fitness" in res.triggered_products
     assert res.docs_only is False
 
+
+def test_deleted_or_unregistered_service_triggers_conservative_fallback(tmp_path: Path):
+    # Setup mock repo with only demo product
+    projects_content = """version: 1
+products:
+  - id: demo
+    manifest: apps/demo/product.yaml
+"""
+    (tmp_path / "projects.yaml").write_text(projects_content, encoding="utf-8")
+    demo_dir = tmp_path / "apps" / "demo"
+    demo_dir.mkdir(parents=True)
+    (demo_dir / "product.yaml").write_text("id: demo\nservices: []\n", encoding="utf-8")
+
+    # A deleted or unregistered product/service path was touched
+    res = classify_files(["apps/removed_product/old_service/main.py"], repo_root=tmp_path)
+    assert res.platform is True
+    assert res.terraform is True
+    assert res.all_triggered is True
+    assert res.docs_only is False
+
+
+def test_malformed_catalog_handled_gracefully(tmp_path: Path):
+    # Corrupted projects.yaml
+    (tmp_path / "projects.yaml").write_text("invalid: [unclosed yaml", encoding="utf-8")
+
+    # Should not crash on classification
+    res = classify_files(["apps/some/file.py"], repo_root=tmp_path)
+    assert res.platform is True
+    assert res.all_triggered is True
+
+    # When projects.yaml itself is the changed file, global triggers activate
+    res_catalog = classify_files(["projects.yaml"], repo_root=tmp_path)
+    assert res_catalog.platform is True
+    assert res_catalog.all_triggered is True
+
+

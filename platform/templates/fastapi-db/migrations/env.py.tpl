@@ -14,7 +14,7 @@ target_metadata = None
 def get_url():
     return os.getenv(
         "DATABASE_MIGRATE_URL",
-        "postgresql+psycopg://role_{{PRODUCT_ID}}_migrate:{{PRODUCT_ID}}_migrate_dev_password@localhost:5432/db_{{PRODUCT_ID}}",
+        "postgresql+psycopg://role_{{PRODUCT_ID_NORM}}_migrate:{{PRODUCT_ID_NORM}}_migrate_dev_password@localhost:5432/db_{{PRODUCT_ID_NORM}}",
     )
 
 

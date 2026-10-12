@@ -7,8 +7,9 @@ WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
-COPY pyproject.toml ./
-RUN uv pip install --system --no-cache -e .
+COPY pyproject.toml README.md ./
+COPY src ./src
+RUN uv pip install --system --no-cache .
 
 FROM python:3.12-slim-bookworm AS runtime
 
@@ -23,6 +24,7 @@ RUN groupadd -g 10001 appgroup && \
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --chown=appuser:appgroup src /app/src
+{{ALEMBIC_DOCKER_COPY}}
 
 USER appuser
 

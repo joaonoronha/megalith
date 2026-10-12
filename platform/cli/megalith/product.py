@@ -168,3 +168,102 @@ def product_validate(
         raise typer.Exit(code=1)
 
     print_success("All registered products and services validated cleanly!")
+
+
+@product_app.command(name="db-init")
+def product_db_init(
+    product_id: str = typer.Argument(
+        ..., help="Product identifier whose database initialization script should be applied."
+    ),
+    repo_root: Optional[Path] = typer.Option(
+        None, "--repo-root", help="Explicit path to monorepo root."
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Preview SQL and execution steps without applying changes."
+    ),
+) -> None:
+    """
+    Safely initialize or onboard a product's isolated database and roles
+    against an already running local PostgreSQL cluster (ADR-007).
+    """
+    root = _resolve_root(repo_root)
+    init_dir = root / "platform" / "deploy" / "postgres" / "init"
+
+    scripts = list(init_dir.glob(f"*-init-{product_id}-db.sh"))
+    if not scripts:
+        print_error(f"No PostgreSQL initialization script found for product '{product_id}' in '{init_dir}'.")
+        console.print("[dim]Stateful services generate initialization scripts when created with '--database'.[/dim]")
+        raise typer.Exit(code=1)
+
+    script_path = scripts[0]
+    script_content = script_path.read_text(encoding="utf-8")
+
+    if dry_run:
+        console.print(f"\n[bold yellow][PREVIEW] PostgreSQL Database Onboarding for '{product_id}'[/bold yellow]\n")
+        try:
+            rel_display = script_path.relative_to(root)
+        except ValueError:
+            rel_display = script_path
+        console.print(f"Target script: [cyan]{rel_display}[/cyan]\n")
+        console.print("[dim]--- Script Preview ---[/dim]")
+        console.print(script_content)
+        console.print("[dim]------------------------[/dim]\n")
+        console.print("[yellow]Dry-run mode: No database changes were applied.[/yellow]")
+        return
+
+    # Check for running PostgreSQL container
+    import subprocess
+    container_candidates = ["megalith-postgres", "postgres"]
+    target_container = None
+    try:
+        ps_out = subprocess.check_output(
+            ["docker", "ps", "--format", "{{.Names}}"], text=True
+        ).splitlines()
+        for cand in container_candidates:
+            if cand in ps_out:
+                target_container = cand
+                break
+        if not target_container:
+            for name in ps_out:
+                if "postgres" in name:
+                    target_container = name
+                    break
+    except Exception:
+        pass
+
+    if target_container:
+        console.print(f"Applying database initialization script via container '[cyan]{target_container}[/cyan]'...")
+        res = subprocess.run(
+            ["docker", "exec", "-i", "-e", "POSTGRES_USER=postgres", "-e", "POSTGRES_DB=postgres", target_container, "bash"],
+            input=script_content.encode("utf-8"),
+            capture_output=True,
+        )
+        if res.returncode != 0:
+            print_error(f"Failed to execute init script: {res.stderr.decode(errors='replace')}")
+            raise typer.Exit(code=1)
+        print_success(f"PostgreSQL database and isolated roles for '{product_id}' initialized successfully in container '{target_container}'.")
+        return
+
+    # Check direct psql connection
+    try:
+        res = subprocess.run(
+            ["psql", "-U", "postgres", "-h", "localhost", "-p", "5432", "-f", str(script_path)],
+            capture_output=True,
+            text=True,
+        )
+        if res.returncode == 0:
+            print_success(f"PostgreSQL database and isolated roles for '{product_id}' initialized successfully via local psql.")
+            return
+    except Exception:
+        pass
+
+    try:
+        rel_display = script_path.relative_to(root)
+    except ValueError:
+        rel_display = script_path
+    print_error("No running local PostgreSQL server detected.")
+    console.print("\nTo apply this initialization script:")
+    console.print("  1. Start the local database stack: [cyan]docker compose -f platform/deploy/compose.yaml up -d postgres[/cyan]")
+    console.print(f"  2. Re-run: [cyan]megalith product db-init {product_id}[/cyan]")
+    console.print(f"  Or execute manually: [cyan]psql -U postgres -f {rel_display}[/cyan]\n")
+    raise typer.Exit(code=1)
