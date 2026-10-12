@@ -10,6 +10,7 @@ import logging
 import os
 from collections.abc import Generator
 from contextlib import contextmanager
+from typing import Any
 
 from sqlalchemy import Column, Integer, MetaData, create_engine, select, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -52,11 +53,52 @@ _engine = None
 _session_factory = None
 
 
+def validate_production_connection(db_url: str) -> None:
+    """Enforces TLS policy for external database connections in production."""
+    env = os.environ.get("ENVIRONMENT", os.environ.get("MEGALITH_ENV", "development")).lower()
+    if env != "production":
+        return
+
+    from pathlib import Path
+    from sqlalchemy.engine import make_url
+
+    u = make_url(db_url)
+    if u.host in ("localhost", "127.0.0.1", "::1", "0.0.0.0", "postgres"):
+        raise ValueError(f"Production database connection cannot target local/internal host '{u.host}'.")
+
+    sslmode = u.query.get("sslmode")
+    if sslmode != "verify-full":
+        safe_str = u.render_as_string(hide_password=True)
+        raise ValueError(
+            f"External production database connection strictly requires sslmode=verify-full (got '{sslmode or 'missing'}'): {safe_str}"
+        )
+    sslrootcert = u.query.get("sslrootcert")
+    if sslrootcert and not Path(sslrootcert).exists():
+        raise ValueError(f"DATABASE_URL specifies sslrootcert='{sslrootcert}' which does not exist on disk.")
+
+
 def get_engine():
     """Lazily initializes and returns the SQLAlchemy Engine."""
     global _engine, _session_factory
     if _engine is None:
         db_url = get_database_url()
+        validate_production_connection(db_url)
+
+        connect_args: dict[str, Any] = {
+            "connect_timeout": int(os.environ.get("DB_CONNECT_TIMEOUT", "5")),
+        }
+        # In transaction pooling mode (e.g. PgBouncer / Supavisor), server-side prepared
+        # statements must be disabled to prevent statement mismatch across pooled connections.
+        # Defaulting prepare_threshold to None provides safe compatibility across direct and pooled endpoints.
+        prep_thresh = os.environ.get("DB_PREPARE_THRESHOLD")
+        if prep_thresh is not None:
+            if prep_thresh.lower() in ("none", "null", "false", "0"):
+                connect_args["prepare_threshold"] = None
+            else:
+                connect_args["prepare_threshold"] = int(prep_thresh)
+        else:
+            connect_args["prepare_threshold"] = None
+
         _engine = create_engine(
             db_url,
             pool_size=_pool_size,
@@ -64,7 +106,7 @@ def get_engine():
             pool_timeout=_pool_timeout,
             pool_recycle=_pool_recycle,
             pool_pre_ping=True,
-            connect_args={"connect_timeout": 3},
+            connect_args=connect_args,
         )
         _session_factory = sessionmaker(bind=_engine, expire_on_commit=False)
     return _engine

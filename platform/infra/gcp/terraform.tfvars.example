@@ -1,0 +1,72 @@
+# Example Terraform Variables for Megalith Google Cloud Infrastructure Foundation
+# Copy this file to terraform.tfvars and populate with your GCP project values.
+# NEVER commit terraform.tfvars containing real project details, keys, or credentials.
+
+# -----------------------------------------------------------------------------
+# Google Cloud Project & Location
+# -----------------------------------------------------------------------------
+# Required: Your GCP Project ID (lowercase alphanumeric + hyphens, 6-30 chars)
+project_id = "my-megalith-project-123456"
+
+# Region & Zone:
+# To qualify for the Compute Engine Free Tier, choose one of these US regions:
+# - us-central1 (Iowa)
+# - us-east1 (South Carolina)
+# - us-west1 (Oregon)
+region = "us-central1"
+zone   = "us-central1-a"
+
+# -----------------------------------------------------------------------------
+# Compute Configuration & Profiles
+# -----------------------------------------------------------------------------
+instance_name = "megalith-host"
+
+# Deployment Profile & Environment (Always Free Staging Defaults):
+# For experimental staging on Always Free tier:
+#   environment          = "staging"
+#   allow_paid_resources = false
+#   machine_type         = "e2-micro"
+#   deployment_profile   = "micro"
+#
+# For future paid production deployments (requires explicit cost approval):
+#   environment          = "production"
+#   allow_paid_resources = true
+#   machine_type         = "e2-standard-2"  # 2 vCPUs, 8 GB RAM (~$48/mo)
+#   deployment_profile   = "full"
+environment          = "staging"
+allow_paid_resources = false
+machine_type         = "e2-micro"
+deployment_profile   = "micro"
+
+# Persistent Disk:
+# Free Tier includes 30 GB standard persistent disk (pd-standard) per month in US regions.
+# Using pd-balanced or pd-ssd provides higher performance but incurs disk charges.
+boot_disk_size_gb = 30
+boot_disk_type    = "pd-standard"
+
+# Operating System Image:
+os_image = "ubuntu-os-cloud/ubuntu-2404-lts-amd64"
+
+# External Public IPv4 Address:
+# Set to true for direct public internet access.
+# NOTE: Google Cloud charges ~$0.005/hour for in-use external IPv4 addresses (~$3.60/month).
+assign_public_ip = true
+
+# -----------------------------------------------------------------------------
+# Security & Access Controls (CRITICAL)
+# -----------------------------------------------------------------------------
+# Trusted administrator CIDR block allowed to access SSH (port 22).
+# MUST NOT be 0.0.0.0/0. Specify your workstation public IPv4 as a /32.
+ssh_admin_cidr = "203.0.113.50/32"
+
+# OpenSSH public key for administrative authentication
+ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyDoNotUseRealKeysInTemplates0000 admin@workstation"
+
+# Non-root administrator username
+admin_username = "ubuntu"
+
+# -----------------------------------------------------------------------------
+# Networking
+# -----------------------------------------------------------------------------
+network_name = "megalith-vpc"
+subnet_cidr  = "10.10.0.0/24"

@@ -1,0 +1,1 @@
+../decisions/adr-012-database-hosting-strategy.md

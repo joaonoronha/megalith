@@ -1,0 +1,87 @@
+#cloud-config
+# Host bootstrap template for Megalith Google Compute Engine (x86_64 Ubuntu 24.04 LTS)
+# Prepares minimal hardened host baseline and container runtime.
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - curl
+  - git
+  - ufw
+  - fail2ban
+  - ca-certificates
+  - chrony
+  - jq
+  - age
+
+users:
+  - default
+  - name: ${admin_username}
+    gecos: Megalith Administrator
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+
+write_files:
+  # Configure Docker daemon log rotation to prevent runaway disk exhaustion (ADR-010)
+  - path: /etc/docker/daemon.json
+    owner: root:root
+    permissions: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "20m",
+          "max-file": "3"
+        }
+      }
+
+  # SSH daemon hardening drop-in configuration
+  - path: /etc/ssh/sshd_config.d/99-megalith-hardening.conf
+    owner: root:root
+    permissions: "0600"
+    content: |
+      PasswordAuthentication no
+      PermitRootLogin prohibit-password
+      PubkeyAuthentication yes
+      X11Forwarding no
+      MaxAuthTries 4
+
+runcmd:
+  # Restart sshd to apply hardened configuration
+  - systemctl restart ssh || systemctl restart sshd
+
+  # Ensure chrony time synchronization is running
+  - systemctl enable --now chrony
+
+  # Configure UFW host firewall: restrict SSH strictly to authorized admin CIDR, allow HTTP/HTTPS
+  - ufw --force reset
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow proto tcp from ${ssh_admin_cidr} to any port 22 comment "SSH administrative ingress restricted"
+  - ufw allow 80/tcp comment "HTTP edge ingress"
+  - ufw allow 443/tcp comment "HTTPS edge ingress"
+  - ufw --force enable
+
+  # Install Docker Engine and Compose plugin via official Docker repository (dynamic arch detection)
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - ARCH=$(dpkg --print-architecture) && echo "deb [arch=$ARCH signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | tee /etc/apt/sources.list.d/docker.list
+  - apt-get update -y
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+  # Enable and restart Docker daemon
+  - systemctl enable docker
+  - systemctl restart docker
+
+  # Add non-root admin user to docker group
+  - usermod -aG docker ${admin_username}
+
+  # Create Megalith platform deployment directory skeleton
+  - mkdir -p /opt/megalith/deploy
+  - chown -R ${admin_username}:${admin_username} /opt/megalith
+  - chmod 0755 /opt/megalith

@@ -25,6 +25,7 @@ locals {
 resource "oci_core_instance" "megalith" {
   compartment_id      = var.compartment_ocid
   availability_domain = local.availability_domain
+  fault_domain        = var.fault_domain != "" ? var.fault_domain : null
   display_name        = var.instance_name
 
   # Fixed to Ampere A1 Flex shape for Always Free ARM64 compute (no paid fallback)

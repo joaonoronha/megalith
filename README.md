@@ -255,6 +255,16 @@ For details, see [AI Instruction Architecture](docs/architecture/ai-instructions
   - Conservative rollback mechanics: automated rollback on health probe failure, manual rollback command, and strict blockage of automated container rollback when non-backward-compatible database migrations were applied.
   - Task 008 follow-ups addressed: narrowed proxy CIDR trust (`127.0.0.1, 172.28.0.0/24`), host-scoped HSTS, test port collision resilience (`find_available_port`), and automated merged compose topology test ([`tooling/tests/test_merged_compose.py`](tooling/tests/test_merged_compose.py)).
   - Automated 16-scenario deployment & rollback verification suite ([`tooling/verify_deployment.py`](tooling/verify_deployment.py)), architecture documentation ([`docs/architecture/deployment.md`](docs/architecture/deployment.md)), deployment runbook ([`docs/operations/deployment.md`](docs/operations/deployment.md)), and rollback runbook ([`docs/operations/rollback.md`](docs/operations/rollback.md)).
+- [x] **Production Readiness, Deployment Security, Operational Hardening, and Disaster Recovery (`platform/deploy/`, `docs/operations/`)**:
+  - Independent deployment authorization: Immutable Schema v2 manifests separated from host-side operator authorizations bound to canonical SHA-256 digests ([`tooling/schemas/authorization.schema.json`](tooling/schemas/authorization.schema.json), [`platform/deploy/scripts/release.py`](platform/deploy/scripts/release.py)).
+  - Exact-commit CI provenance verification ([`platform/deploy/scripts/verify_ci_provenance.py`](platform/deploy/scripts/verify_ci_provenance.py)) preventing untrusted check substitution.
+  - Crash-safe deployment state engine with `os.fsync` pre-mutation writes, durable phase transitions, audit trails (`/var/lib/megalith/audit.log`), and interrupted-operation recovery (`deploy.py recover`).
+  - Encrypted, streaming PostgreSQL backups using `age` (X25519) with zero plaintext on disk, companion `.meta.json` manifests, SHA-256 verification, and off-host export ([`platform/deploy/postgres/backup.py`](platform/deploy/postgres/backup.py)).
+  - Clean-environment restore drills (`restore.py drill`), fail-closed retention pruning, and dedicated systemd units (`megalith-backup.service`, `megalith-backup.timer`).
+  - Operational preflight validation checking host architecture, Docker, memory, disk thresholds, and port bindings ([`platform/deploy/scripts/preflight.py`](platform/deploy/scripts/preflight.py)).
+  - Precise reverse proxy trust with static Caddy IP `172.28.0.10` scoped to `compose.prod.yaml` and `FORWARDED_ALLOW_IPS: "127.0.0.1,172.28.0.10"`.
+  - Comprehensive operational documentation: Disaster Recovery Runbook ([`docs/operations/disaster-recovery-runbook.md`](docs/operations/disaster-recovery-runbook.md)) and Production Readiness Specification ([`docs/operations/production-readiness.md`](docs/operations/production-readiness.md)).
+  - Automated 22-scenario operational resilience and failure-injection verification suite ([`tooling/verify_operations.py`](tooling/verify_operations.py)) passing all tests.
 
 ---
 

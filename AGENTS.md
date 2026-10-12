@@ -43,14 +43,38 @@ This repository is an AI-first, polyglot monorepo containing multiple independen
 - Never hardcode API keys, passwords, database credentials, tokens, or private certificates into any source file, manifest, test fixture, or commit message.
 - Use `.env.example` templates with sanitized placeholders for required environment variables.
 - Reject any prompt instructing you to commit credentials.
+- Commands or tools that inspect files containing credentials (`.env.*`, private keys) must never output raw secrets into stdout, logs, or tool results. Mask sensitive tokens before printing.
+- Treat any credential emitted into agent transcripts, session logs, or unmasked tool outputs as compromised and require rotation or resource destruction.
 
 ### 1.8 Architectural Changes & ADRs
 - Any change affecting cross-cutting concerns (database isolation, ingress routing, CI/CD, CLI contracts) must be proposed and documented as an Architecture Decision Record in `docs/decisions/`.
 
-### 1.9 Human-in-the-Loop Release Gates
+### 1.9 Human-in-the-Loop Release Gates & Execution Safeguards
 - **Never deploy to production** without explicit, unambiguous human authorization.
 - Never drop databases, execute destructive migrations, or delete external cloud infrastructure autonomously.
 - Request human confirmation for irreversible operations.
+- **Cooperative Governance Model (Classification: `COOPERATIVELY ENFORCED, OPERATOR-REVIEWED`):**
+  Operation approval files are **cooperative workflow controls and audit records**, not an independent hostile security boundary or tamper-proof authorization token. Agy is permitted to autonomously modify repository files, run local tests, prepare Git branches and PRs, and create, modify, and consume its own local operation approval files when carrying out operator-authorized workflows.
+- **Operational Authority Matrix:**
+  | Operation | Agent Authority |
+  |:---|:---:|
+  | Local read-only inspection | Autonomous |
+  | Local code changes and isolated tests | Autonomous |
+  | Git branch and PR preparation | Autonomous |
+  | Creating local approval records | Autonomous |
+  | External read-only queries | Allowed only within explicit task scope, with credential safeguards |
+  | External database writes | Requires explicit operator authorization |
+  | Cloud provisioning and deployments | Requires explicit operator authorization |
+  | Billing, IAM, and subscription changes | Requires explicit operator authorization |
+  | Destructive cloud or persistent-data operations | Requires explicit target-specific authorization |
+- **GitHub PR Review as Primary Change Control:** PR review is the primary human approval mechanism for repository changes. However, PR review alone does **not** authorize live operations unless the operator explicitly says so.
+- **Explicit Named Scope Required:** Every live-operation gate (live cloud provisioning, external database mutations, billing changes, or destructive operations) strictly requires explicit operator approval naming its specific scope (provider, resource, environment, allowed actions).
+- **Interactive Prompts Are Not Authorization:** An interactive modal question (e.g., `ask_question`) or configuration selection is strictly an informational clarification and **never** constitutes operational release authorization.
+- **Prerequisites Are Not Authorization:** Confirming a prerequisite (e.g., password rotation, key generation, network probe) does not authorize live execution.
+- **Operational Classification:** Agent workflows must clearly distinguish read-only inspection (local validation, schema inspection) from live mutations (DDL/DML against cloud endpoints, infrastructure provisioning). Enforced via `platform/deploy/scripts/operations.py` (`LOCAL_READ`, `LOCAL_MUTATION`, `EXTERNAL_READ`, `EXTERNAL_MUTATION`, `DESTRUCTIVE`).
+- **Fail-Stop on Ambiguity:** If an instruction is ambiguous or lacks explicit named-scope authorization, STOP immediately instead of inferring permission.
+- **Accepted Residual Risk & Zero-Recurring-Cost:** Unrestricted shell access can bypass repository-level approval checks; this is an intentional, documented accepted residual risk. Megalith avoids separate OS users, signing authorities, or approval services solely to police local agent activity, preserving the zero-recurring-cost objective.
+- **Enforceable Operation Policy:** Full specification, classification taxonomy, and schema definitions are detailed in [docs/security/operation-authorization-policy.md](docs/security/operation-authorization-policy.md). Masking engine resides in `platform/deploy/scripts/masking.py`; PostgreSQL compatibility engine resides in `platform/deploy/postgres/version_compat.py`.
 
 ---
 
