@@ -60,7 +60,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Validate release manifest and approval boundary
+      - name: Validate release manifest and calculate canonical digest
         env:
           REL_ID: ${{ github.event.inputs.release_id }}
           ENV_TARGET: ${{ github.event.inputs.environment }}
@@ -71,7 +71,6 @@ jobs:
           import json
           import os
           import sys
-          from datetime import datetime, timezone
           from pathlib import Path
 
           sys.path.insert(0, "platform/deploy/scripts")
@@ -87,41 +86,38 @@ jobs:
               print(f"[Notice] Release manifest '{manifest_path}' not found in repo tree.")
               print(f"When running on host, manifest must be delivered via /opt/megalith/deploy/releases/{rel_id}.json.")
           else:
-              manifest = ReleaseManifest.from_file(manifest_path, require_approval=False)
-              print(f"Successfully loaded manifest for release: {manifest.release_id}")
-
-              # Attach explicit human authorization
-              approval_data = {
-                  "authorized_by": authorizer,
-                  "authorized_at": datetime.now(timezone.utc).isoformat(),
-                  "release_id": rel_id,
-                  "target_environment": env_target,
-                  "intent": "deploy",
-              }
-              manifest_dict = manifest.to_dict()
-              manifest_dict["approval"] = approval_data
-
-              # Validate with approval requirement enforced
-              approved_manifest = ReleaseManifest.from_dict(manifest_dict, require_approval=True)
-              print(f"Manifest validated with human authorization from: {authorizer}")
+              manifest = ReleaseManifest.from_file(manifest_path)
+              print(f"Successfully loaded immutable manifest for release: {manifest.release_id}")
+              digest = manifest.canonical_digest()
+              print(f"Canonical Release Digest : {digest}")
+              print(f"Target Environment       : {manifest.environment}")
+              print(f"Services                 : {', '.join(manifest.services)}")
+              print("")
+              print("Notice: Manifest contains pure immutable release declarations.")
+              print("Deployment authorization must be initiated by an authenticated operator on the host.")
           EOF
 
-      - name: Deployment transport audit
+      - name: Deployment transport audit & host-only execution notice
         run: |
           echo "============================================================"
-          echo " Megalith Deployment Transport Audit & Execution Notice"
+          echo " Megalith Deployment Transport Audit & Host Execution Policy"
           echo "============================================================"
           echo "Target Environment : ${{ github.event.inputs.environment }}"
           echo "Release ID         : ${{ github.event.inputs.release_id }}"
           echo "Action             : ${{ github.event.inputs.action }}"
-          echo "Authorized By      : ${{ github.actor }}"
+          echo "Initiating Actor   : ${{ github.actor }}"
           echo "Timestamp          : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           echo ""
-          echo "Transport Policy:"
-          echo "In accordance with ADR-005, Task 006, and Task 009 security constraints,"
-          echo "OCI host SSH access is strictly restricted to administrator CIDRs."
-          echo "GitHub-hosted runners are NOT granted direct SSH access to the host VM."
+          echo "Security Policy (Task 010):"
+          echo "1. Unattended remote deployment from GitHub Actions is DISABLED."
+          echo "   Editable or self-declared manifest metadata cannot authorize deployment."
+          echo "2. OCI host SSH access is restricted to administrator CIDRs."
+          echo "   GitHub-hosted runners are NOT granted host credentials or SSH access."
+          echo "3. Deployment must be initiated by an authenticated operator on the host."
           echo ""
           echo "Host Execution Command:"
-          echo "  python3 /opt/megalith/deploy/scripts/deploy.py apply /opt/megalith/deploy/releases/${{ github.event.inputs.release_id }}.json"
+          echo "  python3 /opt/megalith/deploy/scripts/deploy.py apply \\"
+          echo "    /opt/megalith/deploy/releases/${{ github.event.inputs.release_id }}.json \\"
+          echo "    --operator ${{ github.actor }} \\"
+          echo "    --confirm-release-id ${{ github.event.inputs.release_id }}"
           echo "============================================================"

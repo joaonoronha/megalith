@@ -37,6 +37,12 @@ variable "instance_name" {
   default     = "megalith-host"
 }
 
+variable "fault_domain" {
+  description = "Optional fault domain within the availability domain (e.g. 'FAULT-DOMAIN-1', 'FAULT-DOMAIN-2', 'FAULT-DOMAIN-3'). If left empty, OCI selects automatically."
+  type        = string
+  default     = ""
+}
+
 variable "vcn_cidr" {
   description = "IPv4 CIDR block for the dedicated Megalith Virtual Cloud Network."
   type        = string

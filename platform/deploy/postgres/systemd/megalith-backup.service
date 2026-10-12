@@ -1,0 +1,38 @@
+[Unit]
+Description=Megalith PostgreSQL Encrypted Logical Backup Service
+Documentation=https://github.com/megalith/megalith
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/megalith/deploy
+EnvironmentFile=-/opt/megalith/deploy/postgres/backup.env
+
+# Execute encrypted backup and prune old backups conservatively
+ExecStart=/usr/bin/python3 /opt/megalith/deploy/postgres/backup.py create \
+    --host localhost \
+    --port 5432 \
+    --database db_demo \
+    --recipient ${AGE_RECIPIENT} \
+    --output-dir /opt/megalith/deploy/postgres/backups \
+    --destination ${BACKUP_DESTINATION:-/opt/megalith/backups/offhost}
+
+ExecStartPost=/usr/bin/python3 /opt/megalith/deploy/postgres/backup.py prune \
+    --output-dir /opt/megalith/deploy/postgres/backups \
+    --keep-count 7 \
+    --keep-days 14 \
+    --destination ${BACKUP_DESTINATION:-/opt/megalith/backups/offhost}
+
+# Hardening directives
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/megalith/deploy/postgres/backups /opt/megalith/backups
+PrivateTmp=true
+
+# Failure reporting
+StandardOutput=journal
+StandardError=journal

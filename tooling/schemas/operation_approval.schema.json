@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Megalith Operation Approval Schema",
+  "description": "Schema for machine-enforceable out-of-tree operator approval records (Task 017)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "approval_id",
+    "operator",
+    "provider",
+    "resource",
+    "environment",
+    "allowed_actions",
+    "max_classification",
+    "authorized_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "enum": [1]
+    },
+    "approval_id": {
+      "type": "string",
+      "pattern": "^appr-[a-zA-Z0-9._-]+$"
+    },
+    "operator": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider": {
+      "type": "string",
+      "enum": ["neon", "gcp", "oci", "aws", "docker", "local"]
+    },
+    "resource": {
+      "type": "string",
+      "minLength": 1
+    },
+    "environment": {
+      "type": "string",
+      "enum": ["production", "staging", "test", "development", "local"]
+    },
+    "allowed_actions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "max_classification": {
+      "type": "string",
+      "enum": ["LOCAL_READ", "LOCAL_MUTATION", "EXTERNAL_READ", "EXTERNAL_MUTATION", "DESTRUCTIVE"]
+    },
+    "authorized_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "one_time": {
+      "type": "boolean"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

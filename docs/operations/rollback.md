@@ -90,5 +90,31 @@ If a non-backward-compatible migration was applied and corrupted data, or if an 
    ```
 3. Re-apply the previous release manifest:
    ```bash
-   python3 platform/deploy/scripts/deploy.py apply /var/lib/megalith/releases/previous_release.json
+   python3 platform/deploy/scripts/deploy.py apply /var/lib/megalith/releases/previous_release.json --auth /var/lib/megalith/releases/auth_previous.json
    ```
+
+---
+
+## 6. Interrupted Operation & Crash Recovery (`deploy.py recover`)
+
+If a deployment process terminates unexpectedly (process SIGKILL, power outage, or OS reboot during transaction):
+
+1. **State Detection**:
+   Subsequent invocations of `apply` or `rollback` will detect the unfinished transaction recorded in `/var/lib/megalith/state.json` and refuse to proceed until recovery is executed:
+   ```
+   InterruptedDeploymentError: Cannot deploy: Unfinished deployment transaction 'tx-...' detected in phase 'applying'. Run 'deploy.py recover' to resolve before deploying.
+   ```
+
+2. **Run Safe Automated Recovery**:
+   ```bash
+   python3 platform/deploy/scripts/deploy.py recover
+   ```
+
+3. **Recovery Decision Logic**:
+   - **`prepared` phase**: No containers or database mutations took place. The recovery engine cleanly resets the transaction.
+   - **`migrating` or `applying` phase**:
+     - The recovery engine inspects live container status and queries the PostgreSQL database for the current Alembic revision.
+     - If database migrations were executed and are backward-compatible: The engine applies the previous release containers and verifies health probes.
+     - If migrations are non-backward-compatible: The engine marks the transaction as `manual_intervention_required` and halts. Under no circumstance does Megalith automatically drop or downgrade a production schema.
+   - **`verifying` phase**: The engine inspects whether containers are healthy and verifies HTTP `/ready`. If healthy, it finalizes the deployment; otherwise, it rolls back to the previous release.
+
