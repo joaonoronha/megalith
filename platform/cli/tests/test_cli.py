@@ -13,6 +13,7 @@ Covers:
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sys
@@ -21,9 +22,8 @@ import unittest
 from pathlib import Path
 
 import yaml
-from typer.testing import CliRunner
-
 from megalith.main import app
+from typer.testing import CliRunner
 
 
 class TestMegalithCLI(unittest.TestCase):
@@ -358,6 +358,41 @@ class TestMegalithCLI(unittest.TestCase):
         result = self.runner.invoke(app, ["run", "fitness/api", "test", "--repo-root", str(self.repo_root)])
         self.assertNotEqual(result.exit_code, 0)
         self.assertIn("validation failed", result.output)
+
+    def test_staging_help(self) -> None:
+        result = self.runner.invoke(app, ["staging", "--help"])
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("preflight", result.output)
+        self.assertIn("dry-run", result.output)
+
+    def test_staging_preflight_local(self) -> None:
+        repo_actual = Path(__file__).resolve().parent.parent.parent.parent
+        result = self.runner.invoke(app, ["staging", "preflight", "--mode", "local", "--repo-root", str(repo_actual)])
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("PREFLIGHT RESULT: PASSED", result.output)
+
+    def test_staging_preflight_json(self) -> None:
+        repo_actual = Path(__file__).resolve().parent.parent.parent.parent
+        result = self.runner.invoke(app, ["staging", "preflight", "--mode", "local", "--json", "--repo-root", str(repo_actual)])
+        self.assertEqual(result.exit_code, 0)
+        data = json.loads(result.output)
+        self.assertTrue(data.get("all_passed"))
+        self.assertEqual(data.get("mode"), "local")
+
+    def test_staging_dry_run_local(self) -> None:
+        repo_actual = Path(__file__).resolve().parent.parent.parent.parent
+        result = self.runner.invoke(app, ["staging", "dry-run", "--mode", "local", "--repo-root", str(repo_actual)])
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("Dry-Run Summary", result.output)
+        self.assertIn("Resource Inventory", result.output)
+        self.assertIn("Cleanup Plan", result.output)
+        self.assertIn("OFFLINE_VALIDATED", result.output)
+
+    def test_staging_invalid_mode(self) -> None:
+        repo_actual = Path(__file__).resolve().parent.parent.parent.parent
+        result = self.runner.invoke(app, ["staging", "preflight", "--mode", "invalid-mode", "--repo-root", str(repo_actual)])
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("Invalid mode 'invalid-mode'", result.output)
 
 
 if __name__ == "__main__":
