@@ -169,6 +169,27 @@ When `--database` is specified during service creation, the onboarding framework
    - Connection strings follow standard format:
      `postgresql+psycopg://role_<product>_app:****@postgres:5432/db_<product>?sslmode=prefer`
 
+### 4.3 Applying Database Initialization to Existing Running Clusters (`megalith product db-init`)
+
+> [!IMPORTANT]
+> **Docker Initdb Behavior Limitation**: Official PostgreSQL Docker images only execute `/docker-entrypoint-initdb.d/` scripts on the **very first container startup** when the persistent data volume is completely empty. Adding a new stateful product to an existing local cluster will **not** trigger automatic execution of the new product's init script.
+
+To onboard a newly scaffolded database into an already running local cluster without dropping volumes or restarting PostgreSQL:
+
+```bash
+# Preview initialization steps and SQL commands (Dry Run)
+megalith product db-init billing --dry-run
+
+# Execute against the active container (e.g. megalith-postgres)
+megalith product db-init billing
+```
+
+**Key Execution Guarantees:**
+- **Zero Data Loss**: Existing databases, roles, and volumes are preserved. No `DROP DATABASE` or volume teardown is performed.
+- **Auto-Discovery**: Detects running PostgreSQL containers (`megalith-postgres`, `postgres`) or falls back to local `psql`.
+- **Idempotence**: SQL scripts check `IF NOT EXISTS` for roles and databases, making repeated execution safe.
+
+
 ---
 
 ## 5. Selective CI Integration
@@ -195,39 +216,58 @@ services = discover_registered_services(repo_root)
 
 ## 6. Deployment & Ingress Integration
 
-### 6.1 Compose v2 Service Snippets
-The onboarding engine provides modular Docker Compose snippets adhering to container hardening standards:
+### 6.1 Modular Standalone Snippets (`compose.snippet.yaml` & `caddy.snippet.txt`)
+
+When a service is scaffolded, the engine writes modular configuration snippets directly into the service directory (`apps/<product>/<service>/`):
+
+1. **`compose.snippet.yaml`**: A hardened Compose v2 service definition ready to be merged into `platform/deploy/compose.yaml` or used in local docker compose commands.
+2. **`caddy.snippet.txt`**: A Caddy reverse-proxy block ready to be included in `platform/deploy/caddy/Caddyfile`.
 
 ```yaml
-services:
+# apps/billing/api/compose.snippet.yaml
   billing-api:
-    image: ${IMAGE_BILLING_API:-billing-api:latest}
     build:
       context: ../../apps/billing/api
       dockerfile: Dockerfile
-    container_name: billing-api
+    image: ${IMAGE_BILLING_API:-megalith-billing-api:local}
     restart: unless-stopped
-    read_only: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://role_billing_app:billing_app_dev_password@postgres:5432/db_billing}
+    networks:
+      - edge-network
+      - data-network
+    ports:
+      - "${PORT_BILLING_API:-8001}:8001"
+    healthcheck:
+      test: ["python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health').read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    read_only: true
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=64m
-    environment:
-      - PORT=8001
-      - DATABASE_URL=postgresql+psycopg://role_billing_app:${DB_PASS_BILLING_APP}@postgres:5432/db_billing?sslmode=prefer
-    ports:
-      - "127.0.0.1:8001:8001"
+      - /tmp
 ```
 
-### 6.2 Caddy Ingress Routing Snippets
-Ingress routing follows predictable path conventions:
-* API Services: Route `/api/<product>/*` or `/<product>/api/*` -> Reverse proxy to internal service port.
-* Web Services: Route `/<product>/*` -> Reverse proxy to frontend container port.
-* Health Endpoints: Uniformly exposed at `/healthz` or `/health`.
+### 6.2 Service Type Scoping & Worker Isolation
+* **API and Web Services (`api`, `web`)**: Attached to `edge-network` and `data-network` (if database-backed), declare container port forwardings, and generate `caddy.snippet.txt`.
+* **Worker Services (`worker`)**:
+  - Bound strictly to `internal-network` (and `data-network` if database-backed).
+  - Edge ports are **omitted** to eliminate ingress attack surface.
+  - Caddy ingress snippet `caddy.snippet.txt` is **not generated**.
 
-The onboarding engine verifies that proposed ports and ingress route prefixes do not collide with existing services prior to scaffolding.
+### 6.3 Transactional Scaffolding & Regeneration Guardrails
+* **Transactional Rollback**: File generation operates within a transactional envelope. If an error occurs during file rendering or writing (e.g., disk I/O, permissions), modified manifest backups (e.g. `projects.yaml`, `product.yaml`) are automatically restored and any partially created files are deleted.
+* **Collision Protection**: Scaffolding refuses to overwrite existing services or product directories unless `--force` is explicitly provided.
+* **Post-Scaffold Customization**: Once scaffolded, application code and manifest settings are meant to evolve independently. Using `--force` will regenerate files from templates and will overwrite local modifications; manual edits to `service.yaml` are the recommended method for configuration updates.
+
 
 ---
 
@@ -285,6 +325,18 @@ Options:
   --repo-root PATH  Explicit path to monorepo root.
 ```
 
+### `megalith product db-init`
+```
+Usage: megalith product db-init [OPTIONS] PRODUCT_ID
+
+Arguments:
+  PRODUCT_ID    Product identifier whose database initialization script should be applied. [required]
+
+Options:
+  --dry-run         Preview SQL and execution steps without applying changes.
+  --repo-root PATH  Explicit path to monorepo root.
+```
+
 ---
 
 ## 8. Troubleshooting & Common Issues
@@ -308,3 +360,14 @@ Options:
 * **Symptoms:** `python3 tooling/validate.py` reports schema errors on new service.
 * **Cause:** Required manifest field omitted or dependency references non-existent service.
 * **Resolution:** Run `megalith product validate <product-id>` to isolate error details. Ensure dependency references use `<product>/<service>` qualified ID format.
+
+### Issue 5: PostgreSQL Database Not Found in Running Local Stack
+* **Symptoms:** Application fails to connect to `db_<product>` on a pre-existing PostgreSQL container.
+* **Cause:** PostgreSQL Docker entrypoint scripts only execute upon first initialization of an empty volume. Existing database clusters do not automatically execute newly added init scripts.
+* **Resolution:** Run `megalith product db-init <product-id>` to safely execute the initialization script against the running container without tearing down existing data.
+
+### Issue 6: Scaffolding Aborted and Rolled Back
+* **Symptoms:** CLI displays `ScaffoldError: Scaffolding transaction aborted and rolled back: <error>`.
+* **Cause:** An unhandled error occurred during file creation or manifest modification (e.g., file permissions or disk error).
+* **Resolution:** The engine's transactional rollback guarantees that `projects.yaml` and `product.yaml` were restored to their pre-operation state, and any partially generated files were cleaned up. Inspect the error message, resolve permissions or invalid paths, and re-run.
+

@@ -346,9 +346,10 @@ def test_postgresql_isolation_script_generation(mock_repo: Path):
     assert "db_finance" in script_content
     assert "role_finance_migrate" in script_content
     assert "role_finance_app" in script_content
-    assert "REVOKE CONNECT ON DATABASE ${DB_NAME} FROM PUBLIC;" in script_content
-    assert "GRANT USAGE ON SCHEMA public TO ${DB_APP_USER};" in script_content
-    assert "ALTER DEFAULT PRIVILEGES FOR ROLE ${DB_MIGRATE_USER}" in script_content
+    assert "REVOKE CONNECT ON DATABASE %I FROM PUBLIC" in script_content
+    assert "GRANT USAGE ON SCHEMA public TO %I" in script_content
+    assert "ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public" in script_content
+
 
 
 # Scenario 10: Manifest-driven selective CI discovery
@@ -458,3 +459,113 @@ def test_no_cloud_operations(mock_repo: Path, monkeypatch):
     engine.add_service("offline-prod", "worker", template="go")
 
     assert (mock_repo / "apps" / "offline-prod").is_dir()
+
+
+# Scenario 17: Hyphenated product PostgreSQL identifier normalization
+def test_hyphenated_product_db_identifier_normalization(mock_repo: Path):
+    engine = ScaffoldEngine(mock_repo)
+    engine.create_product("billing-core")
+    engine.add_service("billing-core", "api", template="fastapi", with_database=True)
+
+    init_dir = mock_repo / "platform" / "deploy" / "postgres" / "init"
+    scripts = list(init_dir.glob("*-init-billing-core-db.sh"))
+    assert len(scripts) == 1
+    script_content = scripts[0].read_text(encoding="utf-8")
+
+    # Normalized identifiers
+    assert "db_billing_core" in script_content
+    assert "role_billing_core_migrate" in script_content
+    assert "role_billing_core_app" in script_content
+
+    # Safe SQL injection protection using PostgreSQL format %I and %L
+    assert "format('CREATE DATABASE %I OWNER %I'" in script_content
+    assert "format('CREATE ROLE %I WITH LOGIN PASSWORD %L NOSUPERUSER" in script_content
+    assert "format('GRANT CONNECT ON DATABASE %I TO %I, %I'" in script_content
+
+    # Safe bash parameter expansion without delimiter collision
+    assert '${BILLING_CORE_DB_NAME:-db_billing_core}' in script_content
+    assert '${BILLING_CORE_DB_MIGRATE_PASSWORD:-billing_core_migrate_dev_password}' in script_content
+
+
+# Scenario 18: Transactional rollback on write failure
+def test_transactional_rollback_on_write_failure(mock_repo: Path, monkeypatch):
+    engine = ScaffoldEngine(mock_repo)
+    engine.create_product("faulty-prod")
+
+    orig_write = Path.write_text
+    product_manifest = mock_repo / "apps" / "faulty-prod" / "product.yaml"
+    orig_manifest_content = product_manifest.read_text(encoding="utf-8")
+
+    def failing_write(self, data, *args, **kwargs):
+        # Fail when writing Dockerfile to simulate midway failure
+        if self.name == "Dockerfile":
+            raise OSError("Simulated disk I/O error during scaffolding")
+        return orig_write(self, data, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", failing_write)
+
+    with pytest.raises(ScaffoldError) as exc_info:
+        engine.add_service("faulty-prod", "svc", template="fastapi")
+
+    assert "aborted and rolled back" in str(exc_info.value)
+
+    # Verify rollback: product.yaml restored to original state
+    assert product_manifest.read_text(encoding="utf-8") == orig_manifest_content
+
+    # Verify created files were cleaned up
+    svc_dir = mock_repo / "apps" / "faulty-prod" / "svc"
+    created_files = list(svc_dir.rglob("*")) if svc_dir.exists() else []
+    # If the directory exists, it should have no remaining files
+    assert all(not f.is_file() for f in created_files)
+
+
+# Scenario 19: Worker service compose snippet and caddy omission
+def test_worker_compose_and_caddy_snippets(mock_repo: Path):
+    engine = ScaffoldEngine(mock_repo)
+    engine.create_product("queue-system")
+    engine.add_service(
+        "queue-system",
+        "worker",
+        template="go",
+        service_type="worker",
+        with_database=True,
+    )
+
+    worker_dir = mock_repo / "apps" / "queue-system" / "worker"
+    compose_snippet_path = worker_dir / "compose.snippet.yaml"
+    caddy_snippet_path = worker_dir / "caddy.snippet.txt"
+
+    assert compose_snippet_path.is_file()
+    compose_content = compose_snippet_path.read_text(encoding="utf-8")
+
+    # Worker must be on internal-network and data-network, with no edge ports
+    assert "internal-network" in compose_content
+    assert "data-network" in compose_content
+    assert "edge-network" not in compose_content
+    assert "ports:" not in compose_content
+
+    # Worker must NOT have caddy route snippet generated
+    assert not caddy_snippet_path.exists()
+
+
+# Scenario 20: Standalone snippet files generated for API and Web services
+def test_standalone_snippet_files_generated(mock_repo: Path):
+    engine = ScaffoldEngine(mock_repo)
+    engine.create_product("portal")
+    engine.add_service("portal", "api", template="fastapi", port=8010)
+    engine.add_service("portal", "web", template="react", port=8020)
+
+    api_dir = mock_repo / "apps" / "portal" / "api"
+    web_dir = mock_repo / "apps" / "portal" / "web"
+
+    assert (api_dir / "compose.snippet.yaml").is_file()
+    assert (api_dir / "caddy.snippet.txt").is_file()
+    assert (web_dir / "compose.snippet.yaml").is_file()
+    assert (web_dir / "caddy.snippet.txt").is_file()
+
+    api_caddy = (api_dir / "caddy.snippet.txt").read_text(encoding="utf-8")
+    assert "reverse_proxy portal-api:8010" in api_caddy
+
+    web_caddy = (web_dir / "caddy.snippet.txt").read_text(encoding="utf-8")
+    assert "reverse_proxy portal-web:8020" in web_caddy
+

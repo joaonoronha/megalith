@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN npm install -g pnpm@12.3.4
 
-COPY package.json ./
+COPY package.json pnpm-workspace.yaml* ./
 RUN pnpm install
 
 COPY tsconfig.json vite.config.ts index.html ./

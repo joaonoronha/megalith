@@ -120,9 +120,13 @@ def render_template(content: str, variables: Dict[str, str]) -> str:
 
 
 class ScaffoldEngine:
-    def __init__(self, repo_root: Path) -> None:
+    def __init__(self, repo_root: Path, templates_dir: Optional[Path] = None) -> None:
         self.repo_root = repo_root.resolve()
-        self.templates_dir = self.repo_root / "platform" / "templates"
+        self.templates_dir = (
+            templates_dir.resolve()
+            if templates_dir
+            else (self.repo_root / "platform" / "templates").resolve()
+        )
         if not self.templates_dir.is_dir():
             raise ScaffoldError(f"Templates directory not found at {self.templates_dir}")
 
@@ -293,16 +297,23 @@ class ScaffoldEngine:
 
         product_name = product_data.get("name", product_id.replace("-", " ").title())
         product_upper = product_id.upper().replace("-", "_")
+        product_norm = product_id.replace("-", "_")
 
         vars_map = {
             "PRODUCT_ID": product_id,
             "PRODUCT_ID_UPPER": product_upper,
+            "PRODUCT_ID_NORM": product_norm,
             "PRODUCT_NAME": product_name,
             "SERVICE_ID": service_id,
             "SERVICE_TYPE": service_type,
             "PORT": str(port),
             "DEPLOYABLE": "true" if deployable else "false",
             "TARGET": target,
+            "DB_NAME": f"db_{product_norm}",
+            "DB_MIGRATE_USER": f"role_{product_norm}_migrate",
+            "DB_MIGRATE_PASSWORD": f"{product_norm}_migrate_dev_password",
+            "DB_APP_USER": f"role_{product_norm}_app",
+            "DB_APP_PASSWORD": f"{product_norm}_app_dev_password",
         }
 
         # Template-specific rendering
@@ -314,6 +325,35 @@ class ScaffoldEngine:
             files_to_create.extend(self._render_react_template(service_dir_rel, vars_map))
         elif template == "go":
             files_to_create.extend(self._render_go_template(service_dir_rel, vars_map))
+
+        # Generate standalone deployment snippets in the service directory
+        compose_snippet = self.generate_compose_snippet(
+            product_id=product_id,
+            service_id=service_id,
+            template=template,
+            port=port,
+            with_database=with_database,
+            service_type=service_type,
+        )
+        files_to_create.append(
+            ScaffoldingFile(
+                str(service_dir_rel / "compose.snippet.yaml"),
+                compose_snippet,
+            )
+        )
+
+        if service_type in ("api", "web"):
+            caddy_snippet = self.generate_caddy_route_snippet(
+                product_id=product_id,
+                service_id=service_id,
+                port=port,
+            )
+            files_to_create.append(
+                ScaffoldingFile(
+                    str(service_dir_rel / "caddy.snippet.txt"),
+                    caddy_snippet,
+                )
+            )
 
         # If PostgreSQL requested, generate database init script
         files_to_modify: List[ScaffoldingFile] = []
@@ -360,15 +400,18 @@ class ScaffoldEngine:
             migrate_cmd = "\n  migrate:\n    - alembic\n    - upgrade\n    - head"
             deps_block = "\ndependencies:\n  external:\n    - postgresql"
             extra_deps = '    "sqlalchemy>=2.0.0",\n    "psycopg[binary]>=3.1.0",\n    "alembic>=1.13.0",\n'
+            alembic_copy = "COPY --chown=appuser:appgroup alembic.ini /app/alembic.ini\nCOPY --chown=appuser:appgroup migrations /app/migrations\n"
         else:
             migrate_cmd = ""
             deps_block = ""
             extra_deps = ""
+            alembic_copy = ""
 
         fastapi_vars = dict(vars_map)
         fastapi_vars["MIGRATE_COMMAND"] = migrate_cmd
         fastapi_vars["DEPENDENCIES_BLOCK"] = deps_block
         fastapi_vars["EXTRA_DEPENDENCIES"] = extra_deps
+        fastapi_vars["ALEMBIC_DOCKER_COPY"] = alembic_copy
 
         files.append(
             ScaffoldingFile(
@@ -466,6 +509,7 @@ class ScaffoldEngine:
         mappings = [
             ("service.yaml.tpl", "service.yaml"),
             ("package.json.tpl", "package.json"),
+            ("pnpm-workspace.yaml.tpl", "pnpm-workspace.yaml"),
             ("tsconfig.json.tpl", "tsconfig.json"),
             ("vite.config.ts.tpl", "vite.config.ts"),
             ("index.html.tpl", "index.html"),
@@ -529,27 +573,60 @@ class ScaffoldEngine:
     ) -> ScaffoldingFile:
         """Generates idempotent initialization script for the product database."""
         init_dir = Path("platform") / "deploy" / "postgres" / "init"
-        existing_scripts = list((self.repo_root / init_dir).glob("*.sh")) if (self.repo_root / init_dir).is_dir() else []
-        next_num = len(existing_scripts) + 1
-        script_name = f"{next_num:02d}-init-{product_id}-db.sh"
-        script_rel = init_dir / script_name
+        existing_for_prod = list((self.repo_root / init_dir).glob(f"*-init-{product_id}-db.sh")) if (self.repo_root / init_dir).is_dir() else []
+        if existing_for_prod:
+            script_rel = init_dir / existing_for_prod[0].name
+        else:
+            existing_scripts = list((self.repo_root / init_dir).glob("*.sh")) if (self.repo_root / init_dir).is_dir() else []
+            next_num = len(existing_scripts) + 1
+            script_name = f"{next_num:02d}-init-{product_id}-db.sh"
+            script_rel = init_dir / script_name
 
         tpl_content = (self.templates_dir / "postgres" / "init-db.sh.tpl").read_text(encoding="utf-8")
         rendered = render_template(tpl_content, vars_map)
         return ScaffoldingFile(str(script_rel), rendered, executable=True)
 
     def _apply_scaffolding(self, result: ScaffoldingResult) -> None:
-        """Writes scaffolded files to disk."""
-        for sf in result.files_to_create:
-            dest = safe_resolve_repo_path(self.repo_root, sf.relative_path)
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(sf.content, encoding="utf-8")
-            if sf.executable:
-                dest.chmod(dest.stat().st_mode | 0o111)
+        """Transactionally writes scaffolded files to disk with automatic rollback on failure."""
+        created_paths: List[Path] = []
+        modified_backups: Dict[Path, str] = {}
 
-        for sf in result.files_to_modify:
-            dest = safe_resolve_repo_path(self.repo_root, sf.relative_path)
-            dest.write_text(sf.content, encoding="utf-8")
+        try:
+            # 1. Back up any files to be modified
+            for sf in result.files_to_modify:
+                dest = safe_resolve_repo_path(self.repo_root, sf.relative_path)
+                if dest.is_file():
+                    modified_backups[dest] = dest.read_text(encoding="utf-8")
+
+            # 2. Write new files
+            for sf in result.files_to_create:
+                dest = safe_resolve_repo_path(self.repo_root, sf.relative_path)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text(sf.content, encoding="utf-8")
+                created_paths.append(dest)
+                if sf.executable:
+                    dest.chmod(dest.stat().st_mode | 0o111)
+
+            # 3. Write modified files
+            for sf in result.files_to_modify:
+                dest = safe_resolve_repo_path(self.repo_root, sf.relative_path)
+                dest.write_text(sf.content, encoding="utf-8")
+
+        except Exception as exc:
+            # Rollback: restore modified files to original state
+            for dest, original_content in modified_backups.items():
+                try:
+                    dest.write_text(original_content, encoding="utf-8")
+                except Exception:
+                    pass
+            # Delete any newly created files
+            for dest in reversed(created_paths):
+                try:
+                    if dest.is_file():
+                        dest.unlink()
+                except Exception:
+                    pass
+            raise ScaffoldError(f"Scaffolding transaction aborted and rolled back: {exc}") from exc
 
     def generate_compose_snippet(
         self,
@@ -558,13 +635,16 @@ class ScaffoldEngine:
         template: str,
         port: int,
         with_database: bool = False,
+        service_type: str = "api",
     ) -> str:
         """Generates a modular Docker Compose service definition block for the scaffolded service."""
         container_name = f"{product_id}-{service_id}"
         image_var = f"IMAGE_{product_id.upper().replace('-', '_')}_{service_id.upper().replace('-', '_')}"
         context_path = f"../../apps/{product_id}/{service_id}"
+        product_norm = product_id.replace("-", "_")
 
-        networks = ["edge-network"]
+        is_worker = (service_type == "worker")
+        networks = ["internal-network"] if is_worker else ["edge-network"]
         if with_database:
             networks.append("data-network")
 
@@ -573,7 +653,7 @@ class ScaffoldEngine:
         env_block = ""
         if with_database:
             env_block = f"""    environment:
-      DATABASE_URL: ${{DATABASE_URL:-postgresql+psycopg://role_{product_id}_app:{product_id}_app_dev_password@postgres:5432/db_{product_id}}}
+      DATABASE_URL: ${{DATABASE_URL:-postgresql+psycopg://role_{product_norm}_app:{product_norm}_app_dev_password@postgres:5432/db_{product_norm}}}
 """
 
         depends_block = ""
@@ -581,6 +661,12 @@ class ScaffoldEngine:
             depends_block = """    depends_on:
       postgres:
         condition: service_healthy
+"""
+
+        ports_block = ""
+        if not is_worker:
+            ports_block = f"""    ports:
+      - "${{PORT_{product_id.upper().replace('-', '_')}_{service_id.upper().replace('-', '_')}:-{port}}}:{port}"
 """
 
         health_cmd = (
@@ -597,9 +683,7 @@ class ScaffoldEngine:
     restart: unless-stopped
 {depends_block}{env_block}    networks:
 {networks_yaml}
-    ports:
-      - "${{PORT_{product_id.upper().replace('-', '_')}_{service_id.upper().replace('-', '_')}:-{port}}}:{port}"
-    healthcheck:
+{ports_block}    healthcheck:
       test: {health_cmd}
       interval: 10s
       timeout: 3s
