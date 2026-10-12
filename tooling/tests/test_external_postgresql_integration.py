@@ -524,6 +524,21 @@ def external_postgres_simulator():
         subprocess.run(["docker", "exec", cname, "chmod", "600",
                         "/var/lib/postgresql/server.key", "/var/lib/postgresql/mismatched.key"], check=True)
 
+        def run_psql(sql: str, db: str = "postgres", max_retries: int = 25) -> None:
+            cmd = ["docker", "exec", "-i", cname, "psql", "-U", "postgres"]
+            if db != "postgres":
+                cmd.extend(["-d", db])
+            last_err = ""
+            for _ in range(max_retries):
+                res = subprocess.run(cmd, input=sql.encode(), capture_output=True, check=False)
+                if res.returncode == 0:
+                    return
+                last_err = res.stderr.decode(errors="replace")
+                time.sleep(1)
+            raise subprocess.CalledProcessError(
+                2, cmd, output=b"", stderr=last_err.encode()
+            )
+
         # Enable SSL with valid server.crt
         ssl_setup = "\n".join([
             "ALTER SYSTEM SET ssl = 'on';",
@@ -531,7 +546,7 @@ def external_postgres_simulator():
             "ALTER SYSTEM SET ssl_key_file = '/var/lib/postgresql/server.key';",
             "SELECT pg_reload_conf();",
         ])
-        subprocess.run(["docker", "exec", "-i", cname, "psql", "-U", "postgres"], input=ssl_setup.encode(), check=True, capture_output=True)
+        run_psql(ssl_setup)
         time.sleep(1)
 
         # Set up simulated multi-tenant databases and roles
@@ -549,7 +564,7 @@ def external_postgres_simulator():
         REVOKE CONNECT ON DATABASE db_external_app2 FROM PUBLIC;
         GRANT CONNECT ON DATABASE db_external_app2 TO role_app2_user;
         """
-        subprocess.run(["docker", "exec", "-i", cname, "psql", "-U", "postgres"], input=setup_sql.encode(), check=True, capture_output=True)
+        run_psql(setup_sql)
 
         # Configure permissions on db_external_app1
         app1_sql = """
@@ -561,11 +576,11 @@ def external_postgres_simulator():
         ALTER DEFAULT PRIVILEGES FOR ROLE role_ext_migrate IN SCHEMA public
             GRANT USAGE, SELECT ON SEQUENCES TO role_ext_app;
         """
-        subprocess.run(["docker", "exec", "-i", cname, "psql", "-U", "postgres", "-d", "db_external_app1"], input=app1_sql.encode(), check=True, capture_output=True)
+        run_psql(app1_sql, db="db_external_app1")
 
         def switch_cert(cert_file: str, key_file: str):
             q = f"ALTER SYSTEM SET ssl_cert_file = '/var/lib/postgresql/{cert_file}'; ALTER SYSTEM SET ssl_key_file = '/var/lib/postgresql/{key_file}'; SELECT pg_reload_conf();"
-            subprocess.run(["docker", "exec", "-i", cname, "psql", "-U", "postgres"], input=q.encode(), check=True, capture_output=True)
+            run_psql(q)
             time.sleep(0.5)
 
         yield {
