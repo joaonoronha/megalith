@@ -46,6 +46,11 @@ class TestMegalithCLI(unittest.TestCase):
         shutil.copy2(repo_actual / "tooling" / "validate.py", dst_tooling / "validate.py")
         (dst_tooling / "__init__.py").touch()
 
+        # Copy platform/templates to temp repo for scaffolding
+        src_templates = repo_actual / "platform" / "templates"
+        if src_templates.exists():
+            shutil.copytree(src_templates, self.repo_root / "platform" / "templates", dirs_exist_ok=True)
+
         # Add canonical Megalith repo markers
         self._write_file("AGENTS.md", "# Megalith Guidelines\n")
         self._write_yaml("projects.yaml", {"version": 1, "products": []})
@@ -393,6 +398,111 @@ class TestMegalithCLI(unittest.TestCase):
         result = self.runner.invoke(app, ["staging", "preflight", "--mode", "invalid-mode", "--repo-root", str(repo_actual)])
         self.assertNotEqual(result.exit_code, 0)
         self.assertIn("Invalid mode 'invalid-mode'", result.output)
+
+    # 10. Product and Service Scaffolding CLI Commands
+    def test_product_help(self) -> None:
+        result = self.runner.invoke(app, ["product", "--help"])
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("create", result.output)
+        self.assertIn("validate", result.output)
+        self.assertIn("list", result.output)
+
+    def test_product_create_dry_run(self) -> None:
+        result = self.runner.invoke(
+            app,
+            ["product", "create", "testprod", "--name", "Test Product", "--description", "A test", "--dry-run", "--repo-root", str(self.repo_root)],
+        )
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("Dry-run mode", result.output)
+        self.assertFalse((self.repo_root / "apps" / "testprod").exists())
+
+    def test_product_create_and_validate(self) -> None:
+        result = self.runner.invoke(
+            app,
+            ["product", "create", "testprod", "--name", "Test Product", "--description", "A test", "--repo-root", str(self.repo_root)],
+        )
+        self.assertEqual(result.exit_code, 0)
+        self.assertTrue((self.repo_root / "apps" / "testprod" / "product.yaml").exists())
+
+        # Validate product
+        val_result = self.runner.invoke(
+            app,
+            ["product", "validate", "testprod", "--repo-root", str(self.repo_root)],
+        )
+        self.assertEqual(val_result.exit_code, 0)
+        self.assertIn("valid", val_result.output.lower())
+
+    def test_service_help(self) -> None:
+        result = self.runner.invoke(app, ["service", "--help"])
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("add", result.output)
+
+    def test_service_add_dry_run(self) -> None:
+        self.runner.invoke(
+            app,
+            ["product", "create", "testprod", "--name", "Test Product", "--repo-root", str(self.repo_root)],
+        )
+        result = self.runner.invoke(
+            app,
+            ["service", "add", "testprod", "api", "--template", "fastapi", "--port", "8001", "--dry-run", "--repo-root", str(self.repo_root)],
+        )
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("Dry-run mode", result.output)
+        self.assertFalse((self.repo_root / "apps" / "testprod" / "api").exists())
+
+    def test_service_add_and_validate(self) -> None:
+        self.runner.invoke(
+            app,
+            ["product", "create", "testprod", "--name", "Test Product", "--repo-root", str(self.repo_root)],
+        )
+        result = self.runner.invoke(
+            app,
+            ["service", "add", "testprod", "api", "--template", "fastapi", "--port", "8001", "--database", "--repo-root", str(self.repo_root)],
+        )
+        self.assertEqual(result.exit_code, 0)
+        self.assertTrue((self.repo_root / "apps" / "testprod" / "api" / "service.yaml").exists())
+        init_scripts = list((self.repo_root / "platform" / "deploy" / "postgres" / "init").glob("*-init-testprod-db.sh"))
+        self.assertTrue(len(init_scripts) > 0)
+
+        val_result = self.runner.invoke(
+            app,
+            ["product", "validate", "testprod", "--repo-root", str(self.repo_root)],
+        )
+        self.assertEqual(val_result.exit_code, 0)
+        self.assertIn("valid", val_result.output.lower())
+
+    def test_service_add_port_conflict(self) -> None:
+        self.runner.invoke(
+            app,
+            ["product", "create", "testprod", "--name", "Test Product", "--repo-root", str(self.repo_root)],
+        )
+        self.runner.invoke(
+            app,
+            ["service", "add", "testprod", "api", "--template", "fastapi", "--port", "8001", "--repo-root", str(self.repo_root)],
+        )
+        # Attempt to add another service with same port -> produces warning
+        result = self.runner.invoke(
+            app,
+            ["service", "add", "testprod", "web", "--template", "react", "--port", "8001", "--repo-root", str(self.repo_root)],
+        )
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("already assigned", result.output)
+
+    def test_service_add_duplicate_id_rejected(self) -> None:
+        self.runner.invoke(
+            app,
+            ["product", "create", "testprod", "--name", "Test Product", "--repo-root", str(self.repo_root)],
+        )
+        self.runner.invoke(
+            app,
+            ["service", "add", "testprod", "api", "--template", "fastapi", "--port", "8001", "--repo-root", str(self.repo_root)],
+        )
+        result = self.runner.invoke(
+            app,
+            ["service", "add", "testprod", "api", "--template", "fastapi", "--port", "8002", "--repo-root", str(self.repo_root)],
+        )
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("already registered", result.output)
 
 
 if __name__ == "__main__":

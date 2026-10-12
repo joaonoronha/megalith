@@ -218,3 +218,40 @@ def test_ingress_changes_trigger_containers():
     assert res.demo_web is False
     assert res.terraform is False
     assert res.docs_only is False
+
+
+def test_template_changes_trigger_global():
+    res = classify_files(["platform/templates/fastapi/service.yaml.tpl"])
+    assert res.platform is True
+    assert res.all_triggered is True
+    assert res.docs_only is False
+
+
+def test_dynamic_service_discovery_in_ci(tmp_path: Path):
+    # Set up mock repository with dynamic product
+    projects_content = """version: 1
+products:
+  - id: demo
+    manifest: apps/demo/product.yaml
+  - id: fitness
+    manifest: apps/fitness/product.yaml
+"""
+    (tmp_path / "projects.yaml").write_text(projects_content, encoding="utf-8")
+    fit_dir = tmp_path / "apps" / "fitness"
+    fit_dir.mkdir(parents=True)
+    (fit_dir / "product.yaml").write_text(
+        "id: fitness\nname: Fitness\ndescription: Test\ndocs: README.md\nservices:\n  - id: api\n    manifest: api/service.yaml\n",
+        encoding="utf-8",
+    )
+    (fit_dir / "api").mkdir(parents=True)
+    (fit_dir / "api" / "service.yaml").write_text(
+        "id: api\nproduct: fitness\ntype: api\nruntime:\n  language: python\npath: apps/fitness/api\ncommands: {}\nartifact:\n  type: docker\ndeployment:\n  deployable: true\n  target: oci-vm\n",
+        encoding="utf-8",
+    )
+
+    res = classify_files(["apps/fitness/api/src/main.py"], repo_root=tmp_path)
+    assert res.platform is True
+    assert "fitness/api" in res.triggered_services
+    assert "fitness" in res.triggered_products
+    assert res.docs_only is False
+

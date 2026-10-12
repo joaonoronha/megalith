@@ -15,7 +15,9 @@ from megalith.discovery import (
     find_repo_root,
     get_validator,
 )
+from megalith.product import product_app
 from megalith.runner import CommandExecutionError, execute_service_command
+from megalith.service import service_app
 from megalith.staging import staging_app
 from megalith.ui import (
     print_error,
@@ -30,6 +32,8 @@ app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
 )
+app.add_typer(product_app, name="product")
+app.add_typer(service_app, name="service")
 app.add_typer(staging_app, name="staging")
 
 
