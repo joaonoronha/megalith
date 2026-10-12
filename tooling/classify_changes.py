@@ -81,6 +81,7 @@ CONTAINER_INFRA_PATTERNS = [
 
 TERRAFORM_INFRA_PATTERNS = [
     "platform/infra/oci/**",
+    "platform/infra/gcp/**",
 ]
 
 DEMO_PRODUCT_MANIFEST = "apps/demo/product.yaml"

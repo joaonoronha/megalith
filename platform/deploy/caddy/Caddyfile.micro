@@ -1,0 +1,26 @@
+# Global configuration
+{
+	admin off
+	auto_https off
+}
+
+# Micro profile site block for smoke testing
+:80, {$DEMO_HOSTNAME:demo.example.com} {
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Micro profile health check endpoint
+	handle /health {
+		header Content-Type "application/json"
+		respond "{\"status\":\"ok\",\"profile\":\"micro\",\"smoke_test\":true}" 200
+	}
+
+	# Route remaining traffic to lightweight static web container
+	handle {
+		reverse_proxy demo-web:8080
+	}
+}

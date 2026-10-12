@@ -75,22 +75,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_SHA: ${{ github.event.inputs.git_sha }}
+          REPO: ${{ github.repository }}
         run: |
-          echo "Checking workflow runs for exact commit: $TARGET_SHA"
-          # Query GitHub API for CI workflow runs matching the exact commit SHA
-          RUN_STATUS=$(gh run list \
+          echo "Verifying exact-commit CI provenance for: $TARGET_SHA in $REPO"
+          python3 platform/deploy/scripts/verify_ci_provenance.py \
             --commit "$TARGET_SHA" \
-            --workflow "ci.yaml" \
-            --json conclusion,status,headSha \
-            --jq '.[] | select(.headSha == "'"$TARGET_SHA"'") | .conclusion' | head -n 1)
-
-          echo "Exact-commit CI conclusion: '$RUN_STATUS'"
-
-          # Fail closed if CI did not succeed for this exact commit
-          if [[ "$RUN_STATUS" != "success" ]]; then
-            echo "::error::Required CI gate has not succeeded for exact commit $TARGET_SHA (status: '$RUN_STATUS'). Releases strictly require passing CI on the target revision."
-            exit 1
-          fi
+            --repo "$REPO"
           echo "Exact-commit CI verification passed!"
 
       - name: Determine Release ID

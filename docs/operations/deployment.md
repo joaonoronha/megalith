@@ -59,16 +59,39 @@ Verify:
 - Changed services match expectations.
 - Any declared migrations are verified backward-compatible.
 
-### Step 3: Trigger Controlled Deployment
-Trigger the deployment workflow or execute on the host:
-- In GitHub Actions: Navigate to **Actions** -> **Apply Deployment**.
-  - Enter `release_id` (e.g., `rel-20261010-a1b2c3d`).
-  - Enter `confirm_release_id` with the exact same ID (dual confirmation gate).
-  - Workflow seals human authorization and executes host deployment.
-- Or on the host directly:
-  ```bash
-  python3 platform/deploy/scripts/deploy.py apply /path/to/release.json
-  ```
+### Step 3: Authorize and Trigger Controlled Deployment
+In Megalith (Schema v2), release manifests are immutable and cannot self-authorize. Deployment requires an authenticated operator authorization bound to the manifest's canonical SHA-256 digest:
+
+1. **Host-Side Deployment Authorization**:
+   ```bash
+   python3 platform/deploy/scripts/release.py authorize \
+     --manifest /path/to/release.json \
+     --operator "operator-username" \
+     --environment production \
+     --output /var/lib/megalith/releases/auth.json
+   ```
+
+2. **Preflight Health & Resource Check**:
+   Before mutation, run the non-destructive operational preflight validator:
+   ```bash
+   python3 platform/deploy/scripts/preflight.py \
+     --compose platform/deploy/compose.yaml \
+     --compose platform/deploy/compose.prod.yaml \
+     --state-dir /var/lib/megalith \
+     --min-disk-gb 5 \
+     --min-ram-mb 1024
+   ```
+
+3. **Apply Authorized Release**:
+   Apply the release by passing the verified authorization record:
+   ```bash
+   python3 platform/deploy/scripts/deploy.py apply \
+     /path/to/release.json \
+     --auth /var/lib/megalith/releases/auth.json
+   ```
+
+> [!NOTE]
+> Unattended remote deployment via GitHub Actions is disabled by default until remote workflow approval can be cryptographically verified against a host-side key or OIDC token.
 
 ---
 
@@ -79,19 +102,27 @@ The deployment engine (`platform/deploy/scripts/deploy.py`) executes the followi
 1. **Concurrency Lock**:
    - Acquires non-blocking `fcntl.flock` on `/var/lib/megalith/deploy.lock`.
    - Prevents overlapping deployment commands.
-2. **Selective Diffing**:
+2. **Authorization Verification**:
+   - Strictly validates operator identity, target environment, and the manifest's canonical SHA-256 digest.
+   - Any modification or tampering with the release manifest invalidates the authorization.
+3. **Durable Transaction Tracking & Crash Safety**:
+   - Persists transaction state prior to mutation using atomic writes with `os.fsync` on both file and directory.
+   - Sequences through phases: `prepared` -> `migrating` -> `applying` -> `verifying` -> `succeeded`.
+   - Records audit actions to `/var/lib/megalith/audit.log` (mode `0600`).
+4. **Selective Diffing**:
    - Compares release images against active state in `/var/lib/megalith/state.json`.
    - Determines changed services (`demo-api`, `demo-web`).
    - If only `demo-web` changed, `postgres`, `demo-api`, and `caddy` containers are preserved without disruption.
-3. **Database Migrations**:
-   - If migrations are declared, starts `postgres` and waits for healthy status.
+5. **Database Migrations**:
+   - If migrations are declared in local mode (`--database-mode local`, default), starts `postgres` and waits for healthy status.
+   - In external database mode (`--database-mode external`), verifies reachability of `DATABASE_MIGRATE_URL` without starting or scheduling local `postgres`, then runs `demo-migrate`.
    - Runs `demo-migrate` one-shot container with dedicated `role_demo_migrate` credentials.
-4. **Selective Service Recreation**:
+6. **Selective Service Recreation**:
    - Recreates only the changed containers with `docker compose up -d --no-deps <service>`.
-5. **Health Verification**:
-   - Probes container status for healthy state.
+7. **Health Verification**:
+   - Probes container status for healthy state (`demo-api`, `demo-web`, `caddy`; ignores `postgres` in external mode).
    - Queries application API readiness probe (`/ready`) verifying database connectivity.
-6. **State Persistence**:
+8. **State Persistence**:
    - Updates `/var/lib/megalith/state.json` recording successful release and history.
 
 ---
@@ -99,21 +130,31 @@ The deployment engine (`platform/deploy/scripts/deploy.py`) executes the followi
 ## 4. Operational Commands Reference
 
 ```bash
-# Validate release manifest schema and digests
-python3 platform/deploy/scripts/deploy.py validate release.json
+# Validate release manifest schema and cryptographic digests
+python3 platform/deploy/scripts/release.py validate release.json
 
-# Check current running release and deployment history
+# Check current running release, history, and active transactions
 python3 platform/deploy/scripts/deploy.py status
 
-# Run preflight Compose syntax and image check
-python3 platform/deploy/scripts/deploy.py prepare release.json
+# Run preflight operational check (supports --provider oci|gcp and --profile full|micro)
+python3 platform/deploy/scripts/preflight.py --provider gcp --profile full --environment production
 
-# Apply release
-python3 platform/deploy/scripts/deploy.py apply release.json
+# Prepare release (dry-run Compose syntax and image check)
+python3 platform/deploy/scripts/deploy.py prepare release.json --provider gcp --profile full
+
+# Apply release with operator authorization (default local database)
+python3 platform/deploy/scripts/deploy.py apply release.json --auth auth.json --provider gcp --profile full --environment production
+
+# Apply release with external database endpoint
+python3 platform/deploy/scripts/deploy.py apply release.json --auth auth.json --database-mode external --environment production
 
 # Run health probes against active stack
-python3 platform/deploy/scripts/deploy.py check
+python3 platform/deploy/scripts/deploy.py check --provider gcp --profile full
+
+# Recover an interrupted or crashed deployment
+python3 platform/deploy/scripts/deploy.py recover --provider gcp --profile full
 
 # Manual rollback to last-known-good release
-python3 platform/deploy/scripts/deploy.py rollback
+python3 platform/deploy/scripts/deploy.py rollback --provider gcp --profile full
 ```
+

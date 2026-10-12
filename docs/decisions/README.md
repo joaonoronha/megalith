@@ -22,3 +22,6 @@ This directory documents the core architectural decisions that govern the reposi
 | [ADR-008](adr-008-cicd.md) | CI/CD Strategy | Accepted | 2026-10-09 |
 | [ADR-009](adr-009-ai-first-development.md) | AI-First Development Strategy | Accepted | 2026-10-09 |
 | [ADR-010](adr-010-operations.md) | Operations and Observability | Accepted | 2026-10-09 |
+| [ADR-011](adr-011-cloud-portability.md) | Cloud Portability and Secondary Provider (Google Cloud) | Accepted | 2026-10-11 |
+| [ADR-012](adr-012-database-hosting-strategy.md) | Database Hosting Strategy for Multi-Application Scaling | Proposed | 2026-10-12 |
+| [ADR-013](adr-013-cooperative-agent-governance.md) | Cooperative Agent Governance & Execution Authorization | Accepted | 2026-10-12 |
