@@ -25,6 +25,11 @@ def print_warning(message: str) -> None:
     err_console.print(f"[bold yellow]Warning:[/bold yellow] {message}")
 
 
+def print_success(message: str) -> None:
+    """Prints a styled success message to stdout."""
+    console.print(f"[bold green]Success:[/bold green] {message}")
+
+
 def render_project_list(
     products: Dict[str, Any],
     services: Dict[str, Any],

@@ -46,10 +46,16 @@ class ClassificationResult:
     docs_only: bool = False
     all_triggered: bool = False
     changed_files: List[str] = None  # type: ignore
+    triggered_services: List[str] = None  # type: ignore
+    triggered_products: List[str] = None  # type: ignore
 
     def __post_init__(self):
         if self.changed_files is None:
             self.changed_files = []
+        if self.triggered_services is None:
+            self.triggered_services = []
+        if self.triggered_products is None:
+            self.triggered_products = []
 
 
 DOC_PATTERNS = [
@@ -67,6 +73,7 @@ GLOBAL_INFRA_PATTERNS = [
     "tooling/schemas/**",
     "tooling/validate.py",
     "platform/cli/**",
+    "platform/templates/**",
     ".github/workflows/**",
 ]
 
@@ -89,6 +96,48 @@ DEMO_API_PATTERNS = ["apps/demo/api/**"]
 DEMO_WEB_PATTERNS = ["apps/demo/web/**"]
 
 
+def discover_registered_services(repo_root: Path) -> Tuple[Dict[str, List[str]], Dict[str, str]]:
+    """Dynamically discovers registered products and services from projects.yaml."""
+    product_manifests: Dict[str, str] = {}  # manifest_path -> product_id
+    service_patterns: Dict[str, List[str]] = {}  # qualified_service_id -> [path_patterns]
+
+    projects_path = repo_root / "projects.yaml"
+    if not projects_path.is_file():
+        return product_manifests, service_patterns
+
+    try:
+        import yaml
+        with open(projects_path, "r", encoding="utf-8") as f:
+            catalog = yaml.safe_load(f) or {}
+
+        for p in catalog.get("products", []):
+            prod_id = p.get("id")
+            manifest_rel = p.get("manifest", "")
+            if not prod_id or not manifest_rel:
+                continue
+            norm_manifest = manifest_rel.replace("\\", "/").lstrip("./")
+            product_manifests[norm_manifest] = prod_id
+
+            prod_manifest_path = repo_root / norm_manifest
+            if not prod_manifest_path.is_file():
+                continue
+
+            with open(prod_manifest_path, "r", encoding="utf-8") as pf:
+                prod_data = yaml.safe_load(pf) or {}
+
+            for s in prod_data.get("services", []):
+                svc_id = s.get("id")
+                if not svc_id:
+                    continue
+                qualified = f"{prod_id}/{svc_id}"
+                svc_pattern = f"apps/{prod_id}/{svc_id}/**"
+                service_patterns.setdefault(qualified, []).append(svc_pattern)
+    except Exception:
+        pass
+
+    return product_manifests, service_patterns
+
+
 def _matches_any(path: str, patterns: Iterable[str]) -> bool:
     norm = path.replace("\\", "/").lstrip("./")
     for pat in patterns:
@@ -101,7 +150,11 @@ def is_doc_file(path: str) -> bool:
     return _matches_any(path, DOC_PATTERNS)
 
 
-def classify_files(files: Sequence[str], force_all: bool = False) -> ClassificationResult:
+def classify_files(
+    files: Sequence[str],
+    force_all: bool = False,
+    repo_root: Optional[Path] = None,
+) -> ClassificationResult:
     cleaned = [f.replace("\\", "/").lstrip("./").strip() for f in files if f.strip()]
 
     if force_all or not cleaned:
@@ -143,6 +196,11 @@ def classify_files(files: Sequence[str], force_all: bool = False) -> Classificat
     trigger_container_infra = False
     trigger_terraform = False
     unmatched_files: List[str] = []
+    triggered_services: List[str] = []
+    triggered_products: List[str] = []
+
+    root = repo_root or Path(__file__).resolve().parent.parent
+    dynamic_product_manifests, dynamic_service_patterns = discover_registered_services(root)
 
     for f in code_files:
         matched = False
@@ -152,7 +210,25 @@ def classify_files(files: Sequence[str], force_all: bool = False) -> Classificat
         if f == DEMO_PRODUCT_MANIFEST:
             trigger_api = True
             trigger_web = True
+            if "demo/api" not in triggered_services:
+                triggered_services.append("demo/api")
+            if "demo/web" not in triggered_services:
+                triggered_services.append("demo/web")
+            if "demo" not in triggered_products:
+                triggered_products.append("demo")
             matched = True
+        elif f in dynamic_product_manifests:
+            p_id = dynamic_product_manifests[f]
+            if p_id not in triggered_products:
+                triggered_products.append(p_id)
+            if p_id == "demo":
+                trigger_api = True
+                trigger_web = True
+            for svc_qid in dynamic_service_patterns:
+                if svc_qid.startswith(f"{p_id}/") and svc_qid not in triggered_services:
+                    triggered_services.append(svc_qid)
+            matched = True
+
         if _matches_any(f, CONTAINER_INFRA_PATTERNS):
             trigger_container_infra = True
             matched = True
@@ -161,10 +237,28 @@ def classify_files(files: Sequence[str], force_all: bool = False) -> Classificat
             matched = True
         if _matches_any(f, DEMO_API_PATTERNS):
             trigger_api = True
+            if "demo/api" not in triggered_services:
+                triggered_services.append("demo/api")
             matched = True
         if _matches_any(f, DEMO_WEB_PATTERNS):
             trigger_web = True
+            if "demo/web" not in triggered_services:
+                triggered_services.append("demo/web")
             matched = True
+
+        # Check dynamic service patterns for other products/services
+        for svc_qid, patterns in dynamic_service_patterns.items():
+            if _matches_any(f, patterns):
+                if svc_qid not in triggered_services:
+                    triggered_services.append(svc_qid)
+                prod_part = svc_qid.split("/")[0]
+                if prod_part not in triggered_products:
+                    triggered_products.append(prod_part)
+                if svc_qid == "demo/api":
+                    trigger_api = True
+                elif svc_qid == "demo/web":
+                    trigger_web = True
+                matched = True
 
         if not matched:
             unmatched_files.append(f)
@@ -182,6 +276,8 @@ def classify_files(files: Sequence[str], force_all: bool = False) -> Classificat
             docs_only=False,
             all_triggered=True,
             changed_files=cleaned,
+            triggered_services=triggered_services,
+            triggered_products=triggered_products,
         )
 
     # Specific service triggers
@@ -202,6 +298,8 @@ def classify_files(files: Sequence[str], force_all: bool = False) -> Classificat
         docs_only=False,
         all_triggered=False,
         changed_files=cleaned,
+        triggered_services=triggered_services,
+        triggered_products=triggered_products,
     )
 
 
@@ -247,6 +345,8 @@ def write_github_outputs(result: ClassificationResult, output_path: str) -> None
         f"container_smoke={'true' if result.container_smoke else 'false'}\n",
         f"docs_only={'true' if result.docs_only else 'false'}\n",
         f"all_triggered={'true' if result.all_triggered else 'false'}\n",
+        f"triggered_services={json.dumps(result.triggered_services)}\n",
+        f"triggered_products={json.dumps(result.triggered_products)}\n",
     ]
     with open(output_path, "a", encoding="utf-8") as f:
         f.writelines(lines)
@@ -279,7 +379,7 @@ def main() -> int:
             # If git diff failed or returned empty unexpectedly, force all for safety
             force_all = True
 
-    result = classify_files(files, force_all=force_all)
+    result = classify_files(files, force_all=force_all, repo_root=repo_root)
 
     # Output JSON summary to stdout
     print(json.dumps(asdict(result), indent=2))
