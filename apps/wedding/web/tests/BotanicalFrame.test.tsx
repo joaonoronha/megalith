@@ -152,5 +152,12 @@ describe('BotanicalFrame & PaperTexture Components', () => {
       const animatedElements = container.querySelectorAll('animate, animateTransform');
       expect(animatedElements).toHaveLength(0);
     });
+
+    it('applies repeatable wedding-linen-seamless background image', () => {
+      const { container } = render(<PaperTexture />);
+      const root = container.firstElementChild as HTMLElement;
+      expect(root.style.backgroundImage).toContain('wedding-linen-seamless');
+      expect(root.style.backgroundRepeat).toBe('repeat');
+    });
   });
 });

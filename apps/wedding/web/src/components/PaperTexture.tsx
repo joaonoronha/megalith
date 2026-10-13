@@ -1,13 +1,14 @@
 import React from 'react';
+import linenTexture from '../assets/wedding-linen-seamless.png';
 
 export interface PaperTextureProps {
   className?: string;
 }
 
 /**
- * PaperTexture component renders a subtle, tactile warm ivory cotton/linen paper grain.
- * Uses a static SVG fractal turbulence filter without runtime CPU/GPU-heavy animation.
- * Marked with aria-hidden="true" and pointer-events: none for accessibility and responsiveness.
+ * PaperTexture component renders the repeatable tactile wedding linen background texture.
+ * Uses wedding-linen-seamless.png as an organic seamless weave with aria-hidden="true"
+ * and non-blocking interaction for accessibility and optimal performance.
  */
 export const PaperTexture: React.FC<PaperTextureProps> = ({ className = '' }) => {
   return (
@@ -22,6 +23,9 @@ export const PaperTexture: React.FC<PaperTextureProps> = ({ className = '' }) =>
         right: 0,
         bottom: 0,
         zIndex: 0,
+        backgroundImage: `url(${linenTexture})`,
+        backgroundRepeat: 'repeat',
+        backgroundSize: '256px 256px',
       }}
     >
       <svg

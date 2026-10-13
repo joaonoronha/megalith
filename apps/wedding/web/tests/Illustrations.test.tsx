@@ -59,6 +59,27 @@ describe('Chandelier & ReceptionIllustration Components', () => {
       expect(img?.classList.contains('object-contain')).toBe(true);
     });
 
+    it('applies chandelier-sway class under standard motion and removes it when reduced motion is preferred', () => {
+      const { container: normalContainer } = render(<Chandelier />);
+      const normalImg = normalContainer.querySelector('img');
+      expect(normalImg?.classList.contains('chandelier-sway')).toBe(true);
+
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes('prefers-reduced-motion'),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }));
+
+      const { container: reducedContainer } = render(<Chandelier />);
+      const reducedImg = reducedContainer.querySelector('img');
+      expect(reducedImg?.classList.contains('chandelier-sway')).toBe(false);
+    });
+
     it('supports isVisible prop for reveal choreography', () => {
       // Hidden state
       const { container: hiddenContainer } = render(<Chandelier isVisible={false} />);
