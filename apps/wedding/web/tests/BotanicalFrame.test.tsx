@@ -27,17 +27,15 @@ describe('BotanicalFrame & PaperTexture Components', () => {
   });
 
   describe('BotanicalFrame Component', () => {
-    it('renders with aria-hidden="true" on root and SVG elements for screen reader hygiene', () => {
+    it('renders with aria-hidden="true" on root and img elements for screen reader hygiene', () => {
       const { container } = render(<BotanicalFrame />);
       const root = container.firstElementChild as HTMLElement;
 
       expect(root).toHaveAttribute('aria-hidden', 'true');
 
-      const svgs = container.querySelectorAll('svg');
-      expect(svgs.length).toBeGreaterThanOrEqual(1);
-      svgs.forEach((svg) => {
-        expect(svg).toHaveAttribute('aria-hidden', 'true');
-      });
+      const img = container.querySelector('img');
+      expect(img).not.toBeNull();
+      expect(img).toHaveAttribute('aria-hidden', 'true');
     });
 
     it('has pointer-events: none to avoid intercepting user interactions', () => {
@@ -50,65 +48,14 @@ describe('BotanicalFrame & PaperTexture Components', () => {
       ).toBe(true);
     });
 
-    it('renders responsive SVG viewboxes with cascading left and right botanical canopies', () => {
+    it('renders floral canopy artwork with responsive image styling and asset path', () => {
       const { container } = render(<BotanicalFrame />);
+      const img = container.querySelector('img');
 
-      const leftCanopy = container.querySelector('.botanical-canopy-left, [data-canopy="left"]');
-      const rightCanopy = container.querySelector('.botanical-canopy-right, [data-canopy="right"]');
-
-      expect(leftCanopy).toBeInTheDocument();
-      expect(rightCanopy).toBeInTheDocument();
-
-      const svgs = container.querySelectorAll('svg');
-      svgs.forEach((svg) => {
-        const viewBox = svg.getAttribute('viewBox');
-        expect(viewBox).toBeTruthy();
-        expect(viewBox).toMatch(/^\d+\s+\d+\s+\d+\s+\d+$/);
-      });
-    });
-
-    it('contains bespoke olive foliage anatomy: stems, veined leaves, and bud details', () => {
-      const { container } = render(<BotanicalFrame />);
-
-      const stems = container.querySelectorAll('.botanical-stem, [data-part="stem"]');
-      const leaves = container.querySelectorAll('.botanical-leaf, [data-part="leaf"]');
-      const veins = container.querySelectorAll('.botanical-vein, [data-part="vein"]');
-
-      expect(stems.length).toBeGreaterThanOrEqual(2);
-      expect(leaves.length).toBeGreaterThanOrEqual(10);
-      expect(veins.length).toBeGreaterThanOrEqual(10);
-    });
-
-    it('employs olive and sage color tones with layered opacities for visual depth', () => {
-      const { container } = render(<BotanicalFrame />);
-      const htmlContent = container.innerHTML;
-
-      // Olive palette tones: #505B46 or #68745C or #3A4233
-      const hasOlive = /#505B46|#68745C|#3A4233/i.test(htmlContent);
-      // Sage palette tones: #A7B09A or #8F9A83 or #C2C9B8
-      const hasSage = /#A7B09A|#8F9A83|#C2C9B8/i.test(htmlContent);
-
-      expect(hasOlive).toBe(true);
-      expect(hasSage).toBe(true);
-
-      // Verifies layered opacities for foreground/background depth
-      const layeredOpacityElements = container.querySelectorAll('[fill-opacity], [stroke-opacity], [opacity]');
-      expect(layeredOpacityElements.length).toBeGreaterThanOrEqual(5);
-    });
-
-    it('features asymmetrical natural distribution between left and right canopies', () => {
-      const { container } = render(<BotanicalFrame />);
-
-      const leftCanopy = container.querySelector('.botanical-canopy-left, [data-canopy="left"]');
-      const rightCanopy = container.querySelector('.botanical-canopy-right, [data-canopy="right"]');
-
-      expect(leftCanopy).not.toBeNull();
-      expect(rightCanopy).not.toBeNull();
-
-      // Ensure right is not merely a cloned identical path set of left
-      const leftHtml = leftCanopy?.innerHTML || '';
-      const rightHtml = rightCanopy?.innerHTML || '';
-      expect(leftHtml).not.toEqual(rightHtml);
+      expect(img).not.toBeNull();
+      expect(img?.getAttribute('src')).toBeTruthy();
+      expect(img?.getAttribute('src')).toContain('flowers');
+      expect(img?.classList.contains('pointer-events-none')).toBe(true);
     });
 
     it('supports isVisible prop for reveal choreography', () => {
