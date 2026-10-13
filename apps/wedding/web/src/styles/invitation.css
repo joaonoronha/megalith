@@ -39,6 +39,33 @@
   box-sizing: border-box;
 }
 
+/* Botanical floral canopy framing */
+.botanical-frame {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  pointer-events: none;
+  z-index: var(--z-illustration, 1);
+}
+
+.botanical-canopy-img {
+  display: block;
+  width: 100%;
+  max-width: 1600px;
+  height: auto;
+  max-height: clamp(100px, 18vh, 200px);
+  object-fit: cover;
+  object-position: top center;
+  pointer-events: none;
+}
+
+@media (min-width: 768px) {
+  .botanical-canopy-img {
+    object-fit: cover;
+    max-height: clamp(140px, 20vh, 240px);
+  }
+}
+
 /* Chandelier optical proportioning & collision avoidance */
 .chandelier-container {
   display: flex;
