@@ -85,16 +85,16 @@
   will-change: transform;
 }
 
-/* Gentle, organic floral swaying keyframes */
+/* Gentle, subtle organic floral swaying keyframes (calm, slow drift) */
 @keyframes flower-sway-1 {
   0%, 100% {
     transform: rotate(0deg);
   }
   35% {
-    transform: rotate(1.2deg);
+    transform: rotate(0.4deg);
   }
   75% {
-    transform: rotate(-0.8deg);
+    transform: rotate(-0.3deg);
   }
 }
 
@@ -103,10 +103,10 @@
     transform: rotate(0deg);
   }
   40% {
-    transform: rotate(-1.1deg);
+    transform: rotate(-0.35deg);
   }
   80% {
-    transform: rotate(1.3deg);
+    transform: rotate(0.45deg);
   }
 }
 
@@ -115,10 +115,10 @@
     transform: rotate(0deg);
   }
   45% {
-    transform: rotate(0.8deg);
+    transform: rotate(0.3deg);
   }
   85% {
-    transform: rotate(-0.7deg);
+    transform: rotate(-0.25deg);
   }
 }
 
@@ -127,10 +127,10 @@
     transform: rotate(0deg);
   }
   30% {
-    transform: rotate(-1.2deg);
+    transform: rotate(-0.4deg);
   }
   70% {
-    transform: rotate(0.9deg);
+    transform: rotate(0.35deg);
   }
 }
 
@@ -139,52 +139,52 @@
     transform: rotate(0deg);
   }
   50% {
-    transform: rotate(1.0deg);
+    transform: rotate(0.35deg);
   }
   85% {
-    transform: rotate(-1.1deg);
+    transform: rotate(-0.4deg);
   }
 }
 
 .flower-sway-1 {
-  animation: flower-sway-1 7.2s ease-in-out infinite;
+  animation: flower-sway-1 15.6s ease-in-out infinite;
 }
 
 .flower-sway-2 {
-  animation: flower-sway-2 8.4s ease-in-out infinite -2.1s;
+  animation: flower-sway-2 18.2s ease-in-out infinite -5.1s;
 }
 
 .flower-sway-3 {
-  animation: flower-sway-3 6.6s ease-in-out infinite -4.3s;
+  animation: flower-sway-3 14.4s ease-in-out infinite -9.2s;
 }
 
 .flower-sway-4 {
-  animation: flower-sway-4 7.8s ease-in-out infinite -1.6s;
+  animation: flower-sway-4 17.0s ease-in-out infinite -3.8s;
 }
 
 .flower-sway-5 {
-  animation: flower-sway-5 6.9s ease-in-out infinite -3.5s;
+  animation: flower-sway-5 15.8s ease-in-out infinite -7.5s;
 }
 
-/* Chandelier optical proportioning, pendulum swaying & collision avoidance */
+/* Chandelier optical proportioning, gentle pendulum swaying & collision avoidance */
 @keyframes chandelier-sway {
   0%, 100% {
     transform: rotate(0deg);
   }
   25% {
-    transform: rotate(1.4deg);
+    transform: rotate(0.85deg);
   }
   50% {
     transform: rotate(0deg);
   }
   75% {
-    transform: rotate(-1.4deg);
+    transform: rotate(-0.85deg);
   }
 }
 
 .chandelier-sway {
   transform-origin: top center;
-  animation: chandelier-sway 8s ease-in-out infinite;
+  animation: chandelier-sway 11s ease-in-out infinite;
   will-change: transform;
 }
 
