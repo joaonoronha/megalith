@@ -55,7 +55,6 @@ export const Chandelier: React.FC<ChandelierProps> = ({
   const style: React.CSSProperties = {
     pointerEvents: 'none',
     position: 'absolute',
-    top: 0,
     left: '50%',
     transform: reducedMotion
       ? 'translateX(-50%)'
@@ -71,7 +70,7 @@ export const Chandelier: React.FC<ChandelierProps> = ({
 
   return (
     <div
-      className={`chandelier-container pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 overflow-visible select-none flex justify-center items-start ${
+      className={`chandelier-container pointer-events-none absolute left-1/2 -translate-x-1/2 overflow-visible select-none flex justify-center items-start ${
         !isVisible ? 'opacity-0' : 'opacity-100'
       } ${className}`}
       aria-hidden="true"
@@ -82,7 +81,9 @@ export const Chandelier: React.FC<ChandelierProps> = ({
         alt=""
         aria-hidden="true"
         data-part="chandelier-image"
-        className="chandelier-img w-auto h-auto object-contain object-top pointer-events-none select-none"
+        className={`chandelier-img w-auto h-auto object-contain object-top pointer-events-none select-none ${
+          reducedMotion ? '' : 'chandelier-sway'
+        }`}
         draggable={false}
       />
     </div>
