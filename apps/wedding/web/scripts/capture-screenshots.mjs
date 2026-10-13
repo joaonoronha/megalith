@@ -71,6 +71,21 @@ async function main() {
     // Hero viewport (at top)
     saveToBoth('hero-mobile-375-pt.png', await page375.screenshot({ fullPage: false }));
 
+async function revealSchedule(page) {
+  const items = page.locator('.schedule-item');
+  const count = await items.count();
+  for (let i = 0; i < count; i++) {
+    await items.nth(i).scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
+  }
+}
+
+    // Scroll through schedule items to reveal all events
+    await revealSchedule(page375);
+    const scheduleEl375 = page375.locator('.schedule-card');
+    await page375.waitForTimeout(800);
+    saveToBoth('schedule-mobile-375-pt.png', await scheduleEl375.screenshot());
+
     // Scroll to venue card to load map iframe tiles and capture full-page screenshot
     const venueEl375 = page375.locator('.venue-card');
     await venueEl375.scrollIntoViewIfNeeded();
@@ -108,6 +123,11 @@ async function main() {
 
     saveToBoth('hero-mobile-430-pt.png', await page430.screenshot({ fullPage: false }));
 
+    await revealSchedule(page430);
+    const scheduleEl430 = page430.locator('.schedule-card');
+    await page430.waitForTimeout(800);
+    saveToBoth('schedule-mobile-430-pt.png', await scheduleEl430.screenshot());
+
     const venueEl430 = page430.locator('.venue-card');
     await venueEl430.scrollIntoViewIfNeeded();
     await page430.waitForTimeout(3500);
@@ -128,6 +148,11 @@ async function main() {
     await desktopPage.waitForTimeout(3200);
 
     saveToBoth('hero-desktop-1280-pt.png', await desktopPage.screenshot({ fullPage: false }));
+
+    await revealSchedule(desktopPage);
+    const desktopScheduleEl = desktopPage.locator('.schedule-card');
+    await desktopPage.waitForTimeout(800);
+    saveToBoth('schedule-desktop-1280-pt.png', await desktopScheduleEl.screenshot());
 
     const desktopVenueEl = desktopPage.locator('.venue-card');
     await desktopVenueEl.scrollIntoViewIfNeeded();

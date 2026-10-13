@@ -2,6 +2,7 @@ import { I18nProvider, type Locale } from './i18n';
 import { InvitationHero } from './components/InvitationHero';
 import { PaperTexture } from './components/PaperTexture';
 import { WeddingCountdown } from './components/WeddingCountdown';
+import { WeddingSchedule } from './components/WeddingSchedule';
 import { VenueSection } from './components/VenueSection';
 import './styles/global.css';
 import './styles/invitation.css';
@@ -18,6 +19,7 @@ export function App({ initialLocale }: AppProps = {}) {
         <div className="wedding-flow-container">
           <PaperTexture />
           <WeddingCountdown />
+          <WeddingSchedule />
           <VenueSection />
           <footer className="wedding-footer" role="contentinfo">
             <div className="wedding-footer-divider" aria-hidden="true">
