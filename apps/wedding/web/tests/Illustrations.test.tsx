@@ -27,17 +27,15 @@ describe('Chandelier & ReceptionIllustration Components', () => {
   });
 
   describe('Chandelier Component', () => {
-    it('renders with aria-hidden="true" on root and SVG elements for accessibility hygiene', () => {
+    it('renders with aria-hidden="true" on root and img elements for accessibility hygiene', () => {
       const { container } = render(<Chandelier />);
       const root = container.firstElementChild as HTMLElement;
 
       expect(root).toHaveAttribute('aria-hidden', 'true');
 
-      const svgs = container.querySelectorAll('svg');
-      expect(svgs.length).toBeGreaterThanOrEqual(1);
-      svgs.forEach((svg) => {
-        expect(svg).toHaveAttribute('aria-hidden', 'true');
-      });
+      const img = container.querySelector('img');
+      expect(img).not.toBeNull();
+      expect(img).toHaveAttribute('aria-hidden', 'true');
     });
 
     it('has pointer-events: none to prevent intercepting user interactions', () => {
@@ -50,45 +48,15 @@ describe('Chandelier & ReceptionIllustration Components', () => {
       ).toBe(true);
     });
 
-    it('renders responsive SVG with valid viewBox and aspect ratio settings', () => {
+    it('renders chandelier artwork with responsive image styling and asset path', () => {
       const { container } = render(<Chandelier />);
-      const svg = container.querySelector('svg');
+      const img = container.querySelector('img');
 
-      expect(svg).not.toBeNull();
-      const viewBox = svg?.getAttribute('viewBox');
-      expect(viewBox).toBeTruthy();
-      expect(viewBox).toMatch(/^\d+\s+\d+\s+\d+\s+\d+$/);
-    });
-
-    it('employs antique gold color palette tones with layered opacities', () => {
-      const { container } = render(<Chandelier />);
-      const htmlContent = container.innerHTML;
-
-      // Antique gold palette tones
-      const hasPrimaryGold = /#A3894F/i.test(htmlContent);
-      const hasGoldHighlight = /#C9B580/i.test(htmlContent);
-      const hasGoldShadow = /#7D6633/i.test(htmlContent);
-
-      expect(hasPrimaryGold).toBe(true);
-      expect(hasGoldHighlight || hasGoldShadow).toBe(true);
-
-      // Layered opacities for depth
-      const layeredElements = container.querySelectorAll('[fill-opacity], [stroke-opacity], [opacity]');
-      expect(layeredElements.length).toBeGreaterThanOrEqual(4);
-    });
-
-    it('features bespoke candelabra anatomy: arms, crystals, tapers, and candle flames', () => {
-      const { container } = render(<Chandelier />);
-
-      const arms = container.querySelectorAll('.chandelier-arm, [data-part="arm"]');
-      const crystals = container.querySelectorAll('.chandelier-crystal, [data-part="crystal"]');
-      const candles = container.querySelectorAll('.chandelier-candle, [data-part="candle"]');
-      const flames = container.querySelectorAll('.chandelier-flame, [data-part="flame"]');
-
-      expect(arms.length).toBeGreaterThanOrEqual(4);
-      expect(crystals.length).toBeGreaterThanOrEqual(6);
-      expect(candles.length).toBeGreaterThanOrEqual(4);
-      expect(flames.length).toBeGreaterThanOrEqual(4);
+      expect(img).not.toBeNull();
+      expect(img?.getAttribute('src')).toBeTruthy();
+      expect(img?.getAttribute('src')).toContain('chandelier');
+      expect(img?.classList.contains('pointer-events-none')).toBe(true);
+      expect(img?.classList.contains('object-contain')).toBe(true);
     });
 
     it('supports isVisible prop for reveal choreography', () => {
