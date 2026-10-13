@@ -12,6 +12,8 @@ export interface CountdownUnits {
 export interface A11yTranslations {
   readonly languageSelector: string;
   readonly venueExternalLink: string;
+  readonly venueMapsLink: string;
+  readonly venueMapFrame: string;
   readonly countdownLive: string;
 }
 
@@ -26,6 +28,8 @@ export interface TranslationSchema {
   readonly venueHeading: string;
   readonly venueName: string;
   readonly venueLink: string;
+  readonly venueDirections: string;
+  readonly venueAddress: string;
   readonly a11y: A11yTranslations;
 }
 

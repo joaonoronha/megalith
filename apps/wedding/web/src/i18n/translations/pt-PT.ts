@@ -17,9 +17,13 @@ export const ptPT: TranslationSchema = {
   venueHeading: 'O local',
   venueName: 'Quinta da Grilla',
   venueLink: 'Ver o local',
+  venueDirections: 'Como chegar',
+  venueAddress: 'Estrada da Grilla, Alenquer, Portugal',
   a11y: {
     languageSelector: 'Selecionar idioma',
     venueExternalLink: 'Abrir website da Quinta da Grilla numa nova janela',
+    venueMapsLink: 'Abrir direções para a Quinta da Grilla no Google Maps',
+    venueMapFrame: 'Mapa da localização da Quinta da Grilla',
     countdownLive: 'Tempo restante para o casamento',
   },
 };

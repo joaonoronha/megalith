@@ -8,10 +8,14 @@ export interface VenueSectionProps {
 
 /**
  * VenueSection displays Quinta da Grilla wedding location details
- * in an elegant architectural arched card with external links and accessibility features.
+ * in an architectural arched card with an interactive arched Google Maps snippet
+ * and direct action buttons for directions and venue information.
  */
 export const VenueSection: React.FC<VenueSectionProps> = ({ className = '' }) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+
+  const mapLang = locale === 'pt-PT' ? 'pt' : locale === 'fr' ? 'fr' : 'en';
+  const mapEmbedUrl = `https://maps.google.com/maps?q=${WEDDING_CONFIG.venueCoordinates.lat},${WEDDING_CONFIG.venueCoordinates.lng}&hl=${mapLang}&z=15&output=embed`;
 
   return (
     <section
@@ -67,26 +71,42 @@ export const VenueSection: React.FC<VenueSectionProps> = ({ className = '' }) =>
           </svg>
         </div>
 
-        {/* Section Subtitle */}
+        {/* Section Eyebrow */}
         <p id="venue-heading" className="venue-eyebrow">
           {t.venueHeading}
         </p>
 
-        {/* Venue Name */}
+        {/* Venue Title */}
         <h2 className="venue-title">{t.venueName}</h2>
 
+        {/* Arched Map Snippet */}
+        <div className="venue-map-wrapper">
+          <div className="venue-map-arch-container">
+            <iframe
+              title={t.a11y.venueMapFrame}
+              src={mapEmbedUrl}
+              className="venue-map-iframe"
+              loading="eager"
+              allowFullScreen
+            />
+          </div>
+        </div>
+
         {/* Location & Details */}
-        <p className="venue-location">
-          <span>{WEDDING_CONFIG.country}</span>
-          <span className="venue-dot" aria-hidden="true">
-            ·
-          </span>
-          <span>{t.date}</span>
-          <span className="venue-dot" aria-hidden="true">
-            ·
-          </span>
-          <span>{t.time}</span>
-        </p>
+        <div className="venue-location-details">
+          <p className="venue-address-text">{WEDDING_CONFIG.venueAddress}</p>
+          <p className="venue-datetime-text">
+            <span>{WEDDING_CONFIG.country}</span>
+            <span className="venue-dot" aria-hidden="true">
+              ·
+            </span>
+            <span>{t.date}</span>
+            <span className="venue-dot" aria-hidden="true">
+              ·
+            </span>
+            <span>{t.time}</span>
+          </p>
+        </div>
 
         {/* Decorative Divider */}
         <div className="venue-divider" aria-hidden="true">
@@ -95,31 +115,58 @@ export const VenueSection: React.FC<VenueSectionProps> = ({ className = '' }) =>
           <span className="venue-divider-line" />
         </div>
 
-        {/* External Link Action */}
-        <div className="venue-action-container">
+        {/* Action Buttons: Directions & Venue Website */}
+        <div className="venue-actions-group">
+          {/* Get Directions Link */}
           <a
-            href={WEDDING_CONFIG.venueWebsite}
+            href={WEDDING_CONFIG.venueMapsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label={t.a11y.venueExternalLink}
-            className="venue-link-button"
+            aria-label={t.a11y.venueMapsLink}
+            className="venue-btn venue-btn--primary"
           >
-            <span>{t.venueLink}</span>
             <svg
-              className="venue-external-icon"
-              viewBox="0 0 16 16"
+              className="venue-btn-icon"
+              viewBox="0 0 20 20"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
               aria-hidden="true"
             >
               <path
-                d="M5 11L11 5M11 5H6.5M11 5V9.5"
+                d="M10 2C6.686 2 4 4.686 4 8c0 4.5 6 10 6 10s6-5.5 6-10c0-3.314-2.686-6-6-6zm0 8.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>{t.venueDirections}</span>
+          </a>
+
+          {/* View Venue Website Link */}
+          <a
+            href={WEDDING_CONFIG.venueWebsite}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={t.a11y.venueExternalLink}
+            className="venue-btn venue-btn--secondary"
+          >
+            <svg
+              className="venue-btn-icon"
+              viewBox="0 0 20 20"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <path
+                d="M10 3.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM3.5 10h13M10 3.5c1.7 2 2.6 4.2 2.6 6.5s-.9 4.5-2.6 6.5c-1.7-2-2.6-4.2-2.6-6.5s.9-4.5 2.6-6.5z"
                 stroke="currentColor"
                 strokeWidth="1.3"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
             </svg>
+            <span>{t.venueLink}</span>
           </a>
         </div>
       </div>
