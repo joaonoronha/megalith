@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useMemo,
+  useCallback,
   type ReactNode,
 } from 'react';
 import {
@@ -61,13 +62,13 @@ export function I18nProvider({ children, initialLocale }: I18nProviderProps) {
     return detectLanguage(getStoredLocale());
   });
 
-  const setLocale = (newLocale: Locale) => {
+  const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale);
     persistStoredLocale(newLocale);
     if (typeof document !== 'undefined') {
       document.documentElement.lang = newLocale;
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -81,7 +82,7 @@ export function I18nProvider({ children, initialLocale }: I18nProviderProps) {
       t: TRANSLATIONS[locale],
       setLocale,
     }),
-    [locale]
+    [locale, setLocale]
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
