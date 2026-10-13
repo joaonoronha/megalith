@@ -23,9 +23,11 @@ export const PaperTexture: React.FC<PaperTextureProps> = ({ className = '' }) =>
         right: 0,
         bottom: 0,
         zIndex: 0,
+        backgroundColor: '#f7f3ea',
         backgroundImage: `url(${linenTexture})`,
         backgroundRepeat: 'repeat',
         backgroundSize: '256px 256px',
+        opacity: 0.7,
       }}
     >
       <svg
