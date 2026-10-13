@@ -132,3 +132,56 @@ a:focus-visible {
   user-select: none;
   pointer-events: none;
 }
+
+/* Botanical Canopy & Foliage */
+.botanical-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  pointer-events: none;
+  z-index: var(--z-illustration, 1);
+  overflow: hidden;
+}
+
+.botanical-canopy-container {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.botanical-canopy {
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.botanical-canopy-left {
+  width: 44%;
+  max-width: 520px;
+  min-width: 160px;
+  height: auto;
+}
+
+.botanical-canopy-right {
+  width: 44%;
+  max-width: 520px;
+  min-width: 160px;
+  height: auto;
+}
+
+/* Paper Texture Overlay */
+.paper-texture {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: var(--z-background, 0);
+  overflow: hidden;
+  user-select: none;
+}
