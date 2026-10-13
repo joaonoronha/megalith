@@ -77,6 +77,11 @@ describe('Translation Schema Symmetry & Editorial Copy', () => {
     expect(ptPT.venueLink).toBe('Ver o local');
     expect(ptPT.venueDirections).toBe('Como chegar');
     expect(ptPT.venueAddress).toBe('Estrada da Grilla, Alenquer, Portugal');
+    expect(ptPT.schedule.eyebrow).toBe('O NOSSO DIA');
+    expect(ptPT.schedule.title).toBe('16 DE AGOSTO, 2027');
+    expect(ptPT.schedule.events).toHaveLength(6);
+    expect(ptPT.schedule.events[0].time).toBe('15:30');
+    expect(ptPT.schedule.events[1].time).toBe('16:00');
   });
 
   it('contains exact en copy in refined wedding register', () => {
@@ -99,6 +104,11 @@ describe('Translation Schema Symmetry & Editorial Copy', () => {
     expect(en.venueLink).toBe('View the venue');
     expect(en.venueDirections).toBe('Get directions');
     expect(en.venueAddress).toBe('Estrada da Grilla, Alenquer, Portugal');
+    expect(en.schedule.eyebrow).toBe('WEDDING DAY');
+    expect(en.schedule.title).toBe('16 AUGUST 2027');
+    expect(en.schedule.events).toHaveLength(6);
+    expect(en.schedule.events[0].time).toBe('15:30');
+    expect(en.schedule.events[1].time).toBe('16:00');
   });
 
   it('contains exact fr copy in refined wedding register', () => {
@@ -121,6 +131,11 @@ describe('Translation Schema Symmetry & Editorial Copy', () => {
     expect(fr.venueLink).toBe('Découvrir le lieu');
     expect(fr.venueDirections).toBe('Itinéraire');
     expect(fr.venueAddress).toBe('Estrada da Grilla, Alenquer, Portugal');
+    expect(fr.schedule.eyebrow).toBe('JOUR DU MARIAGE');
+    expect(fr.schedule.title).toBe('16 AOÛT 2027');
+    expect(fr.schedule.events).toHaveLength(6);
+    expect(fr.schedule.events[0].time).toBe('15:30');
+    expect(fr.schedule.events[1].time).toBe('16:00');
   });
 
   it('has entries for all SUPPORTED_LOCALES in TRANSLATIONS record', () => {

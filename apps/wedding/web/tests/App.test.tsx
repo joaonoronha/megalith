@@ -13,25 +13,30 @@ describe('App Root & Natural Scroll Progression', () => {
     localStorage.clear();
   });
 
-  it('renders all sections in natural document order: Hero -> Countdown -> Venue -> Footer', () => {
+  it('renders all sections in natural document order: Hero -> Countdown -> Schedule -> Venue -> Footer', () => {
     const { container } = render(<App initialLocale="pt-PT" />);
 
     const hero = container.querySelector('.invitation-hero');
     const countdown = container.querySelector('.wedding-countdown-section');
+    const schedule = container.querySelector('.wedding-schedule-section');
     const venue = container.querySelector('.venue-section');
     const footer = container.querySelector('.wedding-footer');
 
     expect(hero).toBeInTheDocument();
     expect(countdown).toBeInTheDocument();
+    expect(schedule).toBeInTheDocument();
     expect(venue).toBeInTheDocument();
     expect(footer).toBeInTheDocument();
 
-    // Verify DOM order: hero before countdown before venue before footer
+    // Verify DOM order: hero before countdown before schedule before venue before footer
     expect(
       hero!.compareDocumentPosition(countdown!) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     expect(
-      countdown!.compareDocumentPosition(venue!) & Node.DOCUMENT_POSITION_FOLLOWING
+      countdown!.compareDocumentPosition(schedule!) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      schedule!.compareDocumentPosition(venue!) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     expect(
       venue!.compareDocumentPosition(footer!) & Node.DOCUMENT_POSITION_FOLLOWING
@@ -60,6 +65,8 @@ describe('App Root & Natural Scroll Progression', () => {
     expect(screen.getByText('O NOSSO CASAMENTO')).toBeInTheDocument();
     // Countdown Portuguese copy
     expect(screen.getByText('Faltam apenas...')).toBeInTheDocument();
+    // Schedule Portuguese copy
+    expect(screen.getByText('O NOSSO DIA')).toBeInTheDocument();
     // Venue Portuguese copy
     expect(screen.getByText('O local')).toBeInTheDocument();
 
@@ -72,6 +79,8 @@ describe('App Root & Natural Scroll Progression', () => {
     expect(screen.getByText('OUR WEDDING')).toBeInTheDocument();
     // Countdown English copy
     expect(screen.getByText('Counting down...')).toBeInTheDocument();
+    // Schedule English copy
+    expect(screen.getByText('WEDDING DAY')).toBeInTheDocument();
     // Venue English copy
     expect(screen.getByText('The venue')).toBeInTheDocument();
   });

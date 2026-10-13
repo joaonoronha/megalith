@@ -9,6 +9,18 @@ export interface CountdownUnits {
   readonly seconds: string;
 }
 
+export interface ScheduleEvent {
+  readonly time: string;
+  readonly title: string;
+  readonly description: string;
+}
+
+export interface ScheduleTranslations {
+  readonly eyebrow: string;
+  readonly title: string;
+  readonly events: readonly ScheduleEvent[];
+}
+
 export interface A11yTranslations {
   readonly languageSelector: string;
   readonly venueExternalLink: string;
@@ -25,6 +37,7 @@ export interface TranslationSchema {
   readonly time: string;
   readonly countdownHeading: string;
   readonly countdownUnits: CountdownUnits;
+  readonly schedule: ScheduleTranslations;
   readonly venueHeading: string;
   readonly venueName: string;
   readonly venueLink: string;
