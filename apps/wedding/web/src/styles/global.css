@@ -191,7 +191,7 @@ a:focus-visible {
 /* Chandelier Illustration */
 .chandelier-container {
   position: absolute;
-  top: clamp(32px, 8.5vh, 76px);
+  top: clamp(55px, 9.5vh, 85px);
   left: 50%;
   transform: translateX(-50%);
   pointer-events: none;
