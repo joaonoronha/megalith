@@ -51,28 +51,24 @@
   align-items: flex-start;
   pointer-events: none;
   z-index: var(--z-illustration, 1);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .botanical-slices-wrapper {
   position: relative;
   width: 100%;
   max-width: 1600px;
-  height: clamp(110px, 18vh, 180px);
+  aspect-ratio: 1983 / 635;
+  height: auto;
   pointer-events: none;
-}
-
-@media (min-width: 768px) {
-  .botanical-slices-wrapper {
-    height: clamp(140px, 22vh, 240px);
-  }
+  overflow: visible;
 }
 
 .botanical-slice {
   position: absolute;
   top: 0;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: top center;
   transform-origin: top center;
   pointer-events: none;

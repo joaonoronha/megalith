@@ -142,7 +142,7 @@ a:focus-visible {
   width: 100%;
   pointer-events: none;
   z-index: var(--z-illustration, 1);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .botanical-canopy-container {
