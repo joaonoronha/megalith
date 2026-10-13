@@ -68,12 +68,20 @@ async function main() {
     await ptBtn375.click();
     await page375.waitForTimeout(3200);
 
-    // Hero viewport
+    // Hero viewport (at top)
     saveToBoth('hero-mobile-375-pt.png', await page375.screenshot({ fullPage: false }));
-    // Full page scroll
+
+    // Scroll to venue card to load map iframe tiles and capture full-page screenshot
+    const venueEl375 = page375.locator('.venue-card');
+    await venueEl375.scrollIntoViewIfNeeded();
+    await page375.waitForTimeout(3500);
+
+    // Full page scroll (while scrolled at venue card)
     saveToBoth('fullpage-mobile-375-pt.png', await page375.screenshot({ fullPage: true }));
 
     // Switch to EN
+    await page375.evaluate(() => window.scrollTo(0, 0));
+    await page375.waitForTimeout(300);
     const enBtn375 = page375.locator('.language-switcher-btn:has-text("EN")');
     await enBtn375.click();
     await page375.waitForTimeout(600);
@@ -99,6 +107,11 @@ async function main() {
     await page430.waitForTimeout(3200);
 
     saveToBoth('hero-mobile-430-pt.png', await page430.screenshot({ fullPage: false }));
+
+    const venueEl430 = page430.locator('.venue-card');
+    await venueEl430.scrollIntoViewIfNeeded();
+    await page430.waitForTimeout(3500);
+
     saveToBoth('fullpage-mobile-430-pt.png', await page430.screenshot({ fullPage: true }));
     await ctx430.close();
 
@@ -115,6 +128,11 @@ async function main() {
     await desktopPage.waitForTimeout(3200);
 
     saveToBoth('hero-desktop-1280-pt.png', await desktopPage.screenshot({ fullPage: false }));
+
+    const desktopVenueEl = desktopPage.locator('.venue-card');
+    await desktopVenueEl.scrollIntoViewIfNeeded();
+    await desktopPage.waitForTimeout(3500);
+
     saveToBoth('fullpage-desktop-1280-pt.png', await desktopPage.screenshot({ fullPage: true }));
     await desktopCtx.close();
 

@@ -22,6 +22,13 @@ describe('WEDDING_CONFIG', () => {
       venueName: 'Quinta da Grilla',
       venueWebsite: 'https://quintadagrilla.com',
       country: 'Portugal',
+      venueAddress: 'Estrada da Grilla, 2580-081 Alenquer, Portugal',
+      venueMapsUrl:
+        'https://www.google.com/maps/place/Quinta+da+Grilla/@39.1173506,-9.1326937,17z/data=!3m1!4b1!4m6!3m5!1s0xd18d26fb6491eef:0x3a60d630421163cc!8m2!3d39.1173506!4d-9.1326937!16s%2Fg%2F11byyrrx2n?entry=ttu&g_ep=EgoyMDI2MTAxMS4wIKXMDSoASAFQAw%3D%3D',
+      venueCoordinates: {
+        lat: 39.1173506,
+        lng: -9.1326937,
+      },
     });
   });
 
@@ -68,6 +75,8 @@ describe('Translation Schema Symmetry & Editorial Copy', () => {
     expect(ptPT.venueHeading).toBe('O local');
     expect(ptPT.venueName).toBe('Quinta da Grilla');
     expect(ptPT.venueLink).toBe('Ver o local');
+    expect(ptPT.venueDirections).toBe('Como chegar');
+    expect(ptPT.venueAddress).toBe('Estrada da Grilla, Alenquer, Portugal');
   });
 
   it('contains exact en copy in refined wedding register', () => {
@@ -88,6 +97,8 @@ describe('Translation Schema Symmetry & Editorial Copy', () => {
     expect(en.venueHeading).toBe('The venue');
     expect(en.venueName).toBe('Quinta da Grilla');
     expect(en.venueLink).toBe('View the venue');
+    expect(en.venueDirections).toBe('Get directions');
+    expect(en.venueAddress).toBe('Estrada da Grilla, Alenquer, Portugal');
   });
 
   it('contains exact fr copy in refined wedding register', () => {
@@ -108,6 +119,8 @@ describe('Translation Schema Symmetry & Editorial Copy', () => {
     expect(fr.venueHeading).toBe('Le lieu');
     expect(fr.venueName).toBe('Quinta da Grilla');
     expect(fr.venueLink).toBe('Découvrir le lieu');
+    expect(fr.venueDirections).toBe('Itinéraire');
+    expect(fr.venueAddress).toBe('Estrada da Grilla, Alenquer, Portugal');
   });
 
   it('has entries for all SUPPORTED_LOCALES in TRANSLATIONS record', () => {

@@ -66,6 +66,7 @@ out/
 # Temporary files & logs
 *.log
 tmp/
+.tmp/
 temp/
 scratch/
 
