@@ -1,5 +1,9 @@
 import React from 'react';
-import flowersImg from '../assets/flowers.png';
+import slice1 from '../assets/flower-slice-1.png';
+import slice2 from '../assets/flower-slice-2.png';
+import slice3 from '../assets/flower-slice-3.png';
+import slice4 from '../assets/flower-slice-4.png';
+import slice5 from '../assets/flower-slice-5.png';
 
 export interface BotanicalFrameProps {
   /** Controls reveal visibility state. Defaults to true. */
@@ -35,11 +39,28 @@ function usePrefersReducedMotion(): boolean {
   return reducedMotion;
 }
 
+interface FlowerSliceConfig {
+  id: number;
+  src: string;
+  left: string;
+  width: string;
+  swayClass: string;
+}
+
+const FLOWER_SLICES: FlowerSliceConfig[] = [
+  { id: 1, src: slice1, left: '0%', width: '24.21%', swayClass: 'flower-sway-1' },
+  { id: 2, src: slice2, left: '20.17%', width: '24.21%', swayClass: 'flower-sway-2' },
+  { id: 3, src: slice3, left: '40.34%', width: '23.20%', swayClass: 'flower-sway-3' },
+  { id: 4, src: slice4, left: '59.51%', width: '24.21%', swayClass: 'flower-sway-4' },
+  { id: 5, src: slice5, left: '79.68%', width: '20.32%', swayClass: 'flower-sway-5' },
+];
+
 /**
  * BotanicalFrame component renders an artisanal floral canopy
  * cascading along the upper viewport edge.
  *
- * Conceived with natural white roses, hydrangeas, lilies, and cascading olive/eucalyptus greenery.
+ * Sliced into 5 overlapping organic segments that sway gently in the breeze
+ * (with top 20% cropped to sit flush against the ceiling and preserve all hanging tendrils).
  *
  * Conforms to accessibility standards (aria-hidden="true", pointer-events: none)
  * and honors prefers-reduced-motion preferences.
@@ -77,14 +98,25 @@ export const BotanicalFrame: React.FC<BotanicalFrameProps> = ({
       aria-hidden="true"
       style={style}
     >
-      <img
-        src={flowersImg}
-        alt=""
-        aria-hidden="true"
-        data-part="botanical-canopy-image"
-        className="botanical-canopy-img w-full h-auto max-w-[1600px] pointer-events-none select-none"
-        draggable={false}
-      />
+      <div className="botanical-slices-wrapper relative w-full max-w-[1600px] pointer-events-none select-none">
+        {FLOWER_SLICES.map((slice) => (
+          <img
+            key={slice.id}
+            src={slice.src}
+            alt=""
+            aria-hidden="true"
+            data-part={`flower-slice-${slice.id}`}
+            className={`botanical-slice absolute top-0 h-full object-cover object-top pointer-events-none select-none ${
+              reducedMotion ? '' : slice.swayClass
+            }`}
+            style={{
+              left: slice.left,
+              width: slice.width,
+            }}
+            draggable={false}
+          />
+        ))}
+      </div>
     </div>
   );
 };
