@@ -1,5 +1,6 @@
 import { I18nProvider, type Locale } from './i18n';
 import { InvitationHero } from './components/InvitationHero';
+import { PaperTexture } from './components/PaperTexture';
 import { WeddingCountdown } from './components/WeddingCountdown';
 import { VenueSection } from './components/VenueSection';
 import './styles/global.css';
@@ -15,6 +16,7 @@ export function App({ initialLocale }: AppProps = {}) {
       <main className="wedding-app-root">
         <InvitationHero />
         <div className="wedding-flow-container">
+          <PaperTexture />
           <WeddingCountdown />
           <VenueSection />
           <footer className="wedding-footer" role="contentinfo">
