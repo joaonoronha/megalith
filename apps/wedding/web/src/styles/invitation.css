@@ -39,31 +39,125 @@
   box-sizing: border-box;
 }
 
-/* Botanical floral canopy framing */
+/* Botanical floral canopy framing & gentle organic swaying */
 .botanical-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
   display: flex;
   justify-content: center;
   align-items: flex-start;
   pointer-events: none;
   z-index: var(--z-illustration, 1);
+  overflow: hidden;
 }
 
-.botanical-canopy-img {
-  display: block;
+.botanical-slices-wrapper {
+  position: relative;
   width: 100%;
   max-width: 1600px;
-  height: auto;
-  max-height: clamp(100px, 18vh, 200px);
-  object-fit: cover;
-  object-position: top center;
+  height: clamp(110px, 18vh, 180px);
   pointer-events: none;
 }
 
 @media (min-width: 768px) {
-  .botanical-canopy-img {
-    object-fit: cover;
-    max-height: clamp(140px, 20vh, 240px);
+  .botanical-slices-wrapper {
+    height: clamp(140px, 22vh, 240px);
   }
+}
+
+.botanical-slice {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  transform-origin: top center;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* Gentle, organic floral swaying keyframes */
+@keyframes flower-sway-1 {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  35% {
+    transform: rotate(1.2deg);
+  }
+  75% {
+    transform: rotate(-0.8deg);
+  }
+}
+
+@keyframes flower-sway-2 {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  40% {
+    transform: rotate(-1.1deg);
+  }
+  80% {
+    transform: rotate(1.3deg);
+  }
+}
+
+@keyframes flower-sway-3 {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  45% {
+    transform: rotate(0.8deg);
+  }
+  85% {
+    transform: rotate(-0.7deg);
+  }
+}
+
+@keyframes flower-sway-4 {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  30% {
+    transform: rotate(-1.2deg);
+  }
+  70% {
+    transform: rotate(0.9deg);
+  }
+}
+
+@keyframes flower-sway-5 {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(1.0deg);
+  }
+  85% {
+    transform: rotate(-1.1deg);
+  }
+}
+
+.flower-sway-1 {
+  animation: flower-sway-1 7.2s ease-in-out infinite;
+}
+
+.flower-sway-2 {
+  animation: flower-sway-2 8.4s ease-in-out infinite -2.1s;
+}
+
+.flower-sway-3 {
+  animation: flower-sway-3 6.6s ease-in-out infinite -4.3s;
+}
+
+.flower-sway-4 {
+  animation: flower-sway-4 7.8s ease-in-out infinite -1.6s;
+}
+
+.flower-sway-5 {
+  animation: flower-sway-5 6.9s ease-in-out infinite -3.5s;
 }
 
 /* Chandelier optical proportioning & collision avoidance */

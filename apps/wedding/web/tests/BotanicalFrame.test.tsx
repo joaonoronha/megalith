@@ -48,14 +48,17 @@ describe('BotanicalFrame & PaperTexture Components', () => {
       ).toBe(true);
     });
 
-    it('renders floral canopy artwork with responsive image styling and asset path', () => {
+    it('renders floral canopy artwork broken into 5 swaying slices with responsive image styling', () => {
       const { container } = render(<BotanicalFrame />);
-      const img = container.querySelector('img');
+      const imgs = container.querySelectorAll('img');
 
-      expect(img).not.toBeNull();
-      expect(img?.getAttribute('src')).toBeTruthy();
-      expect(img?.getAttribute('src')).toContain('flowers');
-      expect(img?.classList.contains('pointer-events-none')).toBe(true);
+      expect(imgs.length).toBe(5);
+      imgs.forEach((img, idx) => {
+        expect(img).toHaveAttribute('src');
+        expect(img.getAttribute('src')).toContain(`flower-slice-${idx + 1}`);
+        expect(img).toHaveAttribute('aria-hidden', 'true');
+        expect(img.classList.contains('pointer-events-none')).toBe(true);
+      });
     });
 
     it('supports isVisible prop for reveal choreography', () => {
