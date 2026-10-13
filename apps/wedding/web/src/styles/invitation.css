@@ -705,3 +705,79 @@
 .venue-link-button:hover .venue-external-icon {
   transform: translate(2px, -2px);
 }
+
+/* ==========================================================================
+   Flow Container & Footer
+   ========================================================================== */
+
+.wedding-app-root {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--color-ivory, #f7f3ea);
+  color: var(--color-olive, #505B46);
+  display: flex;
+  flex-direction: column;
+}
+
+.wedding-flow-container {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 1.25rem 3.5rem 1.25rem;
+  box-sizing: border-box;
+  z-index: var(--z-content, 2);
+}
+
+.wedding-footer {
+  position: relative;
+  width: 100%;
+  max-width: 680px;
+  margin: 2rem auto 1rem auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: var(--z-content, 2);
+}
+
+.wedding-footer-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 160px;
+  margin-bottom: 1.25rem;
+}
+
+.footer-line {
+  flex: 1;
+  height: 1px;
+  background: rgba(163, 137, 79, 0.35);
+}
+
+.footer-diamond {
+  color: var(--color-gold, #A3894F);
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.wedding-footer-names {
+  font-family: 'Forum', 'Cinzel', var(--font-serif);
+  font-size: clamp(1.125rem, 3.5vw, 1.45rem);
+  color: var(--color-olive, #505B46);
+  letter-spacing: 0.08em;
+  margin: 0 0 0.35rem 0;
+}
+
+.wedding-footer-date {
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 0.8125rem;
+  letter-spacing: 0.2em;
+  color: var(--color-gold, #A3894F);
+  opacity: 0.9;
+  margin: 0;
+}
