@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { useI18n } from '../i18n';
 import type { ScheduleEvent } from '../i18n/types';
+import sagePlasterTexture from '../assets/Seamless Sage Green Venetian Plaster Texture.png';
 
 export interface WeddingScheduleProps {
   className?: string;
@@ -245,7 +246,14 @@ export const WeddingSchedule: React.FC<WeddingScheduleProps> = ({
       className={`wedding-schedule-section ${className}`}
       aria-labelledby="schedule-heading"
     >
-      <div className="schedule-card">
+      <div
+        className="schedule-card"
+        style={{
+          backgroundImage: `url("${sagePlasterTexture}")`,
+          backgroundRepeat: 'repeat',
+          backgroundSize: '400px 400px',
+        }}
+      >
         {/* Architectural Arch Top & Botanical Motif */}
         <div className="schedule-arch-header" aria-hidden="true">
           <svg

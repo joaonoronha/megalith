@@ -572,8 +572,10 @@
 .schedule-card {
   position: relative;
   width: 100%;
-  background: linear-gradient(180deg, #323E2A 0%, #2A3523 55%, #222B1C 100%);
-  border: 1px solid rgba(163, 137, 79, 0.5);
+  background-color: #55624b;
+  background-repeat: repeat;
+  background-size: 380px 380px;
+  border: 1px solid rgba(163, 137, 79, 0.55);
   border-radius: 180px 180px 8px 8px;
   padding: 2.75rem 2rem 3rem 2rem;
   box-sizing: border-box;
@@ -590,7 +592,7 @@
   left: 6px;
   right: 6px;
   bottom: 6px;
-  border: 1px solid rgba(201, 181, 128, 0.3);
+  border: 1px solid rgba(245, 230, 190, 0.35);
   border-radius: 174px 174px 4px 4px;
   pointer-events: none;
 }
@@ -610,10 +612,11 @@
 .schedule-eyebrow {
   font-family: 'Montserrat', var(--font-sans);
   font-size: clamp(0.6875rem, 2vw, 0.8125rem);
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #C9B580;
+  color: #F5E6BE;
+  text-shadow: 0 1px 3px rgba(20, 30, 15, 0.35);
   margin: 0 0 0.5rem 0;
 }
 
@@ -622,7 +625,8 @@
   font-size: clamp(1.625rem, 5vw, 2.35rem);
   font-weight: 400;
   letter-spacing: 0.08em;
-  color: var(--color-ivory, #F5F2EB);
+  color: #FFFFFF;
+  text-shadow: 0 1px 4px rgba(20, 30, 15, 0.35);
   margin: 0 0 0.85rem 0;
 }
 
@@ -638,13 +642,14 @@
 .schedule-divider-line {
   flex: 1;
   height: 1px;
-  background: rgba(201, 181, 128, 0.35);
+  background: rgba(245, 230, 190, 0.45);
 }
 
 .schedule-divider-diamond {
-  color: #C9B580;
+  color: #F5E6BE;
   font-size: 0.65rem;
   line-height: 1;
+  text-shadow: 0 1px 2px rgba(20, 30, 15, 0.3);
 }
 
 /* Chronological Timeline List */
@@ -679,7 +684,7 @@
   top: 44px;
   bottom: 0px;
   width: 1px;
-  background: linear-gradient(180deg, rgba(201, 181, 128, 0.45) 0%, rgba(201, 181, 128, 0.25) 100%);
+  background: linear-gradient(180deg, rgba(245, 230, 190, 0.55) 0%, rgba(245, 230, 190, 0.3) 100%);
   pointer-events: none;
 }
 
@@ -697,13 +702,13 @@
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: rgba(30, 39, 25, 0.95);
-  border: 1px solid rgba(201, 181, 128, 0.55);
+  background: rgba(28, 38, 22, 0.88);
+  border: 1px solid rgba(245, 230, 190, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #C9B580;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  color: #F5E6BE;
+  box-shadow: 0 3px 10px rgba(15, 22, 12, 0.3);
   transition: transform 0.3s ease, border-color 0.3s ease;
 }
 
@@ -730,7 +735,8 @@
   font-size: clamp(0.9375rem, 2.6vw, 1.0625rem);
   font-weight: 600;
   letter-spacing: 0.1em;
-  color: #C9B580;
+  color: #F5E6BE;
+  text-shadow: 0 1px 2px rgba(20, 30, 15, 0.35);
   font-variant-numeric: tabular-nums;
   -webkit-font-feature-settings: 'tnum';
   font-feature-settings: 'tnum';
@@ -742,7 +748,8 @@
   font-size: clamp(1.125rem, 3.5vw, 1.325rem);
   font-weight: 400;
   letter-spacing: 0.04em;
-  color: var(--color-ivory, #F5F2EB);
+  color: #FFFFFF;
+  text-shadow: 0 1px 3px rgba(20, 30, 15, 0.3);
   margin: 0;
   line-height: 1.25;
 }
@@ -751,7 +758,8 @@
   font-family: 'Cormorant Garamond', Georgia, serif;
   font-size: clamp(0.9375rem, 2.5vw, 1.0625rem);
   line-height: 1.55;
-  color: #D8DBCF;
+  color: #F4F6EE;
+  text-shadow: 0 1px 2px rgba(20, 30, 15, 0.25);
   margin: 0;
   letter-spacing: 0.01em;
 }
