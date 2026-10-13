@@ -438,3 +438,110 @@
     transform: none !important;
   }
 }
+
+/* ==========================================================================
+   Wedding Countdown Card
+   ========================================================================== */
+
+.wedding-countdown-section {
+  position: relative;
+  width: 100%;
+  max-width: 680px;
+  margin: 2.5rem auto 3rem auto;
+  padding: 0 1.25rem;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: var(--z-content, 2);
+}
+
+.countdown-card {
+  position: relative;
+  width: 100%;
+  background: rgba(247, 243, 234, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border, #D5D7C6);
+  border-radius: 4px;
+  padding: 2rem 1.5rem;
+  box-sizing: border-box;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(80, 91, 70, 0.04);
+}
+
+/* Elegant inner double border */
+.countdown-card::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  border: 1px solid rgba(163, 137, 79, 0.28);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.countdown-diamond-motif {
+  margin: 0 auto 0.75rem auto;
+  color: var(--color-gold, #A3894F);
+  font-size: 0.875rem;
+  line-height: 1;
+  user-select: none;
+}
+
+.countdown-heading {
+  font-family: 'Forum', 'Cinzel', var(--font-serif);
+  font-size: clamp(1.125rem, 3.2vw, 1.45rem);
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-olive, #505B46);
+  margin: 0 0 1.5rem 0;
+}
+
+.countdown-grid {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(0.5rem, 2.5vw, 1.5rem);
+  flex-wrap: nowrap;
+}
+
+.countdown-unit-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: clamp(52px, 16vw, 76px);
+}
+
+.countdown-digit {
+  font-family: 'Cinzel', 'Forum', Georgia, serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-feature-settings: 'tnum';
+  font-feature-settings: 'tnum';
+  font-size: clamp(2rem, 6.5vw, 2.85rem);
+  font-weight: 500;
+  line-height: 1.1;
+  color: var(--color-olive, #505B46);
+  margin-bottom: 0.25rem;
+}
+
+.countdown-label {
+  font-family: 'Montserrat', var(--font-sans);
+  font-size: clamp(0.625rem, 1.8vw, 0.75rem);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-secondary, #716A54);
+}
+
+.countdown-separator {
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 1.5rem;
+  color: var(--color-gold, #A3894F);
+  opacity: 0.5;
+  user-select: none;
+  margin-bottom: 1.25rem;
+}
