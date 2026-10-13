@@ -58,13 +58,30 @@
 }
 
 /* Reception table grounding & vertical height management */
+.reception-illustration {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.reception-img,
 .reception-svg {
   display: block;
   width: 100%;
+  max-width: 1400px;
   height: auto;
-  max-height: clamp(100px, 17vh, 160px) !important;
-  overflow: visible;
+  max-height: clamp(110px, 19vh, 220px) !important;
+  object-fit: contain;
+  object-position: bottom center;
   pointer-events: none;
+}
+
+@media (min-width: 768px) {
+  .reception-img,
+  .reception-svg {
+    max-height: clamp(150px, 26vh, 320px) !important;
+  }
 }
 
 /* ==========================================================================

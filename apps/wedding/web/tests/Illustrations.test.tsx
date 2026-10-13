@@ -147,17 +147,15 @@ describe('Chandelier & ReceptionIllustration Components', () => {
   });
 
   describe('ReceptionIllustration Component', () => {
-    it('renders with aria-hidden="true" on root and SVG elements for accessibility hygiene', () => {
+    it('renders with aria-hidden="true" on root and img elements for accessibility hygiene', () => {
       const { container } = render(<ReceptionIllustration />);
       const root = container.firstElementChild as HTMLElement;
 
       expect(root).toHaveAttribute('aria-hidden', 'true');
 
-      const svgs = container.querySelectorAll('svg');
-      expect(svgs.length).toBeGreaterThanOrEqual(1);
-      svgs.forEach((svg) => {
-        expect(svg).toHaveAttribute('aria-hidden', 'true');
-      });
+      const img = container.querySelector('img');
+      expect(img).not.toBeNull();
+      expect(img).toHaveAttribute('aria-hidden', 'true');
     });
 
     it('has pointer-events: none to avoid intercepting user interactions', () => {
@@ -170,55 +168,15 @@ describe('Chandelier & ReceptionIllustration Components', () => {
       ).toBe(true);
     });
 
-    it('renders wide panoramic SVG with valid viewBox and aspect ratio', () => {
+    it('renders banquet table artwork with responsive image styling and asset path', () => {
       const { container } = render(<ReceptionIllustration />);
-      const svg = container.querySelector('svg');
+      const img = container.querySelector('img');
 
-      expect(svg).not.toBeNull();
-      const viewBox = svg?.getAttribute('viewBox');
-      expect(viewBox).toBeTruthy();
-      expect(viewBox).toMatch(/^\d+\s+\d+\s+\d+\s+\d+$/);
-
-      // Verify wide aspect ratio: width should be significantly larger than height
-      const [, , width, height] = viewBox!.split(/\s+/).map(Number);
-      expect(width).toBeGreaterThanOrEqual(800);
-      expect(width / height).toBeGreaterThanOrEqual(2.5);
-    });
-
-    it('employs ivory runner, antique brass, and botanical foliage color palette', () => {
-      const { container } = render(<ReceptionIllustration />);
-      const htmlContent = container.innerHTML;
-
-      // Ivory runner palette tones
-      const hasIvory = /#FAF7F0|#FAF8F2|#EDE5D8|#D5D7C6|#F5F2EB/i.test(htmlContent);
-      // Brass taper holder tones
-      const hasBrass = /#A3894F|#C9B580|#7D6633/i.test(htmlContent);
-      // Botanical garland tones (olive and eucalyptus/sage)
-      const hasBotanical = /#505B46|#68745C|#A7B09A|#8F9A83/i.test(htmlContent);
-
-      expect(hasIvory).toBe(true);
-      expect(hasBrass).toBe(true);
-      expect(hasBotanical).toBe(true);
-    });
-
-    it('features complete banquet table anatomy: runner, candlesticks, flames, glassware, and garlands', () => {
-      const { container } = render(<ReceptionIllustration />);
-
-      const runner = container.querySelectorAll('.reception-runner, [data-part="runner"]');
-      const candleholders = container.querySelectorAll('.reception-candleholder, [data-part="candleholder"]');
-      const tapers = container.querySelectorAll('.reception-candle, [data-part="candle"]');
-      const flames = container.querySelectorAll('.reception-flame, [data-part="flame"]');
-      const glassware = container.querySelectorAll('.reception-glassware, [data-part="glassware"]');
-      const garlands = container.querySelectorAll('.reception-garland, [data-part="garland"]');
-      const leaves = container.querySelectorAll('.reception-leaf, [data-part="leaf"]');
-
-      expect(runner.length).toBeGreaterThanOrEqual(1);
-      expect(candleholders.length).toBeGreaterThanOrEqual(3);
-      expect(tapers.length).toBeGreaterThanOrEqual(3);
-      expect(flames.length).toBeGreaterThanOrEqual(3);
-      expect(glassware.length).toBeGreaterThanOrEqual(3);
-      expect(garlands.length).toBeGreaterThanOrEqual(1);
-      expect(leaves.length).toBeGreaterThanOrEqual(8);
+      expect(img).not.toBeNull();
+      expect(img?.getAttribute('src')).toBeTruthy();
+      expect(img?.getAttribute('src')).toContain('reception-table');
+      expect(img?.classList.contains('pointer-events-none')).toBe(true);
+      expect(img?.classList.contains('object-contain')).toBe(true);
     });
 
     it('supports isVisible prop for reveal choreography', () => {
