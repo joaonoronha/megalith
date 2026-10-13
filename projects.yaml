@@ -14,4 +14,6 @@ version: 1
 products:
   - id: demo
     manifest: apps/demo/product.yaml
+  - id: wedding
+    manifest: apps/wedding/product.yaml
 
