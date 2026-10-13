@@ -92,13 +92,13 @@ export const BotanicalFrame: React.FC<BotanicalFrameProps> = ({
 
   return (
     <div
-      className={`botanical-frame pointer-events-none absolute top-0 left-0 right-0 w-full overflow-hidden select-none flex justify-center items-start ${
+      className={`botanical-frame pointer-events-none absolute top-0 left-0 right-0 w-full overflow-visible select-none flex justify-center items-start ${
         !isVisible ? 'opacity-0' : 'opacity-100'
       } ${className}`}
       aria-hidden="true"
       style={style}
     >
-      <div className="botanical-slices-wrapper relative w-full max-w-[1600px] pointer-events-none select-none">
+      <div className="botanical-slices-wrapper relative w-full max-w-[1600px] overflow-visible pointer-events-none select-none">
         {FLOWER_SLICES.map((slice) => (
           <img
             key={slice.id}
@@ -106,7 +106,7 @@ export const BotanicalFrame: React.FC<BotanicalFrameProps> = ({
             alt=""
             aria-hidden="true"
             data-part={`flower-slice-${slice.id}`}
-            className={`botanical-slice absolute top-0 h-full object-cover object-top pointer-events-none select-none ${
+            className={`botanical-slice absolute top-0 h-full object-contain object-top pointer-events-none select-none ${
               reducedMotion ? '' : slice.swayClass
             }`}
             style={{
