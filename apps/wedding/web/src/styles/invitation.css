@@ -11,10 +11,7 @@
   min-height: 100vh;
   min-height: 100dvh;
   overflow: hidden;
-  background-color: var(--color-ivory, #F5F2EB);
-  background-image: url('../assets/wedding-linen-seamless.png');
-  background-repeat: repeat;
-  background-size: 256px 256px;
+  background-color: var(--color-ivory, #f7f3ea);
   color: var(--color-olive, #505B46);
   display: flex;
   flex-direction: column;
@@ -25,6 +22,20 @@
   padding-bottom: max(1rem, calc(var(--safe-area-bottom, 0px) + 0.5rem));
   padding-left: max(1rem, var(--safe-area-left, 0px));
   padding-right: max(1rem, var(--safe-area-right, 0px));
+}
+
+.paper-texture {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: var(--z-background, 0);
+  background-color: var(--color-ivory, #f7f3ea);
+  opacity: 0.7;
+  overflow: hidden;
+  user-select: none;
 }
 
 .hero-content-wrapper {

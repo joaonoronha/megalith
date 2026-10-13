@@ -153,11 +153,13 @@ describe('BotanicalFrame & PaperTexture Components', () => {
       expect(animatedElements).toHaveLength(0);
     });
 
-    it('applies repeatable wedding-linen-seamless background image', () => {
+    it('applies repeatable wedding-linen-seamless background image with #f7f3ea and 0.7 opacity', () => {
       const { container } = render(<PaperTexture />);
       const root = container.firstElementChild as HTMLElement;
+      expect(root.style.backgroundColor).toMatch(/(?:#f7f3ea|rgb\(247,\s*243,\s*234\))/i);
       expect(root.style.backgroundImage).toContain('wedding-linen-seamless');
       expect(root.style.backgroundRepeat).toBe('repeat');
+      expect(root.style.opacity).toBe('0.7');
     });
   });
 });
