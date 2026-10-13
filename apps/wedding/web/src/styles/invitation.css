@@ -545,3 +545,163 @@
   user-select: none;
   margin-bottom: 1.25rem;
 }
+
+/* ==========================================================================
+   Venue Section
+   ========================================================================== */
+
+.venue-section {
+  position: relative;
+  width: 100%;
+  max-width: 680px;
+  margin: 1.5rem auto 4.5rem auto;
+  padding: 0 1.25rem;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: var(--z-content, 2);
+}
+
+.venue-card {
+  position: relative;
+  width: 100%;
+  background: rgba(247, 243, 234, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border, #D5D7C6);
+  border-radius: 60px 60px 4px 4px;
+  padding: 2.25rem 1.5rem 2.5rem 1.5rem;
+  box-sizing: border-box;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(80, 91, 70, 0.04);
+}
+
+/* Architectural arched inner border */
+.venue-card::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  border: 1px solid rgba(163, 137, 79, 0.28);
+  border-radius: 54px 54px 2px 2px;
+  pointer-events: none;
+}
+
+.venue-arch-header {
+  margin: 0 auto 0.5rem auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.venue-arch-sprig {
+  width: 90px;
+  height: 30px;
+}
+
+.venue-eyebrow {
+  font-family: 'Montserrat', var(--font-sans);
+  font-size: clamp(0.6875rem, 2vw, 0.8125rem);
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-gold, #A3894F);
+  margin: 0 0 0.5rem 0;
+}
+
+.venue-title {
+  font-family: 'Forum', 'Cinzel', var(--font-serif);
+  font-size: clamp(1.625rem, 5vw, 2.35rem);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--color-olive, #505B46);
+  margin: 0 0 0.6rem 0;
+}
+
+.venue-location {
+  font-family: 'Montserrat', var(--font-sans);
+  font-size: clamp(0.75rem, 2.2vw, 0.875rem);
+  color: var(--color-secondary, #716A54);
+  margin: 0 0 1.25rem 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.venue-dot {
+  color: var(--color-gold, #A3894F);
+  opacity: 0.6;
+}
+
+.venue-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  max-width: 200px;
+  margin: 0 auto 1.75rem auto;
+}
+
+.venue-divider-line {
+  flex: 1;
+  height: 1px;
+  background: rgba(163, 137, 79, 0.35);
+}
+
+.venue-divider-diamond {
+  color: var(--color-gold, #A3894F);
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.venue-action-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.venue-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.75rem;
+  border: 1px solid var(--color-gold, #A3894F);
+  border-radius: 2px;
+  color: var(--color-olive, #505B46);
+  background: rgba(247, 243, 234, 0.5);
+  font-family: 'Montserrat', var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.venue-link-button:hover {
+  background: var(--color-olive, #505B46);
+  color: var(--color-ivory, #F5F2EB);
+  border-color: var(--color-olive, #505B46);
+}
+
+.venue-link-button:focus-visible {
+  outline: 2px solid var(--color-gold, #A3894F);
+  outline-offset: 2px;
+}
+
+.venue-external-icon {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.2s ease;
+}
+
+.venue-link-button:hover .venue-external-icon {
+  transform: translate(2px, -2px);
+}
