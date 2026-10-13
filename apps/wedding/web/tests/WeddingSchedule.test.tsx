@@ -106,4 +106,19 @@ describe('WeddingSchedule Component', () => {
     expect(section).toHaveClass('wedding-schedule-section');
     expect(section).toHaveClass('custom-schedule-class');
   });
+
+  it('applies the seamless sage green Venetian plaster texture as a tiled background', () => {
+    const { container } = render(
+      <I18nProvider initialLocale="pt-PT">
+        <WeddingSchedule />
+      </I18nProvider>
+    );
+
+    const card = container.querySelector('.schedule-card') as HTMLElement;
+    expect(card).toBeInTheDocument();
+    expect(decodeURIComponent(card.style.backgroundImage)).toContain(
+      'Seamless Sage Green Venetian Plaster Texture'
+    );
+    expect(card.style.backgroundRepeat).toBe('repeat');
+  });
 });
