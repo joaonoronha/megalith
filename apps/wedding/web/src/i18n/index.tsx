@@ -71,6 +71,12 @@ export function I18nProvider({ children, initialLocale }: I18nProviderProps) {
   }, []);
 
   useEffect(() => {
+    if (initialLocale && initialLocale in TRANSLATIONS) {
+      setLocaleState(initialLocale);
+    }
+  }, [initialLocale]);
+
+  useEffect(() => {
     if (typeof document !== 'undefined') {
       document.documentElement.lang = locale;
     }
