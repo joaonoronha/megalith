@@ -1,0 +1,7 @@
+id: wedding
+name: Madalena & João Wedding Invitation
+description: Animated multilingual wedding invitation website celebrating at Quinta da Grilla, Portugal.
+docs: README.md
+services:
+  - id: web
+    manifest: web/service.yaml

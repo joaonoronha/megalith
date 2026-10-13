@@ -1,0 +1,30 @@
+# Service manifest for wedding/web
+# Production port: 8080 (container / reverse proxy)
+# Local development port: 5174 (Vite)
+id: web
+product: wedding
+type: web
+runtime:
+  language: typescript
+  version: "5.x"
+  framework: React
+path: apps/wedding/web
+commands:
+  dev:
+    - pnpm
+    - dev
+  test:
+    - pnpm
+    - test
+  build:
+    - pnpm
+    - build
+  check:
+    - pnpm
+    - check
+artifact:
+  type: docker
+  image_name: megalith-wedding-web
+deployment:
+  deployable: true
+  target: oci-vm
