@@ -1,0 +1,236 @@
+@import './tokens.css';
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500&family=Forum&family=Montserrat:wght@300;400;500&display=swap');
+
+/* ==========================================================================
+   Hero Invitation Layout & Editorial Typography
+   ========================================================================== */
+
+.invitation-hero {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  background-color: var(--color-ivory, #F5F2EB);
+  color: var(--color-olive, #505B46);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  box-sizing: border-box;
+  padding-top: max(1.25rem, calc(var(--safe-area-top, 0px) + 0.5rem));
+  padding-bottom: max(1rem, calc(var(--safe-area-bottom, 0px) + 0.5rem));
+  padding-left: max(1rem, var(--safe-area-left, 0px));
+  padding-right: max(1rem, var(--safe-area-right, 0px));
+}
+
+.hero-content-wrapper {
+  position: relative;
+  z-index: var(--z-content, 2);
+  width: 100%;
+  max-width: 680px;
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 1.5rem 1.25rem;
+  box-sizing: border-box;
+}
+
+/* Chandelier optical proportioning & collision avoidance */
+.chandelier-svg {
+  display: block;
+  width: clamp(200px, 52vw, 270px) !important;
+  height: auto !important;
+  max-height: 240px;
+  overflow: visible;
+  pointer-events: none;
+  margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .chandelier-svg {
+    width: clamp(220px, 22vw, 300px) !important;
+    max-height: 250px;
+  }
+}
+
+/* Reception table grounding & vertical height management */
+.reception-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: clamp(100px, 17vh, 160px) !important;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   Editorial Typography Components
+   ========================================================================== */
+
+.invitation-text-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 1. Eyebrow Header */
+.hero-eyebrow {
+  font-family: var(--font-sans);
+  font-size: clamp(0.6875rem, 2.2vw, 0.8125rem);
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--color-secondary, #716A54);
+  margin: 0 0 0.75rem 0;
+  line-height: 1.3;
+  padding-left: 0.28em; /* Optically balances the trailing letter-spacing */
+}
+
+/* 2. Couple Names */
+.hero-names {
+  font-family: 'Forum', 'Cinzel', var(--font-serif);
+  font-size: clamp(2.1rem, 7.8vw, 3.75rem);
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+  color: var(--color-olive, #505B46);
+  margin: 0 0 0.875rem 0;
+  text-align: center;
+  word-break: normal;
+  overflow-wrap: normal;
+  white-space: normal;
+  text-shadow: 0 1px 2px rgba(80, 91, 70, 0.04);
+}
+
+/* 3. Gold Divider with 45-degree Diamond Motif */
+.hero-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: clamp(140px, 40vw, 240px);
+  margin: 0.5rem auto 1.125rem auto;
+  position: relative;
+}
+
+.hero-divider-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-gold, #A3894F) 50%,
+    var(--color-gold, #A3894F) 100%
+  );
+  opacity: 0.75;
+}
+
+.hero-divider-line--right {
+  background: linear-gradient(
+    90deg,
+    var(--color-gold, #A3894F) 0%,
+    var(--color-gold, #A3894F) 50%,
+    transparent 100%
+  );
+}
+
+.hero-divider-diamond {
+  width: 6px;
+  height: 6px;
+  background-color: var(--color-gold, #A3894F);
+  transform: rotate(45deg);
+  margin: 0 0.75rem;
+  flex-shrink: 0;
+}
+
+/* 4. Date and Time */
+.hero-datetime {
+  font-family: 'Cinzel', var(--font-serif);
+  font-size: clamp(0.875rem, 2.5vw, 1.0625rem);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-olive, #505B46);
+  margin: 0 0 0.4rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  line-height: 1.4;
+}
+
+.hero-datetime-sep {
+  color: var(--color-gold, #A3894F);
+  font-weight: 300;
+  font-size: 0.9em;
+}
+
+/* 5. Venue */
+.hero-venue {
+  font-family: 'Forum', 'Cinzel', var(--font-serif);
+  font-size: clamp(1.0625rem, 3vw, 1.3125rem);
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: var(--color-secondary, #716A54);
+  margin: 0 0 1.125rem 0;
+  line-height: 1.3;
+}
+
+/* 6. Invitation Message */
+.hero-message {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: clamp(1.0625rem, 2.7vw, 1.25rem);
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.65;
+  color: var(--color-olive, #505B46);
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 0 0.5rem;
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   Responsive Adaptations & Viewport Safety
+   ========================================================================== */
+
+@media (max-width: 480px) {
+  .hero-content-wrapper {
+    padding: 1rem 0.5rem;
+  }
+
+  .hero-names {
+    margin-bottom: 0.65rem;
+  }
+
+  .hero-divider {
+    margin: 0.35rem auto 0.875rem auto;
+  }
+
+  .hero-message {
+    padding: 0 0.25rem;
+  }
+}
+
+/* Reduced Motion Override */
+@media (prefers-reduced-motion: reduce) {
+  .invitation-hero,
+  .invitation-hero *,
+  .invitation-hero *::before,
+  .invitation-hero *::after {
+    animation-delay: 0s !important;
+    animation-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    transition-duration: 0.01ms !important;
+    transform: none !important;
+  }
+}
