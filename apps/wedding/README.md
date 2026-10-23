@@ -82,3 +82,54 @@ pnpm check
 # Production bundle build
 pnpm build
 ```
+
+---
+
+## Deployment & Domain Configuration
+
+The `wedding/web` application is continuously deployed to GitHub Pages and served under the custom apex domain **`madalenaejoao.pt`**.
+
+### Custom Domain & DNS Settings
+
+To route traffic to GitHub Pages, DNS records must be configured with the domain registrar / DNS provider for `madalenaejoao.pt`:
+
+| Record Type | Host / Name | Target / Value | Purpose |
+| :--- | :--- | :--- | :--- |
+| **A** | `@` | `185.199.108.153` | GitHub Pages Anycast IPv4 |
+| **A** | `@` | `185.199.109.153` | GitHub Pages Anycast IPv4 |
+| **A** | `@` | `185.199.110.153` | GitHub Pages Anycast IPv4 |
+| **A** | `@` | `185.199.111.153` | GitHub Pages Anycast IPv4 |
+| **AAAA** | `@` | `2606:50c0:8000::153` | GitHub Pages Anycast IPv6 |
+| **AAAA** | `@` | `2606:50c0:8001::153` | GitHub Pages Anycast IPv6 |
+| **AAAA** | `@` | `2606:50c0:8002::153` | GitHub Pages Anycast IPv6 |
+| **AAAA** | `@` | `2606:50c0:8003::153` | GitHub Pages Anycast IPv6 |
+| **CNAME** | `www` | `joaonoronha.github.io.` | Subdomain alias / redirect to apex |
+
+#### GitHub Pages Repository Settings
+- **Source**: Deploy from GitHub Actions
+- **Custom domain**: `madalenaejoao.pt`
+- **Enforce HTTPS**: Enabled (automated TLS certificate provisioning via Let's Encrypt upon DNS resolution)
+
+### GitHub Actions Deployment Model
+
+The deployment workflow is defined in [`.github/workflows/wedding-pages.yaml`](file:///.github/workflows/wedding-pages.yaml).
+
+- **Automated Triggers**: Triggers on `push` to `main` when changes affect `apps/wedding/web/**` or `.github/workflows/wedding-pages.yaml`.
+- **Pipeline Stages**:
+  1. **Dependencies**: `pnpm install` using Node.js 20 and pnpm 9.
+  2. **Type Check**: `pnpm run check` (TypeScript verification).
+  3. **Automated Tests**: `pnpm run test` (Vitest unit and component test suites).
+  4. **Production Build**: `pnpm run build` generates the static bundle into `dist/`, including `CNAME` (`madalenaejoao.pt`) and `404.html` (SPA fallback redirect).
+  5. **Artifact Upload**: `actions/upload-pages-artifact@v3` uploads the built bundle.
+  6. **Deployment**: `actions/deploy-pages@v4` publishes the artifact to GitHub Pages under the `github-pages` environment.
+- **Concurrency**: Governed by the `pages` concurrency group with `cancel-in-progress: false` to ensure atomic, non-overlapping deployments.
+
+### Manual Deployment (`workflow_dispatch`)
+
+In addition to automated pushes to `main`, deployments can be dispatched on demand via the GitHub UI:
+
+1. Navigate to the repository on GitHub.
+2. Click on the **Actions** tab in the main repository navigation.
+3. In the left sidebar, select the **Deploy Wedding Web to GitHub Pages** workflow.
+4. Click the **Run workflow** dropdown on the right side of the workflow banner.
+5. Choose branch `main` and click **Run workflow**.
