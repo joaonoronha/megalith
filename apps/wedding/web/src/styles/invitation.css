@@ -1155,18 +1155,12 @@
   position: relative;
   min-height: 100%;
   min-height: 100vh;
-  min-height: 100lvh;
-  min-height: -webkit-fill-available;
+  min-height: 100dvh;
   width: 100%;
-  background-color: #F8F5EE;
-  background-image: url('/assets/save-the-date-bg.png');
-  background-position: top center;
-  background-repeat: repeat;
-  background-size: 700px auto;
+  background: transparent;
   color: var(--color-olive, #505B46);
   display: flex;
   flex-direction: column;
-  overflow-x: clip;
   box-sizing: border-box;
 }
 
@@ -1185,14 +1179,14 @@
   transform: translate(-10%, -10%);
 }
 
-/* Language Switcher Capsule in Top Right */
+/* Language Switcher Capsule in Top Right - Reverted and comfortably padded */
 .save-the-date-header {
   position: relative;
   z-index: var(--z-nav, 10);
   width: 100%;
   max-width: 760px;
   margin: 0 auto;
-  padding: max(0.85rem, calc(var(--safe-area-top, 0px) + 0.5rem)) 1.25rem 0.25rem;
+  padding: max(1.25rem, calc(env(safe-area-inset-top, 0px) + 0.85rem)) 1.25rem 0.5rem;
   display: flex;
   justify-content: flex-end;
   box-sizing: border-box;
@@ -1248,14 +1242,14 @@
   user-select: none;
 }
 
-/* Central Content Container */
+/* Central Content Container - Reverted downward spacing */
 .save-the-date-content-container {
   position: relative;
   z-index: var(--z-content, 2);
   width: 100%;
   max-width: 540px;
   margin: 0 auto;
-  padding: 0.75rem 1rem max(2rem, calc(var(--safe-area-bottom, 0px) + 1rem));
+  padding: 1.25rem 1rem max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1265,7 +1259,8 @@
 
 /* 1. Header Section: Badge, Names, Date, Diamond, Quote */
 .screenshot-hero-intro {
-  margin-bottom: 1.2rem;
+  margin-top: 0.5rem;
+  margin-bottom: 1.35rem;
   display: flex;
   flex-direction: column;
   align-items: center;
