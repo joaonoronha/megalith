@@ -112,7 +112,7 @@ To route traffic to GitHub Pages, DNS records must be configured with the domain
 
 ### GitHub Actions Deployment Model
 
-The deployment workflow is defined in [`.github/workflows/wedding-pages.yaml`](file:///.github/workflows/wedding-pages.yaml).
+The deployment workflow is defined in [`.github/workflows/wedding-pages.yaml`](../../.github/workflows/wedding-pages.yaml).
 
 - **Automated Triggers**: Triggers on `push` to `main` when changes affect `apps/wedding/web/**` or `.github/workflows/wedding-pages.yaml`.
 - **Pipeline Stages**:
