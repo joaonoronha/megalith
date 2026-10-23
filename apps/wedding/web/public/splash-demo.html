@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Save the Date — João &amp; Madalena</title>
+  
+  <!-- Google Fonts Clássicas e Românticas -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=Forum&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ==========================================================================
+       Variáveis de Design (Paleta Clássica e Romântica)
+       ========================================================================== */
+    :root {
+      --color-ivory: #F8F5EE;
+      --color-ivory-warm: #FAF8F2;
+      --color-olive: #3E4636;
+      --color-olive-dark: #2F3628;
+      --color-gold: #A3894F;
+      --color-gold-light: rgba(163, 137, 79, 0.2);
+      --color-taupe: #78715C;
+      --font-serif: 'Cormorant Garamond', 'Forum', Georgia, serif;
+      --font-display: 'Forum', 'Cinzel', Georgia, serif;
+      --font-cinzel: 'Cinzel', Georgia, serif;
+      --font-sans: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--color-ivory);
+      color: var(--color-olive);
+      font-family: var(--font-serif);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ==========================================================================
+       Splash Screen (Ecrã de Introdução)
+       ========================================================================== */
+    .splash-overlay {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      background: radial-gradient(
+        ellipse at center,
+        #FFFFFF 0%,
+        var(--color-ivory-warm) 60%,
+        #EDE8DC 100%
+      );
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1),
+                  visibility 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      padding: 1.5rem;
+    }
+
+    /* Textura subtil de papel e vinheta suave */
+    .splash-overlay::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(163, 137, 79, 0.05) 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    /* Moldura dourada decorativa */
+    .splash-frame {
+      position: absolute;
+      inset: 1.5rem;
+      border: 1px solid rgba(163, 137, 79, 0.25);
+      pointer-events: none;
+      box-sizing: border-box;
+    }
+
+    .splash-frame::after {
+      content: "";
+      position: absolute;
+      inset: 6px;
+      border: 1px solid rgba(163, 137, 79, 0.12);
+    }
+
+    /* Estado de Fade-Out */
+    .splash-overlay.fade-out {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    /* Cartão de Conteúdo Central */
+    .splash-card {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      max-width: 600px;
+      width: 100%;
+      animation: fadeInScale 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* Tag / Eyebrow: "SAVE THE DATE" */
+    .splash-badge {
+      font-family: var(--font-sans);
+      font-size: clamp(0.7rem, 2vw, 0.825rem);
+      font-weight: 500;
+      letter-spacing: 0.38em;
+      text-transform: uppercase;
+      color: var(--color-gold);
+      margin-bottom: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .splash-badge::before,
+    .splash-badge::after {
+      content: "";
+      width: 28px;
+      height: 1px;
+      background-color: var(--color-gold);
+      opacity: 0.6;
+    }
+
+    /* Nomes dos Noivos */
+    .splash-names {
+      font-family: var(--font-display);
+      font-size: clamp(2.4rem, 8vw, 4.4rem);
+      font-weight: 400;
+      color: var(--color-olive-dark);
+      letter-spacing: 0.04em;
+      line-height: 1.12;
+      margin: 0;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+
+    .splash-names span {
+      display: block;
+    }
+
+    .splash-ampersand {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-weight: 300;
+      color: var(--color-gold);
+      margin: 0 0.35rem;
+    }
+
+    /* Divisor com Losango Dourado */
+    .splash-divider {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      width: 160px;
+      margin: 1.5rem auto;
+    }
+
+    .splash-divider-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
+      opacity: 0.5;
+    }
+
+    .splash-divider-diamond {
+      color: var(--color-gold);
+      font-size: 0.8rem;
+      line-height: 1;
+    }
+
+    /* Data do Casamento */
+    .splash-date {
+      font-family: var(--font-cinzel);
+      font-size: clamp(1rem, 3vw, 1.25rem);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--color-olive);
+      margin-bottom: 0.35rem;
+      font-weight: 500;
+    }
+
+    /* Localização */
+    .splash-location {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: clamp(1.05rem, 2.5vw, 1.2rem);
+      color: var(--color-taupe);
+      letter-spacing: 0.05em;
+      margin-bottom: 2.2rem;
+    }
+
+    /* Botão "Entrar no Site" */
+    .splash-enter-btn {
+      appearance: none;
+      -webkit-appearance: none;
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid var(--color-gold);
+      color: var(--color-olive-dark);
+      font-family: var(--font-sans);
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      padding: 0.75rem 1.8rem;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(163, 137, 79, 0.12);
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .splash-enter-btn:hover {
+      background: var(--color-olive-dark);
+      color: var(--color-ivory);
+      border-color: var(--color-olive-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(47, 54, 40, 0.2);
+    }
+
+    /* Indicador de progresso automático */
+    .splash-progress-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 2px;
+      width: 0%;
+      background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
+      animation: progressTimer 3s linear forwards;
+    }
+
+    /* Animação suave de entrada dos elementos */
+    @keyframes fadeInScale {
+      0% {
+        opacity: 0;
+        transform: translateY(14px) scale(0.98);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes progressTimer {
+      0% {
+        width: 0%;
+      }
+      100% {
+        width: 100%;
+      }
+    }
+
+    /* ==========================================================================
+       Conteúdo Principal da Página (Revelado após o Splash)
+       ========================================================================== */
+    .main-site-content {
+      padding: 4rem 1.5rem;
+      max-width: 800px;
+      margin: 0 auto;
+      text-align: center;
+      animation: fadeInContent 1.2s ease 2.8s both;
+    }
+
+    .main-site-content h1 {
+      font-family: var(--font-display);
+      font-size: 2.8rem;
+      margin-bottom: 1rem;
+      color: var(--color-olive-dark);
+    }
+
+    .main-site-content p {
+      font-size: 1.2rem;
+      color: var(--color-taupe);
+      line-height: 1.6;
+    }
+
+    @keyframes fadeInContent {
+      0% {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .splash-frame {
+        inset: 0.75rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==========================================================================
+       SPLASH SCREEN (SAVE THE DATE)
+       ========================================================================== -->
+  <div id="splashScreen" class="splash-overlay" role="dialog" aria-modal="true" aria-label="Save the Date">
+    <!-- Moldura decorativa dupla -->
+    <div class="splash-frame" aria-hidden="true"></div>
+
+    <!-- Conteúdo Central -->
+    <div class="splash-card">
+      <p class="splash-badge">Save the Date</p>
+      
+      <h1 class="splash-names">
+        João <span class="splash-ampersand">&amp;</span> Madalena
+      </h1>
+
+      <div class="splash-divider" aria-hidden="true">
+        <span class="splash-divider-line"></span>
+        <span class="splash-divider-diamond">✦</span>
+        <span class="splash-divider-line"></span>
+      </div>
+
+      <p class="splash-date">16 · 08 · 2027</p>
+      <p class="splash-location">Quinta da Grilla · Portugal</p>
+
+      <button id="enterBtn" class="splash-enter-btn" type="button">
+        Entrar no Site &rarr;
+      </button>
+    </div>
+
+    <!-- Barra subtil de progresso (3 segundos) -->
+    <div class="splash-progress-bar" aria-hidden="true"></div>
+  </div>
+
+  <!-- ==========================================================================
+       CONTEÚDO PRINCIPAL DO SITE (Fica visível após a introdução)
+       ========================================================================== -->
+  <main class="main-site-content">
+    <h1>Bem-vindos ao Nosso Casamento</h1>
+    <p>É com muita alegria que partilhamos este momento tão especial convosco.</p>
+  </main>
+
+  <!-- ==========================================================================
+       SCRIPT DE CONTROLO DO FADE-OUT
+       ========================================================================== -->
+  <script>
+    (function () {
+      const splash = document.getElementById('splashScreen');
+      const enterBtn = document.getElementById('enterBtn');
+      const DURATION_MS = 3000; // 3 segundos antes do fade-out automático
+      let isDismissed = false;
+
+      function dismissSplash() {
+        if (isDismissed) return;
+        isDismissed = true;
+
+        // Inicia a transição de fade-out suave (opacidade 1 -> 0)
+        splash.classList.add('fade-out');
+
+        // Remove do DOM / acessibilidade após terminar a transição (1.2s)
+        setTimeout(() => {
+          splash.style.display = 'none';
+        }, 1200);
+      }
+
+      // 1. Temporizador automático de 3 segundos
+      const autoTimer = setTimeout(dismissSplash, DURATION_MS);
+
+      // 2. Clique no botão "Entrar no Site" (cancela timer e fecha logo)
+      enterBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        clearTimeout(autoTimer);
+        dismissSplash();
+      });
+
+      // 3. Clique em qualquer área do ecrã de introdução para avançar
+      splash.addEventListener('click', function () {
+        clearTimeout(autoTimer);
+        dismissSplash();
+      });
+    })();
+  </script>
+</body>
+</html>

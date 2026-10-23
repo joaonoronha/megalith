@@ -1126,3 +1126,1087 @@
   opacity: 0.9;
   margin: 0;
 }
+
+/* ==========================================================================
+   Save The Date Gate & Video Presentation (Screenshot Aesthetic)
+   ========================================================================== */
+
+.save-the-date-bg-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  height: 100vh;
+  height: 100lvh;
+  height: -webkit-fill-available;
+  background-color: #F8F5EE;
+  background-image: url('/assets/save-the-date-bg.png');
+  background-position: top center;
+  background-repeat: repeat;
+  background-size: 700px auto;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.save-the-date-gate-root {
+  position: relative;
+  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100lvh;
+  min-height: -webkit-fill-available;
+  width: 100%;
+  background-color: #F8F5EE;
+  background-image: url('/assets/save-the-date-bg.png');
+  background-position: top center;
+  background-repeat: repeat;
+  background-size: 700px auto;
+  color: var(--color-olive, #505B46);
+  display: flex;
+  flex-direction: column;
+  overflow-x: clip;
+  box-sizing: border-box;
+}
+
+/* Botanical branch in top-left */
+.screenshot-top-left-branch {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: clamp(340px, 80vw, 700px);
+  max-width: 85vw;
+  height: auto;
+  pointer-events: none;
+  z-index: 1;
+  user-select: none;
+  opacity: 0.98;
+  transform: translate(-10%, -10%);
+}
+
+/* Language Switcher Capsule in Top Right */
+.save-the-date-header {
+  position: relative;
+  z-index: var(--z-nav, 10);
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: max(0.85rem, calc(var(--safe-area-top, 0px) + 0.5rem)) 1.25rem 0.25rem;
+  display: flex;
+  justify-content: flex-end;
+  box-sizing: border-box;
+}
+
+.save-the-date-header .language-switcher {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.save-the-date-header .language-switcher-list {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(163, 137, 79, 0.4);
+  border-radius: 9999px;
+  padding: 0.28rem 0.75rem;
+  box-shadow: 0 1px 4px rgba(67, 76, 58, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.save-the-date-header .language-switcher-btn {
+  font-family: 'Montserrat', var(--font-sans);
+  font-size: 0.76rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8c7b64;
+  font-weight: 500;
+  padding: 0.15rem 0.35rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s ease, font-weight 0.2s ease;
+}
+
+.save-the-date-header .language-switcher-btn.is-active {
+  color: #2F3628;
+  font-weight: 700;
+}
+
+.save-the-date-header .language-switcher-separator {
+  color: rgba(163, 137, 79, 0.45);
+  font-size: 0.72rem;
+  font-weight: 300;
+  line-height: 1;
+  user-select: none;
+}
+
+/* Central Content Container */
+.save-the-date-content-container {
+  position: relative;
+  z-index: var(--z-content, 2);
+  width: 100%;
+  max-width: 540px;
+  margin: 0 auto;
+  padding: 0.75rem 1rem max(2rem, calc(var(--safe-area-bottom, 0px) + 1rem));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+/* 1. Header Section: Badge, Names, Date, Diamond, Quote */
+.screenshot-hero-intro {
+  margin-bottom: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.screenshot-badge {
+  font-family: 'Montserrat', var(--font-sans);
+  font-size: 0.76rem;
+  font-weight: 500;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: #877550;
+  margin: 0 0 0.4rem 0;
+}
+
+.screenshot-names {
+  font-family: 'Forum', 'Cinzel', var(--font-serif);
+  font-size: clamp(2.6rem, 8.8vw, 4rem);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: #353D2F;
+  margin: 0;
+  line-height: 1.14;
+}
+
+.screenshot-date {
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: clamp(1.1rem, 3.4vw, 1.4rem);
+  letter-spacing: 0.28em;
+  color: #434c3a;
+  margin: 0.4rem 0 0.35rem 0;
+}
+
+.screenshot-diamond {
+  color: #A3894F;
+  font-size: 0.65rem;
+  line-height: 1;
+  margin: 0.35rem 0;
+  opacity: 0.9;
+}
+
+.screenshot-intro-quote {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic;
+  font-size: clamp(1.05rem, 2.7vw, 1.22rem);
+  color: #5F5845;
+  line-height: 1.4;
+  margin-top: 0.25rem;
+}
+
+.screenshot-intro-quote p {
+  margin: 0;
+}
+
+/* 2. Video Player Section with Organic Border */
+.screenshot-media-section {
+  width: 100%;
+  margin-bottom: 1.35rem;
+  display: flex;
+  justify-content: center;
+}
+
+.save-the-date-video-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.video-frame,
+.wavy-video-container {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  aspect-ratio: 4 / 3;
+  margin: 0 auto;
+  border: none;
+  background: transparent;
+  overflow: visible;
+}
+
+.wavy-video-clip {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  clip-path: url(#frame);
+  -webkit-clip-path: url(#frame);
+  overflow: hidden;
+  background-color: #1a1e18;
+}
+
+.wavy-video-element,
+.video-frame video,
+.save-the-date-video-element {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Fullscreen stays zero-crop contain and removes frame styling */
+.wavy-video-clip video:fullscreen,
+.wavy-video-clip video:-webkit-full-screen,
+.video-frame video:fullscreen,
+.video-frame video:-webkit-full-screen,
+.save-the-date-video-element:fullscreen,
+.save-the-date-video-element:-webkit-full-screen {
+  clip-path: none !important;
+  -webkit-clip-path: none !important;
+  object-fit: contain !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: #000000 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+/* Diagonal Gold Outline Overlay */
+.wavy-video-outline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+  filter: drop-shadow(0 15px 35px rgba(0, 0, 0, 0.25));
+}
+
+/* Play Button Video Overlay Container */
+.wavy-video-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  cursor: pointer;
+  background: transparent;
+  pointer-events: auto;
+}
+
+/* Liquid Glass Circular Play Button (https://github.com/prabinpebam/liquid-glass Refraction) */
+.wavy-play-button {
+  position: relative;
+  width: 70px;
+  height: 70px;
+  min-width: 70px;
+  min-height: 70px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.1);
+  border: none !important; /* User explicitly requested: remove the current border */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  z-index: 11;
+  padding: 0;
+  overflow: hidden;
+  pointer-events: auto;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.2s ease, box-shadow 0.25s ease;
+}
+
+.liquid-glass-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.wavy-video-overlay:hover .wavy-play-button,
+.wavy-play-button:hover {
+  transform: scale(1.08);
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+}
+
+.wavy-play-button:active {
+  transform: scale(0.95);
+}
+
+.wavy-play-triangle {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  flex-shrink: 0;
+  margin-left: 4px; /* Optical center compensation */
+  fill: #ffffff;
+  display: block;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+  transition: transform 0.2s ease;
+}
+
+.wavy-video-overlay:hover .wavy-play-triangle,
+.wavy-play-button:hover .wavy-play-triangle {
+  transform: scale(1.06);
+}
+
+.play-button-label {
+  display: none;
+}
+
+/* 3. Venue Teaser Section */
+.screenshot-venue-teaser {
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.screenshot-venue-name {
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: clamp(0.95rem, 2.8vw, 1.15rem);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #384030;
+  font-weight: 500;
+  margin: 0;
+}
+
+.screenshot-country {
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: #877550;
+  margin: 0.35rem 0 0.25rem 0;
+}
+
+/* 4. Countdown Card (Delicate frame with vertical separators) */
+.screenshot-countdown-card {
+  width: 100%;
+  max-width: min(440px, 94vw);
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(163, 137, 79, 0.32);
+  border-radius: 12px;
+  padding: 1.5rem 1.15rem 1.4rem;
+  margin: 0.25rem auto 1.25rem;
+  box-shadow: 0 4px 16px rgba(80, 91, 70, 0.04);
+  box-sizing: border-box;
+}
+
+.screenshot-countdown-title {
+  font-family: 'Cinzel', 'Forum', Georgia, serif;
+  font-size: clamp(0.72rem, 2.2vw, 0.82rem);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #434c3a;
+  margin: 0 0 1.2rem 0;
+  font-weight: 500;
+  text-align: center;
+}
+
+.screenshot-countdown-grid {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  width: 100%;
+}
+
+.countdown-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 52px;
+}
+
+.countdown-num {
+  font-family: 'Forum', 'Cinzel', serif;
+  font-size: clamp(1.8rem, 6vw, 2.35rem);
+  font-weight: 400;
+  color: #353D2F;
+  line-height: 1;
+}
+
+.countdown-unit-txt {
+  font-family: 'Montserrat', var(--font-sans);
+  font-size: 0.58rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #78715C;
+  margin-top: 0.4rem;
+  font-weight: 500;
+}
+
+.countdown-bar-separator {
+  width: 1px;
+  height: 32px;
+  background: rgba(163, 137, 79, 0.35);
+}
+
+.screenshot-countdown-subtext {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic;
+  font-size: clamp(0.95rem, 2.6vw, 1.1rem);
+  color: #5F5845;
+  margin: 1.2rem auto 0;
+  max-width: 340px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+/* 5. "GUARDAR A DATA" Calendar Action Button */
+.screenshot-calendar-action {
+  margin: 0.15rem 0 1.4rem;
+}
+
+.screenshot-guardar-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(163, 137, 79, 0.5);
+  border-radius: 30px;
+  padding: 0.65rem 1.6rem;
+  font-family: 'Cinzel', 'Montserrat', var(--font-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: #434c3a;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 3px 12px rgba(163, 137, 79, 0.08);
+}
+
+.screenshot-guardar-btn:hover {
+  background: #353D2F;
+  color: #FAF8F2;
+  border-color: #353D2F;
+  transform: translateY(-1px);
+}
+
+.screenshot-guardar-btn:hover .calendar-btn-svg {
+  stroke: #FAF8F2;
+}
+
+.calendar-btn-svg {
+  width: 15px;
+  height: 15px;
+  stroke: #A3894F;
+  transition: stroke 0.25s ease;
+}
+
+/* 6. Closing Romantic Quote & Monogram */
+.screenshot-closing-section {
+  margin: 0.4rem 0 1.4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.screenshot-closing-quote p {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic;
+  font-size: clamp(1.05rem, 2.7vw, 1.25rem);
+  color: #5F5845;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.screenshot-monogram {
+  font-family: 'Forum', 'Cinzel', serif;
+  font-size: 1.5rem;
+  letter-spacing: 0.25em;
+  color: #434c3a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-top: 1.1rem;
+}
+
+.monogram-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(163, 137, 79, 0.5);
+}
+
+/* 7. Quinta da Grilla Illustration at Base (Translated left and cropped by ~20%) */
+.screenshot-quinta-container {
+  width: 100%;
+  max-width: 100%;
+  margin: 1.5rem 0 0 0;
+  padding: 0;
+  line-height: 0;
+  overflow: hidden;
+  pointer-events: none;
+  display: block;
+  align-self: stretch;
+}
+
+.screenshot-quinta-img {
+  width: 125%;
+  max-width: 125%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+  margin: 0;
+  padding: 0;
+  transform: translate(-18%, 12%);
+  margin-bottom: -10%;
+}
+
+/* ==========================================================================
+   Intro Overlay: Sliding in Names & Pulsing Save the date Button
+   ========================================================================== */
+
+.save-the-date-intro-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  background: radial-gradient(
+    ellipse at center,
+    #FFFFFF 0%,
+    var(--color-ivory-warm, #FAF8F2) 65%,
+    #EDE8DC 100%
+  );
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  box-sizing: border-box;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1),
+              visibility 1s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.save-the-date-intro-overlay.fade-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Seamless Black Backdrop during suck-in transition to fullscreen */
+.intro-black-backdrop {
+  position: absolute;
+  inset: 0;
+  background: #000000;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.25s ease-in;
+}
+
+.save-the-date-intro-overlay.zooming .intro-black-backdrop {
+  opacity: 1;
+  transition-delay: 0.22s;
+}
+
+.intro-frame {
+  position: absolute;
+  inset: 1.5rem;
+  border: 1px solid rgba(163, 137, 79, 0.22);
+  pointer-events: none;
+  box-sizing: border-box;
+  transition: opacity 0.3s ease-out, transform 0.45s cubic-bezier(0.8, 0, 0.95, 0.15);
+  z-index: 2;
+}
+
+.intro-frame::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(163, 137, 79, 0.1);
+}
+
+.save-the-date-intro-overlay.zooming .intro-frame {
+  opacity: 0;
+  transform: scale(3.5);
+}
+
+.intro-content {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 580px;
+  width: 100%;
+  transform-origin: center center;
+}
+
+/* Sucked-In Zoom Center Effect: Fast, high-velocity suck-in zoom */
+.save-the-date-intro-overlay.zooming .intro-content {
+  animation: introSuckInZoom 0.55s cubic-bezier(0.8, 0, 0.95, 0.15) forwards;
+  pointer-events: none;
+}
+
+@keyframes introSuckInZoom {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0px);
+  }
+  35% {
+    transform: scale(2.8);
+    opacity: 0.9;
+    filter: blur(3px);
+  }
+  65% {
+    transform: scale(6.5);
+    opacity: 0.5;
+    filter: blur(12px);
+  }
+  100% {
+    transform: scale(12);
+    opacity: 0;
+    filter: blur(28px);
+    visibility: hidden;
+  }
+}
+
+/* Sliding in Names: Madalena from left, João from right */
+.intro-names {
+  font-family: 'Forum', 'Cinzel', var(--font-serif);
+  font-size: clamp(2.6rem, 9vw, 4.5rem);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--color-olive-dark, #3A4233);
+  margin: 0;
+  line-height: 1.15;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.6rem;
+}
+
+.intro-name-madalena {
+  display: inline-block;
+  animation: introSlideInLeft 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.intro-name-joao {
+  display: inline-block;
+  animation: introSlideInRight 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.intro-ampersand {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic;
+  font-weight: 300;
+  color: var(--color-gold, #A3894F);
+  display: inline-block;
+  animation: introAmpersandFade 1s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
+}
+
+@keyframes introSlideInLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-70px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes introSlideInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(70px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes introAmpersandFade {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.intro-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 160px;
+  margin: 1.5rem auto 2.2rem;
+  animation: introDividerFade 1.2s ease 0.35s both;
+}
+
+.intro-divider-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-gold, #A3894F), transparent);
+  opacity: 0.5;
+}
+
+.intro-divider-diamond {
+  color: var(--color-gold, #A3894F);
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+/* Pulsing "Save the date" Button */
+.intro-pulse-btn {
+  position: relative;
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--color-gold, #A3894F);
+  color: var(--color-olive-dark, #3A4233);
+  font-family: 'Montserrat', var(--font-sans);
+  font-size: clamp(0.75rem, 2.5vw, 0.85rem);
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  padding: 0.95rem 2.2rem;
+  border-radius: 40px;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(163, 137, 79, 0.18);
+  animation: introButtonAppear 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.6s both,
+             introPulse 2.2s ease-in-out 1.5s infinite;
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.intro-pulse-btn:hover,
+.intro-pulse-btn:focus-visible {
+  background: var(--color-olive-dark, #3A4233);
+  color: #FAF8F2;
+  border-color: var(--color-olive-dark, #3A4233);
+  outline: none;
+}
+
+@keyframes introDividerFade {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.7);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes introButtonAppear {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes introPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(163, 137, 79, 0.4), 0 4px 18px rgba(163, 137, 79, 0.18);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 24px 6px rgba(163, 137, 79, 0.38), 0 6px 24px rgba(163, 137, 79, 0.28);
+  }
+}
+
+/* Video visual fade-in animation */
+.save-the-date-video-element.fading-in {
+  animation: videoVisualFadeIn 1.4s ease-out forwards;
+}
+
+@keyframes videoVisualFadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .intro-frame {
+    inset: 0.75rem;
+  }
+}
+
+
+
+/* ==========================================================================
+   Splash Screen (Ecrã de Introdução "Save the Date")
+   ========================================================================== */
+
+.splash-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  background: radial-gradient(
+    ellipse at center,
+    #FFFFFF 0%,
+    var(--color-ivory-warm, #FAF8F2) 60%,
+    #EDE8DC 100%
+  );
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1),
+              visibility 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  padding: 1.5rem;
+}
+
+.splash-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(163, 137, 79, 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.splash-frame {
+  position: absolute;
+  inset: 1.5rem;
+  border: 1px solid rgba(163, 137, 79, 0.25);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.splash-frame::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(163, 137, 79, 0.12);
+}
+
+.splash-overlay.fade-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.splash-card {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 600px;
+  width: 100%;
+  animation: fadeInScale 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.splash-badge {
+  font-family: 'Montserrat', var(--font-sans);
+  font-size: clamp(0.7rem, 2vw, 0.825rem);
+  font-weight: 500;
+  letter-spacing: 0.38em;
+  text-transform: uppercase;
+  color: var(--color-gold, #A3894F);
+  margin-bottom: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.splash-badge::before,
+.splash-badge::after {
+  content: "";
+  width: 28px;
+  height: 1px;
+  background-color: var(--color-gold, #A3894F);
+  opacity: 0.6;
+}
+
+.splash-names {
+  font-family: 'Forum', 'Cinzel', var(--font-serif);
+  font-size: clamp(2.4rem, 8vw, 4.4rem);
+  font-weight: 400;
+  color: var(--color-olive-dark, #3A4233);
+  letter-spacing: 0.04em;
+  line-height: 1.12;
+  margin: 0;
+}
+
+.splash-ampersand {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic;
+  font-weight: 300;
+  color: var(--color-gold, #A3894F);
+  margin: 0 0.35rem;
+}
+
+.splash-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 160px;
+  margin: 1.5rem auto;
+}
+
+.splash-divider-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-gold, #A3894F), transparent);
+  opacity: 0.5;
+}
+
+.splash-divider-diamond {
+  color: var(--color-gold, #A3894F);
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.splash-date {
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: clamp(1rem, 3vw, 1.25rem);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-olive, #505B46);
+  margin-bottom: 0.35rem;
+  font-weight: 500;
+}
+
+.splash-location {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic;
+  font-size: clamp(1.05rem, 2.5vw, 1.2rem);
+  color: var(--color-secondary, #716A54);
+  letter-spacing: 0.05em;
+  margin-bottom: 2.2rem;
+}
+
+.splash-enter-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--color-gold, #A3894F);
+  color: var(--color-olive-dark, #3A4233);
+  font-family: 'Montserrat', var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 0.75rem 1.8rem;
+  border-radius: 30px;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(163, 137, 79, 0.12);
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.splash-enter-btn:hover {
+  background: var(--color-olive-dark, #3A4233);
+  color: #FAF8F2;
+  border-color: var(--color-olive-dark, #3A4233);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(47, 54, 40, 0.2);
+}
+
+.splash-progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  width: 0%;
+  background: linear-gradient(90deg, transparent, var(--color-gold, #A3894F), transparent);
+  animation: progressTimer 3s linear forwards;
+}
+
+@keyframes fadeInScale {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes progressTimer {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .splash-frame {
+    inset: 0.75rem;
+  }
+}
+
+

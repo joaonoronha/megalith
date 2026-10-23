@@ -51,6 +51,19 @@ describe('LanguageSwitcher Component', () => {
     });
   });
 
+  it('renders vertical bar separator characters when separator="bar" is specified', () => {
+    render(
+      <I18nProvider initialLocale="pt-PT">
+        <LanguageSwitcher separator="bar" />
+      </I18nProvider>
+    );
+    const separators = screen.getAllByText('|');
+    expect(separators).toHaveLength(2);
+    separators.forEach((sep) => {
+      expect(sep).toHaveAttribute('aria-hidden', 'true');
+    });
+  });
+
   it('marks active locale with aria-pressed="true" and inactives with aria-pressed="false"', () => {
     renderWithProvider('pt-PT');
 
