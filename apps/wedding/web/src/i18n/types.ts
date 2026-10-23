@@ -29,6 +29,27 @@ export interface A11yTranslations {
   readonly countdownLive: string;
 }
 
+export interface SaveTheDateTranslations {
+  readonly badge: string;
+  readonly subtitle: string;
+  readonly quoteIntro1: string;
+  readonly quoteIntro2: string;
+  readonly venueName: string;
+  readonly country: string;
+  readonly countdownHeading: string;
+  readonly countdownSubtext: string;
+  readonly calendarButton: string;
+  readonly closingQuote1: string;
+  readonly closingQuote2: string;
+  readonly closingQuote3: string;
+  readonly monogram: string;
+  readonly playPrompt: string;
+  readonly pausePrompt: string;
+  readonly videoAriaLabel: string;
+  readonly videoFallback: string;
+  readonly weddingDateTeaser: string;
+}
+
 export interface TranslationSchema {
   readonly eyebrow: string;
   readonly names: string;
@@ -44,6 +65,7 @@ export interface TranslationSchema {
   readonly venueDirections: string;
   readonly venueAddress: string;
   readonly a11y: A11yTranslations;
+  readonly saveTheDate: SaveTheDateTranslations;
 }
 
 export interface I18nContextValue {

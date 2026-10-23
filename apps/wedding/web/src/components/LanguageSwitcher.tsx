@@ -16,14 +16,18 @@ const LOCALES: readonly LocaleItem[] = [
 
 export interface LanguageSwitcherProps {
   readonly className?: string;
+  readonly separator?: 'dot' | 'bar';
 }
 
 /**
- * Discreet language switcher rendering PT · EN · FR.
+ * Discreet language switcher rendering PT · EN · FR or PT | EN | FR.
  * Strictly adheres to editorial guidelines: typography-only, zero national flags.
  * Accessible with dynamic aria-pressed states and screen-reader localized labels.
  */
-export function LanguageSwitcher({ className }: LanguageSwitcherProps = {}): React.JSX.Element {
+export function LanguageSwitcher({
+  className,
+  separator = 'dot',
+}: LanguageSwitcherProps = {}): React.JSX.Element {
   const { locale, setLocale, t } = useI18n();
 
   const containerClasses = ['language-switcher', className].filter(Boolean).join(' ');
@@ -36,8 +40,11 @@ export function LanguageSwitcher({ className }: LanguageSwitcherProps = {}): Rea
           return (
             <React.Fragment key={item.code}>
               {index > 0 && (
-                <span className="language-switcher-separator" aria-hidden="true">
-                  ·
+                <span
+                  className={`language-switcher-separator ${separator}`}
+                  aria-hidden="true"
+                >
+                  {separator === 'bar' ? '|' : '·'}
                 </span>
               )}
               <button

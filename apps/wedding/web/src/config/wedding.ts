@@ -3,6 +3,12 @@ export interface VenueCoordinates {
   readonly lng: number;
 }
 
+export interface SaveTheDateConfig {
+  readonly unlockUtc: string;
+  readonly videoUrl: string;
+  readonly posterUrl?: string;
+}
+
 export interface WeddingConfig {
   readonly bride: string;
   readonly groom: string;
@@ -17,6 +23,7 @@ export interface WeddingConfig {
   readonly venueAddress: string;
   readonly venueMapsUrl: string;
   readonly venueCoordinates: VenueCoordinates;
+  readonly saveTheDate: SaveTheDateConfig;
 }
 
 export const WEDDING_CONFIG: WeddingConfig = Object.freeze({
@@ -36,5 +43,13 @@ export const WEDDING_CONFIG: WeddingConfig = Object.freeze({
   venueCoordinates: Object.freeze({
     lat: 39.1173506,
     lng: -9.1326937,
+  }),
+  saveTheDate: Object.freeze({
+    unlockUtc:
+      (typeof import.meta !== 'undefined' && import.meta.env?.VITE_INVITATION_UNLOCK_UTC) ||
+      '2027-02-16T00:00:00Z',
+    videoUrl:
+      (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SAVE_THE_DATE_VIDEO_URL) ||
+      '/assets/save-the-date.MOV',
   }),
 });

@@ -29,6 +29,10 @@ describe('WEDDING_CONFIG', () => {
         lat: 39.1173506,
         lng: -9.1326937,
       },
+      saveTheDate: {
+        unlockUtc: '2027-02-16T00:00:00Z',
+        videoUrl: '/assets/save-the-date.MOV',
+      },
     });
   });
 
