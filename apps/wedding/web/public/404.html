@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Redirecting...</title>
+    <script>
+      (function () {
+        var path = window.location.pathname;
+        var search = window.location.search;
+        var hash = window.location.hash;
+        // Redirect back to root preserving query & hash
+        window.location.replace('/' + search + hash);
+      })();
+    </script>
+  </head>
+  <body>
+    <p>Redirecting to <a href="/">madalenaejoao.pt</a>...</p>
+  </body>
+</html>
