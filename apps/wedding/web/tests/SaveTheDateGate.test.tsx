@@ -96,6 +96,26 @@ describe('SaveTheDateGate component', () => {
     const introButton = screen.getByTestId('intro-save-the-date-button');
     expect(introButton).toBeInTheDocument();
     expect(document.querySelector('.intro-black-backdrop')).toBeInTheDocument();
+
+    // Body and HTML scrolling are locked while overlay is displayed
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.documentElement.style.overflow).toBe('hidden');
+    expect(document.body.style.touchAction).toBe('none');
+  });
+
+  it('does not lock body scrolling when intro overlay is not shown', () => {
+    document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
+    document.body.style.touchAction = '';
+
+    render(
+      <I18nProvider initialLocale="pt-PT">
+        <SaveTheDateGate initialShowIntro={false} />
+      </I18nProvider>
+    );
+
+    expect(document.body.style.overflow).not.toBe('hidden');
+    expect(document.documentElement.style.overflow).not.toBe('hidden');
   });
 
   it('renders intro overlay with sliding names, triggers suck-in zoom on click, then enters fullscreen and fades in video audio', async () => {

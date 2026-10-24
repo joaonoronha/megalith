@@ -43,6 +43,31 @@ export const SaveTheDateSplash: React.FC<SaveTheDateSplashProps> = ({
     };
   }, [autoDismissMs, handleDismiss]);
 
+  React.useEffect(() => {
+    if (!isRemoved) {
+      const originalBodyOverflow = document.body.style.overflow;
+      const originalHtmlOverflow = document.documentElement.style.overflow;
+      const originalTouchAction = document.body.style.touchAction;
+
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+
+      const preventTouchMove = (e: TouchEvent) => {
+        e.preventDefault();
+      };
+
+      window.addEventListener('touchmove', preventTouchMove, { passive: false });
+
+      return () => {
+        document.body.style.overflow = originalBodyOverflow;
+        document.documentElement.style.overflow = originalHtmlOverflow;
+        document.body.style.touchAction = originalTouchAction;
+        window.removeEventListener('touchmove', preventTouchMove);
+      };
+    }
+  }, [isRemoved]);
+
   if (isRemoved) {
     return null;
   }
