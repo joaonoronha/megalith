@@ -1362,22 +1362,70 @@
 }
 
 /* Fullscreen stays zero-crop contain and removes frame styling */
+.save-the-date-video-element.is-fullscreen,
 .wavy-video-clip video:fullscreen,
-.wavy-video-clip video:-webkit-full-screen,
 .video-frame video:fullscreen,
-.video-frame video:-webkit-full-screen,
-.save-the-date-video-element:fullscreen,
-.save-the-date-video-element:-webkit-full-screen {
+.save-the-date-video-element:fullscreen {
   clip-path: none !important;
   -webkit-clip-path: none !important;
   object-fit: contain !important;
-  width: 100vw !important;
-  height: 100vh !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
   background-color: #000000 !important;
   border: none !important;
   border-radius: 0 !important;
   box-shadow: none !important;
   filter: none !important;
+}
+
+.save-the-date-video-element:-webkit-full-screen,
+.wavy-video-clip video:-webkit-full-screen,
+.video-frame video:-webkit-full-screen {
+  clip-path: none !important;
+  -webkit-clip-path: none !important;
+  object-fit: contain !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  background-color: #000000 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+video:fullscreen {
+  clip-path: none !important;
+  -webkit-clip-path: none !important;
+  object-fit: contain !important;
+  background-color: #000000 !important;
+}
+
+video:-webkit-full-screen {
+  clip-path: none !important;
+  -webkit-clip-path: none !important;
+  object-fit: contain !important;
+  background-color: #000000 !important;
+}
+
+/* Hide native browser controls on PC / desktop browsers */
+.save-the-date-video-element::-webkit-media-controls {
+  display: none !important;
+}
+
+.save-the-date-video-element::-webkit-media-controls-enclosure {
+  display: none !important;
+}
+
+.save-the-date-video-element::-webkit-media-controls-panel {
+  display: none !important;
+}
+
+.save-the-date-video-element::-moz-media-controls {
+  display: none !important;
 }
 
 /* Diagonal Gold Outline Overlay */
