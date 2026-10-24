@@ -1137,11 +1137,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  width: 100%;
-  height: 100%;
-  height: 100vh;
-  height: 100lvh;
-  height: -webkit-fill-available;
+  inset: 0;
   background-color: #F8F5EE;
   background-image: url('/assets/save-the-date-bg.png');
   background-position: top center;
@@ -1696,10 +1692,13 @@
 
 .save-the-date-intro-overlay {
   position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   inset: 0;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
+  touch-action: none;
+  overscroll-behavior: none;
   background: radial-gradient(
     ellipse at center,
     #FFFFFF 0%,
@@ -1711,7 +1710,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
+  padding: max(1.5rem, env(safe-area-inset-top, 0px)) max(1.5rem, env(safe-area-inset-right, 0px)) max(1.5rem, env(safe-area-inset-bottom, 0px)) max(1.5rem, env(safe-area-inset-left, 0px));
   box-sizing: border-box;
   opacity: 1;
   visibility: visible;
@@ -1990,10 +1989,13 @@
 
 .splash-overlay {
   position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   inset: 0;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
+  touch-action: none;
+  overscroll-behavior: none;
   background: radial-gradient(
     ellipse at center,
     #FFFFFF 0%,
