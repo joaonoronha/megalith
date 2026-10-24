@@ -107,16 +107,6 @@ export const SaveTheDateGate: React.FC<SaveTheDateGateProps> = ({
 
   const handleVideoEnded = React.useCallback(() => {
     exitVideoFullscreen(videoRef.current);
-
-    const performScroll = () => {
-      if (countdownRef.current) {
-        countdownRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    };
-
-    window.setTimeout(performScroll, 100);
-    window.setTimeout(performScroll, 350);
-    window.setTimeout(performScroll, 650);
   }, []);
 
   return (
