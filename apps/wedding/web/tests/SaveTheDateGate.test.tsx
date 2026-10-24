@@ -169,7 +169,7 @@ describe('SaveTheDateGate component', () => {
     vi.useRealTimers();
   });
 
-  it('exits fullscreen and scrolls to the countdown card when video ends', async () => {
+  it('exits fullscreen without scrolling when video ends', async () => {
     vi.useFakeTimers();
     window.document.exitFullscreen = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(document, 'fullscreenElement', {
@@ -196,12 +196,13 @@ describe('SaveTheDateGate component', () => {
     expect(window.document.exitFullscreen).toHaveBeenCalled();
     expect((video as any).webkitExitFullscreen).toHaveBeenCalled();
 
-    // Advance timers for smooth scroll
+    // Advance timers
     await act(async () => {
       vi.advanceTimersByTime(400);
     });
 
-    expect(window.HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+    // Scrolling must NOT be triggered
+    expect(window.HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
 });

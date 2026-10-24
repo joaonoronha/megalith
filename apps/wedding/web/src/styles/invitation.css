@@ -1238,14 +1238,14 @@
   user-select: none;
 }
 
-/* Central Content Container - Reverted downward spacing */
+/* Central Content Container - Compact and elegantly proportioned */
 .save-the-date-content-container {
   position: relative;
   z-index: var(--z-content, 2);
   width: 100%;
   max-width: 540px;
   margin: 0 auto;
-  padding: 1.25rem 1rem max(2rem, calc(env(safe-area-inset-bottom, 0px) + 1rem));
+  padding: 1.25rem 1rem 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1675,7 +1675,7 @@ video:-webkit-full-screen {
 
 /* 6. Closing Romantic Quote & Monogram */
 .screenshot-closing-section {
-  margin: 0.4rem 0 1.4rem;
+  margin: 0.4rem 0 0.35rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1693,14 +1693,14 @@ video:-webkit-full-screen {
 
 .screenshot-monogram {
   font-family: 'Forum', 'Cinzel', serif;
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   letter-spacing: 0.25em;
   color: #434c3a;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.65rem;
-  margin-top: 1.1rem;
+  margin-top: 0.65rem;
 }
 
 .monogram-divider {
@@ -1713,7 +1713,7 @@ video:-webkit-full-screen {
 .screenshot-quinta-container {
   width: 100%;
   max-width: 100%;
-  margin: 1.5rem 0 0 0;
+  margin: 0.25rem 0 0 0;
   padding: 0;
   line-height: 0;
   overflow: hidden;
