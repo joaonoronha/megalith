@@ -152,6 +152,7 @@ export const SaveTheDateVideo: React.FC<SaveTheDateVideoProps> = ({
   const internalVideoRef = React.useRef<HTMLVideoElement>(null);
   const videoRef = externalVideoRef || internalVideoRef;
   const [isPlaying, setIsPlaying] = React.useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = React.useState<boolean>(false);
   const hasEndedRef = React.useRef<boolean>(false);
 
   const handleTogglePlay = () => {
@@ -192,7 +193,12 @@ export const SaveTheDateVideo: React.FC<SaveTheDateVideoProps> = ({
     const video = videoRef.current;
     if (!video) return;
 
+    const handleWebkitBeginFullscreen = () => {
+      setIsFullscreen(true);
+    };
+
     const handleWebkitEndFullscreen = () => {
+      setIsFullscreen(false);
       setIsPlaying(false);
       if (video.ended || hasEndedRef.current) {
         onVideoEnded?.();
@@ -200,7 +206,7 @@ export const SaveTheDateVideo: React.FC<SaveTheDateVideoProps> = ({
     };
 
     const handleFullscreenChange = () => {
-      const isFullscreen = Boolean(
+      const activeFullscreen = Boolean(
         (typeof document !== 'undefined' &&
           (document.fullscreenElement ||
             (document as any).webkitFullscreenElement ||
@@ -208,12 +214,15 @@ export const SaveTheDateVideo: React.FC<SaveTheDateVideoProps> = ({
           (video as any).webkitDisplayingFullscreen
       );
 
-      if (!isFullscreen && (video.ended || hasEndedRef.current)) {
+      setIsFullscreen(activeFullscreen);
+
+      if (!activeFullscreen && (video.ended || hasEndedRef.current)) {
         setIsPlaying(false);
         onVideoEnded?.();
       }
     };
 
+    video.addEventListener('webkitbeginfullscreen', handleWebkitBeginFullscreen);
     video.addEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
     if (typeof document !== 'undefined') {
       document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -221,6 +230,7 @@ export const SaveTheDateVideo: React.FC<SaveTheDateVideoProps> = ({
     }
 
     return () => {
+      video.removeEventListener('webkitbeginfullscreen', handleWebkitBeginFullscreen);
       video.removeEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
       if (typeof document !== 'undefined') {
         document.removeEventListener('fullscreenchange', handleFullscreenChange);
@@ -252,11 +262,11 @@ export const SaveTheDateVideo: React.FC<SaveTheDateVideoProps> = ({
         <div className="wavy-video-clip">
           <video
             ref={videoRef}
-            className="wavy-video-element save-the-date-video-element"
+            className={`wavy-video-element save-the-date-video-element ${isFullscreen ? 'is-fullscreen' : ''}`}
             src={src}
             poster={poster}
             playsInline
-            controls={isPlaying}
+            controls={false}
             preload="auto"
             onClick={handleTogglePlay}
             onPlay={handlePlay}
