@@ -1,0 +1,29 @@
+# Service manifest for portfolio/web
+# Production: Static build served via GitHub Pages / custom domain
+# Local development port: 5175 (Vite)
+id: web
+product: portfolio
+type: web
+runtime:
+  language: typescript
+  version: "5.x"
+  framework: React
+path: apps/portfolio/web
+commands:
+  dev:
+    - pnpm
+    - dev
+  test:
+    - pnpm
+    - test
+  build:
+    - pnpm
+    - build
+  check:
+    - pnpm
+    - check
+artifact:
+  type: static
+deployment:
+  deployable: true
+  target: static

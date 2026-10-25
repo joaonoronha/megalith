@@ -1,0 +1,7 @@
+id: portfolio
+name: João Noronha Portfolio & Digital CV
+description: Modernized personal portfolio, digital CV, and AI engineering leadership showcase.
+docs: README.md
+services:
+  - id: web
+    manifest: web/service.yaml
