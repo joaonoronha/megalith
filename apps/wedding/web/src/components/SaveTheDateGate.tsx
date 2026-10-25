@@ -27,7 +27,7 @@ export interface SaveTheDateGateProps {
  * - Romantic intro quote
  * - Gold double-rimmed video card with click-to-fullscreen
  * - Venue banner: "QUINTA DA GRILLA · PORTUGAL"
- * - Countdown card: "A NOSSA HISTÓRIA CONTINUA EM..." with days/hours/minutes/seconds
+ * - Countdown card: "REVELAMOS MAIS DA NOSSA HISTÓRIA EM..." with days/hours/minutes/seconds
  * - "GUARDAR A DATA" calendar integration button
  * - Closing love quote and "M | J" monogram
  * - Quinta da Grilla watercolor illustration at the base
