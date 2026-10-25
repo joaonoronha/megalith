@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { trackEvent, AnalyticsEvents } from "@megalith/analytics";
 import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
 import { AboutSection } from "@/components/AboutSection";
@@ -11,6 +12,10 @@ import { Footer } from "@/components/Footer";
 
 export function App() {
   const [viewMode, setViewMode] = useState<"standard" | "ai-focus">("standard");
+
+  useEffect(() => {
+    trackEvent(AnalyticsEvents.PORTFOLIO_VIEWED);
+  }, []);
 
   useEffect(() => {
     // Check URL hash for direct deep-linking

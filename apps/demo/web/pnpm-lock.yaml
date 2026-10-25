@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@megalith/analytics':
+        specifier: link:../../../packages/analytics
+        version: link:../../../packages/analytics
       react:
         specifier: ^19.0.0
         version: 19.3.0

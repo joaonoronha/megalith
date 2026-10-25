@@ -1,4 +1,5 @@
 import React from 'react';
+import { trackEvent, AnalyticsEvents } from '@megalith/analytics';
 import { useI18n, type Locale } from '../i18n';
 import '../styles/global.css';
 
@@ -52,7 +53,13 @@ export function LanguageSwitcher({
                 className={`language-switcher-btn ${isActive ? 'is-active' : ''}`}
                 aria-pressed={isActive}
                 aria-label={item.ariaLabel}
-                onClick={() => setLocale(item.code)}
+                onClick={() => {
+                  trackEvent(AnalyticsEvents.WEDDING_LANGUAGE_CHANGED, {
+                    previous_locale: locale,
+                    new_locale: item.code,
+                  });
+                  setLocale(item.code);
+                }}
               >
                 {item.label}
               </button>
