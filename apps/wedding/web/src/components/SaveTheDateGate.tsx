@@ -1,4 +1,5 @@
 import React from 'react';
+import { trackEvent, AnalyticsEvents } from '@megalith/analytics';
 import { useI18n } from '../i18n';
 import { WEDDING_CONFIG } from '../config/wedding';
 import { calculateCountdown, CountdownResult } from '../utils/countdown';
@@ -88,9 +89,17 @@ export const SaveTheDateGate: React.FC<SaveTheDateGateProps> = ({
     };
   }, [unlockUtc]);
 
+  React.useEffect(() => {
+    trackEvent(AnalyticsEvents.WEDDING_VIEWED, {
+      unlock_utc: unlockUtc,
+    });
+  }, [unlockUtc]);
+
   const handleStartExperience = () => {
     if (introState !== 'active') return;
 
+    trackEvent(AnalyticsEvents.WEDDING_INTRO_DISMISSED);
+    trackEvent(AnalyticsEvents.WEDDING_VIDEO_STARTED);
     setIntroState('zooming');
 
     // Allow the high-velocity center suck-in zoom and black backdrop transition to complete (550ms)
@@ -106,6 +115,7 @@ export const SaveTheDateGate: React.FC<SaveTheDateGateProps> = ({
   };
 
   const handleVideoEnded = React.useCallback(() => {
+    trackEvent(AnalyticsEvents.WEDDING_VIDEO_COMPLETED);
     exitVideoFullscreen(videoRef.current);
   }, []);
 
@@ -266,7 +276,10 @@ export const SaveTheDateGate: React.FC<SaveTheDateGateProps> = ({
           <button
             type="button"
             className="screenshot-guardar-btn"
-            onClick={downloadWeddingCalendar}
+            onClick={() => {
+              trackEvent(AnalyticsEvents.WEDDING_CALENDAR_SAVED);
+              downloadWeddingCalendar();
+            }}
             data-testid="guardar-data-button"
             aria-label={t.saveTheDate.calendarButton}
           >
