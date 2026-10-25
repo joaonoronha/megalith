@@ -6,6 +6,7 @@ interface HeaderProps {
   currentApp: AppId;
   onSelectApp: (app: AppId) => void;
   isLive: boolean;
+  isFromEnv?: boolean;
   onOpenSettings: () => void;
 }
 
@@ -13,6 +14,7 @@ export const Header: React.FC<HeaderProps> = ({
   currentApp,
   onSelectApp,
   isLive,
+  isFromEnv,
   onOpenSettings,
 }) => {
   const tabs: { id: AppId; label: string }[] = [
@@ -75,7 +77,7 @@ export const Header: React.FC<HeaderProps> = ({
           />
           <span className="flex items-center gap-1.5">
             <Radio className="w-3.5 h-3.5 text-slate-400" />
-            {isLive ? 'PostHog Live' : 'Demo Feed'}
+            {isLive ? (isFromEnv ? 'PostHog Live (Env)' : 'PostHog Live') : 'Demo Feed'}
           </span>
           <Sliders className="w-3.5 h-3.5 text-slate-500 ml-1" />
         </button>

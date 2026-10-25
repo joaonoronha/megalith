@@ -1,3 +1,18 @@
+declare global {
+  interface ImportMetaEnv {
+    VITE_POSTHOG_KEY?: string;
+    VITE_POSTHOG_HOST?: string;
+    NEXT_PUBLIC_POSTHOG_KEY?: string;
+    DEV?: boolean;
+    PROD?: boolean;
+    MODE?: string;
+    [key: string]: unknown;
+  }
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
+}
+
 /**
  * Configuration options for @megalith/analytics
  */

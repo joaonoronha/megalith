@@ -16,6 +16,7 @@ export default defineConfig({
     port: 5176,
     host: true,
   },
+  envPrefix: ["VITE_", "POSTHOG_"],
   test: {
     globals: true,
     environment: "jsdom",

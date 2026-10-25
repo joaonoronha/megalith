@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Key, ShieldCheck, Zap } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Key, ShieldCheck, Zap, CheckCircle2 } from 'lucide-react';
 import type { PostHogQueryCredentials } from '../services/posthogApi';
 
 interface PostHogSettingsModalProps {
@@ -8,6 +8,8 @@ interface PostHogSettingsModalProps {
   onConnect: (creds: PostHogQueryCredentials) => void;
   onReset: () => void;
   isLive: boolean;
+  initialCredentials?: PostHogQueryCredentials | null;
+  isConfiguredFromEnv?: boolean;
 }
 
 export const PostHogSettingsModal: React.FC<PostHogSettingsModalProps> = ({
@@ -16,10 +18,20 @@ export const PostHogSettingsModal: React.FC<PostHogSettingsModalProps> = ({
   onConnect,
   onReset,
   isLive,
+  initialCredentials,
+  isConfiguredFromEnv,
 }) => {
-  const [host, setHost] = useState('https://eu.i.posthog.com');
-  const [projectId, setProjectId] = useState('');
-  const [personalApiKey, setPersonalApiKey] = useState('');
+  const [host, setHost] = useState(initialCredentials?.host || 'https://eu.i.posthog.com');
+  const [projectId, setProjectId] = useState(initialCredentials?.projectId || '');
+  const [personalApiKey, setPersonalApiKey] = useState(initialCredentials?.personalApiKey || '');
+
+  useEffect(() => {
+    if (initialCredentials) {
+      if (initialCredentials.host) setHost(initialCredentials.host);
+      if (initialCredentials.projectId) setProjectId(initialCredentials.projectId);
+      if (initialCredentials.personalApiKey) setPersonalApiKey(initialCredentials.personalApiKey);
+    }
+  }, [initialCredentials]);
 
   if (!isOpen) return null;
 
@@ -63,6 +75,13 @@ export const PostHogSettingsModal: React.FC<PostHogSettingsModalProps> = ({
             Credentials are kept in browser memory and used exclusively to run read-only HogQL analytics queries against your PostHog EU cloud instance.
           </span>
         </p>
+
+        {isConfiguredFromEnv && (
+          <div className="mb-4 px-3 py-2 rounded-lg bg-emerald-950/40 border border-emerald-800/50 text-emerald-300 text-xs flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>Active: Pre-configured from environment variables (.env.local)</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

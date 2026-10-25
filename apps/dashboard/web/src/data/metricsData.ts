@@ -39,6 +39,30 @@ export interface DeviceSegment {
   pct: number;
 }
 
+export interface GeoLocationSegment {
+  country: string;
+  countryCode: string;
+  city: string;
+  region?: string;
+  postalCode?: string;
+  latitude?: number;
+  longitude?: number;
+  accuracyKm?: number;
+  count: number;
+  pct: number;
+}
+
+export interface ClickHeatMapItem {
+  id: string;
+  element: string;
+  label: string;
+  selector: string;
+  clicks: number;
+  pct: number;
+  app: 'wedding' | 'portfolio' | 'demo';
+  intensity: 'hot' | 'warm' | 'cool';
+}
+
 export interface TelemetryEventItem {
   id: string;
   name: string;
@@ -53,6 +77,8 @@ export interface AppMetricsOverview {
   funnel?: FunnelStep[];
   languages: LanguageSegment[];
   devices: DeviceSegment[];
+  locations?: GeoLocationSegment[];
+  clickHeatmap?: ClickHeatMapItem[];
 }
 
 export const METRICS_DATA: Record<AppId, AppMetricsOverview> = {
@@ -94,6 +120,18 @@ export const METRICS_DATA: Record<AppId, AppMetricsOverview> = {
       { name: 'Desktop (Chrome / Safari / Edge)', pct: 26 },
       { name: 'Android Mobile', pct: 12 },
     ],
+    locations: [
+      { country: 'Portugal', countryCode: 'PT', city: 'Lisbon', count: 980, pct: 68.6 },
+      { country: 'United Kingdom', countryCode: 'GB', city: 'London', count: 215, pct: 15.1 },
+      { country: 'France', countryCode: 'FR', city: 'Paris', count: 142, pct: 9.9 },
+      { country: 'United States', countryCode: 'US', city: 'San Francisco', count: 91, pct: 6.4 },
+    ],
+    clickHeatmap: [
+      { id: '1', element: 'Calendar Invitation (.ics)', label: 'Save Date to Calendar', selector: 'button#save-date-ics', clicks: 384, pct: 45, app: 'wedding', intensity: 'hot' },
+      { id: '2', element: 'CV Download (PDF)', label: 'Curriculum Vitae Download', selector: 'a#download-cv', clicks: 128, pct: 24, app: 'portfolio', intensity: 'hot' },
+      { id: '3', element: 'Project Cards', label: 'Technical Deep-Dives', selector: 'div.project-card', clicks: 114, pct: 18, app: 'portfolio', intensity: 'warm' },
+      { id: '4', element: 'Video Player', label: 'Play / Fullscreen Intro', selector: 'video#wedding-video', clicks: 92, pct: 13, app: 'wedding', intensity: 'cool' },
+    ],
   },
   wedding: {
     kpi: {
@@ -133,6 +171,17 @@ export const METRICS_DATA: Record<AppId, AppMetricsOverview> = {
       { name: 'Desktop Browsers', pct: 16 },
       { name: 'Android Mobile', pct: 10 },
     ],
+    locations: [
+      { country: 'Portugal', countryCode: 'PT', city: 'Lisbon', count: 742, pct: 72.5 },
+      { country: 'United Kingdom', countryCode: 'GB', city: 'London', count: 186, pct: 18.2 },
+      { country: 'France', countryCode: 'FR', city: 'Paris', count: 96, pct: 9.3 },
+    ],
+    clickHeatmap: [
+      { id: 'w1', element: 'Save Calendar CTA', label: 'Download .ics Calendar File', selector: 'button#save-date-ics', clicks: 384, pct: 54, app: 'wedding', intensity: 'hot' },
+      { id: 'w2', element: 'Video Player', label: 'Start / Replay Video', selector: 'video#intro-video', clicks: 198, pct: 28, app: 'wedding', intensity: 'warm' },
+      { id: 'w3', element: 'Language Switcher', label: 'PT / EN / FR Toggle', selector: 'nav.lang-switcher', clicks: 82, pct: 12, app: 'wedding', intensity: 'cool' },
+      { id: 'w4', element: 'Map / Venue Link', label: 'Open Google Maps Venue', selector: 'a#venue-map-link', clicks: 42, pct: 6, app: 'wedding', intensity: 'cool' },
+    ],
   },
   portfolio: {
     kpi: {
@@ -170,6 +219,16 @@ export const METRICS_DATA: Record<AppId, AppMetricsOverview> = {
       { name: 'Desktop (macOS / Linux / Windows)', pct: 72 },
       { name: 'Mobile Safari / Chrome', pct: 28 },
     ],
+    locations: [
+      { country: 'United States', countryCode: 'US', city: 'San Francisco', count: 154, pct: 45.0 },
+      { country: 'United Kingdom', countryCode: 'GB', city: 'London', count: 98, pct: 28.7 },
+      { country: 'Portugal', countryCode: 'PT', city: 'Lisbon', count: 90, pct: 26.3 },
+    ],
+    clickHeatmap: [
+      { id: 'p1', element: 'Download CV CTA', label: 'Curriculum Vitae (PDF)', selector: 'a#download-cv', clicks: 74, pct: 58, app: 'portfolio', intensity: 'hot' },
+      { id: 'p2', element: 'Project Cards', label: 'Megalith Architecture Click', selector: 'div.project-megalith', clicks: 32, pct: 25, app: 'portfolio', intensity: 'warm' },
+      { id: 'p3', element: 'Contact Links', label: 'Email / LinkedIn Outreach', selector: 'a.contact-social', clicks: 22, pct: 17, app: 'portfolio', intensity: 'cool' },
+    ],
   },
   demo: {
     kpi: {
@@ -199,6 +258,12 @@ export const METRICS_DATA: Record<AppId, AppMetricsOverview> = {
     devices: [
       { name: 'Automated CI / Curl Probes', pct: 65 },
       { name: 'Desktop Chrome', pct: 35 },
+    ],
+    locations: [
+      { country: 'Portugal', countryCode: 'PT', city: 'Lisbon (Localhost)', count: 62, pct: 100.0 },
+    ],
+    clickHeatmap: [
+      { id: 'd1', element: 'API Health Probe', label: 'GET /api/v1/health probe', selector: 'probe.health', clicks: 18, pct: 100, app: 'demo', intensity: 'hot' },
     ],
   },
 };
