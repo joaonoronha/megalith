@@ -24,13 +24,14 @@ function resolveApiKey(config: AnalyticsConfig): string | undefined {
   if (config.apiKey && config.apiKey.trim().length > 0) {
     return config.apiKey.trim();
   }
-  // Attempt to read from Vite standard env
+  // Fallback to Vite/Next standard env if available in runtime environment
   try {
-    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_POSTHOG_KEY) {
-      return import.meta.env.VITE_POSTHOG_KEY.trim();
+    const metaEnv = typeof import.meta !== 'undefined' ? (import.meta as Record<string, any>).env : undefined;
+    if (metaEnv?.VITE_POSTHOG_KEY) {
+      return String(metaEnv.VITE_POSTHOG_KEY).trim();
     }
-    if (typeof import.meta !== 'undefined' && (import.meta.env as Record<string, any>)?.NEXT_PUBLIC_POSTHOG_KEY) {
-      return String((import.meta.env as Record<string, any>).NEXT_PUBLIC_POSTHOG_KEY).trim();
+    if (metaEnv?.NEXT_PUBLIC_POSTHOG_KEY) {
+      return String(metaEnv.NEXT_PUBLIC_POSTHOG_KEY).trim();
     }
   } catch {
     // Ignore
@@ -43,8 +44,9 @@ function resolveApiHost(config: AnalyticsConfig): string {
     return config.apiHost.trim();
   }
   try {
-    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_POSTHOG_HOST) {
-      return import.meta.env.VITE_POSTHOG_HOST.trim();
+    const metaEnv = typeof import.meta !== 'undefined' ? (import.meta as Record<string, any>).env : undefined;
+    if (metaEnv?.VITE_POSTHOG_HOST) {
+      return String(metaEnv.VITE_POSTHOG_HOST).trim();
     }
   } catch {
     // Ignore
