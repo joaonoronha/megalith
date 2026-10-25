@@ -1,4 +1,5 @@
 name: Deploy Wedding Web to GitHub Pages
+# Trigger deployment for madalenaejoao.pt on GitHub Pages
 
 on:
   push:
