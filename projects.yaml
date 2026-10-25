@@ -18,4 +18,6 @@ products:
     manifest: apps/portfolio/product.yaml
   - id: wedding
     manifest: apps/wedding/product.yaml
+  - id: dashboard
+    manifest: apps/dashboard/product.yaml
 

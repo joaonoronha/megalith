@@ -1,0 +1,7 @@
+id: dashboard
+name: Megalith Telemetry & Analytics Dashboard
+description: Centralized cross-product analytics and metrics telemetry dashboard powered by PostHog.
+docs: README.md
+services:
+  - id: web
+    manifest: web/service.yaml
