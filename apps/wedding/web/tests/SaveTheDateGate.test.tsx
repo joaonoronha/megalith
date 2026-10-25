@@ -66,7 +66,7 @@ describe('SaveTheDateGate component', () => {
     expect(screen.getByTestId('gate-countdown-hours')).toBeInTheDocument();
     expect(screen.getByTestId('gate-countdown-minutes')).toBeInTheDocument();
     expect(screen.getByTestId('gate-countdown-seconds')).toBeInTheDocument();
-    expect(screen.getByText('OUR STORY CONTINUES IN...')).toBeInTheDocument();
+    expect(screen.getByText('MORE OF OUR STORY UNFOLDS IN...')).toBeInTheDocument();
   });
 
   it('updates text translations when language is switched', () => {
@@ -76,7 +76,7 @@ describe('SaveTheDateGate component', () => {
       </I18nProvider>
     );
 
-    expect(screen.getByText('NOTRE HISTOIRE CONTINUE DANS...')).toBeInTheDocument();
+    expect(screen.getByText('LA SUITE DE NOTRE HISTOIRE SE DÉVOILE DANS...')).toBeInTheDocument();
     expect(screen.getByText(/16 · 08 · 2027/)).toBeInTheDocument();
   });
 

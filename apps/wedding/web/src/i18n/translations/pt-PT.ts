@@ -75,7 +75,7 @@ export const ptPT: TranslationSchema = {
     quoteIntro2: 'Este queremos partilhar convosco.',
     venueName: 'QUINTA DA GRILLA',
     country: 'PORTUGAL',
-    countdownHeading: 'A NOSSA HISTÓRIA CONTINUA EM...',
+    countdownHeading: 'REVELAMOS MAIS DA NOSSA HISTÓRIA EM...',
     countdownSubtext: 'Volta em fevereiro para descobrires todos os detalhes do nosso grande dia.',
     calendarButton: 'GUARDAR A DATA',
     closingQuote1: 'O amor trouxe-nos até aqui.',

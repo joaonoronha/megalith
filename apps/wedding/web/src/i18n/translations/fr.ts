@@ -75,7 +75,7 @@ export const fr: TranslationSchema = {
     quoteIntro2: 'Celui-ci, nous voulons le partager avec vous.',
     venueName: 'QUINTA DA GRILLA',
     country: 'PORTUGAL',
-    countdownHeading: 'NOTRE HISTOIRE CONTINUE DANS...',
+    countdownHeading: 'LA SUITE DE NOTRE HISTOIRE SE DÉVOILE DANS...',
     countdownSubtext: 'Revenez en février pour découvrir tous les détails de notre grand jour.',
     calendarButton: 'RÉSERVER LA DATE',
     closingQuote1: "L'amour nous a menés jusqu'ici.",
