@@ -1,0 +1,81 @@
+import React from 'react';
+import { Users, Eye, CheckCircle2, TrendingUp } from 'lucide-react';
+import type { KpiMetrics } from '../data/metricsData';
+
+interface KpiGridProps {
+  kpi: KpiMetrics;
+}
+
+export const KpiGrid: React.FC<KpiGridProps> = ({ kpi }) => {
+  return (
+    <section className="grid grid-cols-2 lg:grid-cols-4 gap-4" aria-label="Key Performance Indicators">
+      {/* 1. Unique Visitors */}
+      <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 md:p-5 shadow-sm relative overflow-hidden backdrop-blur-sm">
+        <div className="flex items-center justify-between text-xs text-slate-400 font-medium mb-1.5">
+          <span className="flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5 text-blue-400" />
+            Unique Visitors
+          </span>
+          <span className="text-emerald-400 font-semibold text-[11px] bg-emerald-500/10 px-1.5 py-0.5 rounded">
+            {kpi.visitorsTrend}
+          </span>
+        </div>
+        <div className="text-2xl md:text-3xl font-bold tracking-tight text-white" data-testid="kpi-visitors">
+          {kpi.visitors}
+        </div>
+        <p className="text-[11px] text-slate-400 mt-1">Unique client fingerprints</p>
+      </div>
+
+      {/* 2. Total Impressions */}
+      <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 md:p-5 shadow-sm relative overflow-hidden backdrop-blur-sm">
+        <div className="flex items-center justify-between text-xs text-slate-400 font-medium mb-1.5">
+          <span className="flex items-center gap-1.5">
+            <Eye className="w-3.5 h-3.5 text-indigo-400" />
+            Total Impressions
+          </span>
+          <span className="text-emerald-400 font-semibold text-[11px] bg-emerald-500/10 px-1.5 py-0.5 rounded">
+            {kpi.pageviewsTrend}
+          </span>
+        </div>
+        <div className="text-2xl md:text-3xl font-bold tracking-tight text-white" data-testid="kpi-pageviews">
+          {kpi.pageviews}
+        </div>
+        <p className="text-[11px] text-slate-400 mt-1">Total pageviews &amp; reloads</p>
+      </div>
+
+      {/* 3. Key Conversion Actions */}
+      <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 md:p-5 shadow-sm relative overflow-hidden backdrop-blur-sm">
+        <div className="flex items-center justify-between text-xs text-slate-400 font-medium mb-1.5">
+          <span className="flex items-center gap-1.5 truncate">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="truncate">{kpi.actionLabel}</span>
+          </span>
+          <span className="text-indigo-400 font-semibold text-[11px] bg-indigo-500/10 px-1.5 py-0.5 rounded shrink-0">
+            Goals
+          </span>
+        </div>
+        <div className="text-2xl md:text-3xl font-bold tracking-tight text-white" data-testid="kpi-actions">
+          {kpi.actions}
+        </div>
+        <p className="text-[11px] text-slate-400 mt-1 truncate">{kpi.actionSub}</p>
+      </div>
+
+      {/* 4. Engagement / Completion */}
+      <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 md:p-5 shadow-sm relative overflow-hidden backdrop-blur-sm">
+        <div className="flex items-center justify-between text-xs text-slate-400 font-medium mb-1.5">
+          <span className="flex items-center gap-1.5 truncate">
+            <TrendingUp className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="truncate">{kpi.engLabel}</span>
+          </span>
+          <span className="text-emerald-400 font-semibold text-[11px] bg-emerald-500/10 px-1.5 py-0.5 rounded shrink-0">
+            High
+          </span>
+        </div>
+        <div className="text-2xl md:text-3xl font-bold tracking-tight text-white" data-testid="kpi-eng-rate">
+          {kpi.engRate}
+        </div>
+        <p className="text-[11px] text-slate-400 mt-1 truncate">{kpi.engSub}</p>
+      </div>
+    </section>
+  );
+};
