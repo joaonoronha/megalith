@@ -203,11 +203,23 @@ export function buildLiveMetrics(
       rawApp === 'portfolio' || rawApp === 'demo' ? rawApp : 'wedding';
 
     statsByApp[targetApp].totalEvents += count;
-    statsByApp[targetApp].visitors = Math.max(statsByApp[targetApp].visitors, visitors);
+    // Count visitors on pageview / primary impression events
+    if (event === 'wedding_viewed' || event === '$pageview' || event === 'portfolio_viewed' || event === 'demo_viewed') {
+      statsByApp[targetApp].visitors = Math.max(statsByApp[targetApp].visitors, visitors);
+    }
     statsByApp[targetApp].events[event] = (statsByApp[targetApp].events[event] || 0) + count;
 
+    if (event === 'wedding_viewed' || event === '$pageview' || event === 'portfolio_viewed' || event === 'demo_viewed') {
+      allVisitors = Math.max(allVisitors, visitors);
+    }
     allEvents += count;
-    allVisitors = Math.max(allVisitors, visitors);
+  }
+
+  // Fallback if visitors wasn't set by an impression event
+  for (const app of ['wedding', 'portfolio', 'demo'] as const) {
+    if (statsByApp[app].visitors === 0) {
+      statsByApp[app].visitors = Math.max(0, ...Object.values(statsByApp[app].events));
+    }
   }
 
   // Parse geo locations from raw event properties
@@ -301,27 +313,32 @@ export function buildLiveMetrics(
   };
 
   const weddingSaves = statsByApp.wedding.events['wedding_calendar_saved'] || 0;
-  const weddingViews = statsByApp.wedding.events['wedding_viewed'] || statsByApp.wedding.totalEvents;
+  const weddingViews = statsByApp.wedding.events['wedding_viewed'] || statsByApp.wedding.events['$pageview'] || statsByApp.wedding.visitors || 0;
   const weddingVideoStarted = statsByApp.wedding.events['wedding_video_started'] || 0;
   const weddingVideoDone = statsByApp.wedding.events['wedding_video_completed'] || 0;
 
   const portfolioClicks = statsByApp.portfolio.events['portfolio_project_clicked'] || 0;
-  const portfolioViews = statsByApp.portfolio.events['portfolio_viewed'] || statsByApp.portfolio.totalEvents;
+  const portfolioViews = statsByApp.portfolio.events['portfolio_viewed'] || statsByApp.portfolio.events['$pageview'] || statsByApp.portfolio.visitors || 0;
   const portfolioCv = statsByApp.portfolio.events['portfolio_cv_downloaded'] || 0;
+
+  const demoViews = statsByApp.demo.events['demo_viewed'] || statsByApp.demo.events['$pageview'] || statsByApp.demo.visitors || 0;
+
+  const totalPageviews = weddingViews + portfolioViews + demoViews;
+  const totalVisitors = Math.max(statsByApp.wedding.visitors, statsByApp.portfolio.visitors, statsByApp.demo.visitors);
 
   return {
     all: {
       kpi: {
-        visitors: String(allVisitors),
+        visitors: String(totalVisitors || allVisitors),
         visitorsTrend: 'Live',
-        pageviews: String(allEvents),
+        pageviews: String(totalPageviews),
         pageviewsTrend: 'Live',
         actions: String(weddingSaves + portfolioCv + portfolioClicks),
         actionLabel: 'Calendar Saves & Interactions',
         actionSub: `${weddingSaves} ICS saves · ${portfolioCv + portfolioClicks} portfolio clicks`,
-        engRate: allEvents > 0 ? `${Math.round((weddingSaves / allEvents) * 100)}%` : '0%',
+        engRate: totalPageviews > 0 ? `${Math.round(((weddingSaves + portfolioCv + portfolioClicks) / totalPageviews) * 100)}%` : '0%',
         engLabel: 'Overall Conversion Rate',
-        engSub: 'Actions per recorded event',
+        engSub: 'Actions per page impression',
       },
       chart: buildChart(todayEvents, todayVisitors),
       funnel: [
@@ -343,7 +360,7 @@ export function buildLiveMetrics(
       kpi: {
         visitors: String(statsByApp.wedding.visitors),
         visitorsTrend: 'Live',
-        pageviews: String(statsByApp.wedding.totalEvents),
+        pageviews: String(weddingViews),
         pageviewsTrend: 'Live',
         actions: String(weddingSaves),
         actionLabel: 'Calendar Event Saves',
@@ -352,7 +369,7 @@ export function buildLiveMetrics(
         engLabel: 'Invitation Conversion',
         engSub: `${weddingSaves} saves / ${weddingViews} views`,
       },
-      chart: buildChart(statsByApp.wedding.totalEvents, statsByApp.wedding.visitors),
+      chart: buildChart(weddingViews, statsByApp.wedding.visitors),
       funnel: [
         { name: '1. Page Impression', count: weddingViews, pct: 100, color: 'bg-slate-500' },
         { name: '2. Video Started / Watched', count: weddingVideoStarted, pct: weddingViews > 0 ? Math.round((weddingVideoStarted / weddingViews) * 100) : 0, color: 'bg-blue-500' },
@@ -424,12 +441,14 @@ export function buildLiveMetrics(
 export async function fetchLiveTelemetry(
   creds: PostHogQueryCredentials
 ): Promise<LiveTelemetryResult> {
+  const filter =
+    "WHERE distinct_id NOT LIKE 'test-%' AND distinct_id != 'install_verification_agent'";
   const eventsQuery =
-    'SELECT uuid, event, properties, properties.app, timestamp FROM events ORDER BY timestamp DESC LIMIT 50';
+    `SELECT uuid, event, properties, properties.app, timestamp FROM events ${filter} ORDER BY timestamp DESC LIMIT 50`;
   const aggQuery =
-    'SELECT event, properties.app, count(), count(DISTINCT distinct_id) FROM events GROUP BY event, properties.app';
+    `SELECT event, properties.app, count(), count(DISTINCT distinct_id) FROM events ${filter} GROUP BY event, properties.app`;
   const dailyQuery =
-    'SELECT toDate(timestamp) as dt, count(), count(DISTINCT distinct_id) FROM events WHERE timestamp >= now() - INTERVAL 7 DAY GROUP BY dt ORDER BY dt ASC';
+    `SELECT toDate(timestamp) as dt, count(), count(DISTINCT distinct_id) FROM events ${filter} AND timestamp >= now() - INTERVAL 7 DAY GROUP BY dt ORDER BY dt ASC`;
 
   const [eventsRes, aggRes, dailyRes] = await Promise.all([
     queryPostHogHogQL(creds, eventsQuery),
