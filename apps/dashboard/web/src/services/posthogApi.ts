@@ -94,38 +94,32 @@ function formatInteractionElement(event: string, _app: 'wedding' | 'portfolio' |
   switch (event) {
     case 'wedding_calendar_saved':
       return {
-        element: 'Calendar Invitation (.ics)',
-        label: 'Save Date to Calendar',
-        selector: 'button#save-date-ics',
+        element: 'Salvar no Calendário (.ics)',
+        label: 'Guardar a Data Calendar CTA',
+        selector: 'button.screenshot-guardar-btn',
         intensity: 'hot',
       };
     case 'wedding_video_completed':
       return {
         element: 'Video Player',
         label: '100% Video Completed',
-        selector: 'video#intro-stream',
-        intensity: 'hot',
-      };
-    case 'wedding_video_started':
-      return {
-        element: 'Play Video CTA',
-        label: 'Fullscreen Video Started',
-        selector: 'button#play-video',
+        selector: 'video.screenshot-video-element',
         intensity: 'warm',
       };
+    case 'wedding_video_started':
     case 'wedding_intro_dismissed':
       return {
-        element: 'Intro Screen Overlay',
-        label: 'Dismiss Intro Overlay',
-        selector: 'div#intro-overlay',
-        intensity: 'cool',
+        element: 'SAVE THE DATE Button',
+        label: 'Enter & Start Video (intro-pulse-btn)',
+        selector: 'button.intro-pulse-btn',
+        intensity: 'hot',
       };
     case 'wedding_language_changed':
       return {
         element: 'Language Switcher',
         label: 'Locale Switcher (PT/EN/FR)',
         selector: 'nav.lang-switch',
-        intensity: 'warm',
+        intensity: 'cool',
       };
     case 'wedding_viewed':
       return {
@@ -277,8 +271,17 @@ export function buildLiveMetrics(
 
   const buildAppHeatmap = (appKey: 'wedding' | 'portfolio' | 'demo'): ClickHeatMapItem[] => {
     const evMap = statsByApp[appKey].events;
-    const total = Object.values(evMap).reduce((a, b) => a + b, 0) || 1;
-    return Object.entries(evMap)
+    const ignoredEvents = new Set([
+      '$web_vitals',
+      '$pageleave',
+      '$pageview',
+      'wedding_viewed',
+      'portfolio_viewed',
+      'demo_viewed',
+    ]);
+    const clickEntries = Object.entries(evMap).filter(([evName]) => !ignoredEvents.has(evName));
+    const total = clickEntries.reduce((sum, [, count]) => sum + count, 0) || 1;
+    return clickEntries
       .map(([evName, count], idx) => {
         const formatted = formatInteractionElement(evName, appKey);
         return {
