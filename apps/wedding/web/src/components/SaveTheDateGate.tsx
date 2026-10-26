@@ -212,6 +212,7 @@ export const SaveTheDateGate: React.FC<SaveTheDateGateProps> = ({
 
         {/* 2. Video Player Section with Baroque Gold Frame */}
         <section
+          id="video-section"
           className="screenshot-media-section"
           aria-label={t.saveTheDate.videoAriaLabel}
         >
@@ -282,7 +283,7 @@ export const SaveTheDateGate: React.FC<SaveTheDateGateProps> = ({
         </section>
 
         {/* 5. "GUARDAR A DATA" Calendar Button */}
-        <div className="screenshot-calendar-action">
+        <div id="calendar-section" className="screenshot-calendar-action">
           <button
             type="button"
             className="screenshot-guardar-btn"
