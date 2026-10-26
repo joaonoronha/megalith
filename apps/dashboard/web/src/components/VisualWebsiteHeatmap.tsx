@@ -8,7 +8,6 @@ import {
   Sliders,
   RefreshCw,
   MousePointer2,
-  ArrowDown,
 } from 'lucide-react';
 import type { ClickHeatMapItem, AppId } from '../data/metricsData';
 
@@ -44,6 +43,7 @@ export const VisualWebsiteHeatmap: React.FC<VisualWebsiteHeatmapProps> = ({ item
       : 'https://joaonoronha.pt';
 
   const isScrollable = selectedSite === 'wedding' && weddingView === 'invitation';
+  const isMobileView = viewport === 'mobile' || (typeof window !== 'undefined' && window.innerWidth < 768);
 
   // Find click stats for specific targets purely from real telemetry items
   const getStats = (selectorPart: string) => {
@@ -257,7 +257,7 @@ export const VisualWebsiteHeatmap: React.FC<VisualWebsiteHeatmapProps> = ({ item
             <div
               className="relative w-full"
               style={{
-                height: isScrollable ? (viewport === 'mobile' ? '1550px' : '1420px') : '100%',
+                height: isScrollable ? (isMobileView ? '1080px' : '1160px') : '100%',
               }}
             >
             <iframe
@@ -354,7 +354,7 @@ export const VisualWebsiteHeatmap: React.FC<VisualWebsiteHeatmapProps> = ({ item
                           }
                           onMouseLeave={() => setActiveElementId(null)}
                           style={{
-                            top: viewport === 'mobile' ? '490px' : '470px',
+                            top: isMobileView ? '320px' : '360px',
                           }}
                           className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 group cursor-pointer pointer-events-auto"
                         >
@@ -388,12 +388,12 @@ export const VisualWebsiteHeatmap: React.FC<VisualWebsiteHeatmapProps> = ({ item
                           }
                           onMouseLeave={() => setActiveElementId(null)}
                           style={{
-                            top: viewport === 'mobile' ? '1040px' : '960px',
+                            top: isMobileView ? '645px' : '730px',
                           }}
                           className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 group cursor-pointer pointer-events-auto"
                         >
                           <div
-                            className="w-72 sm:w-80 h-20 rounded-full blur-md"
+                            className="w-64 sm:w-72 h-14 rounded-full blur-md"
                             style={{
                               background:
                                 weddingCalendarStats && weddingCalendarStats.clicks > 0
@@ -493,14 +493,6 @@ export const VisualWebsiteHeatmap: React.FC<VisualWebsiteHeatmapProps> = ({ item
               </div>
             )}
             </div>
-
-            {/* Floating scroll hint for scrollable multi-zone invitation view */}
-            {isScrollable && (
-              <div className="absolute bottom-3 right-4 z-40 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 text-[10px] text-slate-300 font-mono px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1.5 pointer-events-none select-none">
-                <ArrowDown className="w-3 h-3 text-amber-400 animate-bounce" />
-                <span>Scroll down for Countdown &amp; Calendar CTA</span>
-              </div>
-            )}
           </div>
         </div>
       </div>
