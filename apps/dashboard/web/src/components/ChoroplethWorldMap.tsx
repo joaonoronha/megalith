@@ -81,6 +81,23 @@ const COUNTRY_POLYGONS: Record<string, [number, number][]> = {
     [48.4, -124.7],
     [49.0, -124.7],
   ],
+  CH: [
+    [47.81, 8.56],
+    [47.58, 9.65],
+    [46.85, 10.49],
+    [46.54, 10.22],
+    [46.21, 9.12],
+    [45.83, 8.98],
+    [45.98, 7.74],
+    [45.93, 7.04],
+    [46.2, 6.14],
+    [46.42, 6.07],
+    [46.97, 6.84],
+    [47.47, 7.07],
+    [47.6, 7.63],
+    [47.78, 8.57],
+    [47.81, 8.56],
+  ],
 };
 
 // City coordinates for radar pin markers
@@ -92,10 +109,14 @@ const CITY_COORDINATES: Record<string, [number, number]> = {
   'San Francisco': [37.7749, -122.4194],
   'New York': [40.7128, -74.006],
   Madrid: [40.4168, -3.7038],
+  Zurich: [47.3769, 8.5417],
+  Geneva: [46.2044, 6.1432],
+  Bern: [46.948, 7.4474],
   default_PT: [38.7219, -9.1398],
   default_GB: [51.5074, -0.1278],
   default_FR: [48.8566, 2.3522],
   default_US: [37.7749, -122.4194],
+  default_CH: [47.1449, 8.1551],
 };
 
 export const ChoroplethWorldMap: React.FC<ChoroplethWorldMapProps> = ({ locations }) => {
@@ -183,7 +204,7 @@ export const ChoroplethWorldMap: React.FC<ChoroplethWorldMapProps> = ({ location
               ${getCountryFlag(loc.countryCode)} ${loc.country}
             </div>
             <div style="color: ${color}; font-weight: bold; font-size: 13px;">${loc.pct}% Traffic Share</div>
-            <div style="color: #94a3b8; font-size: 11px;">${loc.count} recorded visitors · ${loc.city || 'Primary Region'}</div>
+            <div style="color: #94a3b8; font-size: 11px;">${loc.count} recorded ${loc.count === 1 ? 'visitor' : 'visitors'} · ${[loc.city, loc.region].filter(Boolean).join(', ') || 'National'}</div>
           </div>
         `);
       }
@@ -213,10 +234,10 @@ export const ChoroplethWorldMap: React.FC<ChoroplethWorldMapProps> = ({ location
       marker.bindPopup(`
         <div style="font-family: sans-serif; font-size: 12px; color: #f8fafc; line-height: 1.4;">
           <div style="font-size: 14px; font-weight: bold; margin-bottom: 2px;">
-            ${getCountryFlag(loc.countryCode)} ${loc.city}${loc.region ? `, ${loc.region}` : ''}, ${loc.country}
+            ${getCountryFlag(loc.countryCode)} ${[loc.city, loc.region, loc.country].filter(Boolean).join(', ')}
           </div>
           <div style="color: ${color}; font-weight: bold; font-size: 13px; margin-top: 4px;">${loc.pct}% Live Traffic</div>
-          <div style="color: #cbd5e1; font-size: 11px;">${loc.count} sessions connected</div>
+          <div style="color: #cbd5e1; font-size: 11px;">${loc.count} unique ${loc.count === 1 ? 'visitor' : 'visitors'}</div>
           ${loc.region || loc.postalCode ? `<div style="color: #94a3b8; font-size: 10px; margin-top: 3px;">📍 ${[loc.region, loc.postalCode ? `Postal Code ${loc.postalCode}` : ''].filter(Boolean).join(' · ')}</div>` : ''}
         </div>
       `);
@@ -312,7 +333,7 @@ export const ChoroplethWorldMap: React.FC<ChoroplethWorldMapProps> = ({ location
           const isTop = loc.pct >= 50;
           return (
             <div
-              key={loc.countryCode}
+              key={`${loc.countryCode}-${loc.city || 'all'}-${loc.region || ''}`}
               onClick={() => {
                 setSelectedLocation(loc);
                 const coords: [number, number] =

@@ -3,6 +3,7 @@ import {
   queryPostHogHogQL,
   getEnvironmentCredentials,
   fetchLiveTelemetry,
+  parseGeoQueryRows,
 } from '../src/services/posthogApi';
 
 describe('posthogApi service', () => {
@@ -108,5 +109,34 @@ describe('posthogApi service', () => {
         'SELECT 1'
       )
     ).rejects.toThrow('PostHog API request failed (401): Unauthorized');
+  });
+
+  it('accurately parses geo query rows with distinct visitor counts and handles null city without fallback corruption', () => {
+    const rawGeoRows = [
+      ['wedding', 'Portugal', 'PT', 'Lisbon', 'Lisbon', '1000-001', 38.72, -9.14, 6],
+      ['wedding', 'Switzerland', 'CH', null, null, null, 47.14, 8.15, 1],
+      ['dashboard', 'Portugal', 'PT', 'Lisbon', 'Lisbon', '1000-001', 38.72, -9.14, 2],
+    ];
+
+    const parsed = parseGeoQueryRows(rawGeoRows, false) as Record<'wedding' | 'portfolio' | 'demo', any[]>;
+
+    // Wedding should strictly receive wedding visitors, excluding dashboard internal sessions
+    expect(parsed.wedding).toHaveLength(2);
+    expect(parsed.wedding[0]).toMatchObject({
+      country: 'Portugal',
+      countryCode: 'PT',
+      city: 'Lisbon',
+      count: 6,
+      pct: 86, // 6 / 7
+    });
+
+    // Switzerland must keep empty city rather than incorrectly defaulting to 'Lisbon'
+    expect(parsed.wedding[1]).toMatchObject({
+      country: 'Switzerland',
+      countryCode: 'CH',
+      city: '',
+      count: 1,
+      pct: 14, // 1 / 7
+    });
   });
 });
