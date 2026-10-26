@@ -15,6 +15,7 @@ export default defineConfig({
   server: {
     port: 5176,
     host: true,
+    allowedHosts: true,
   },
   envPrefix: ["VITE_", "POSTHOG_"],
   test: {
