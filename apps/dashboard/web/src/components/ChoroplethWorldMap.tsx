@@ -209,38 +209,44 @@ export const ChoroplethWorldMap: React.FC<ChoroplethWorldMapProps> = ({ location
         `);
       }
 
-      // Add Glowing Pulsing Radar Marker on City Coordinate
-      const coords: [number, number] =
-        loc.latitude !== undefined && loc.longitude !== undefined
-          ? [loc.latitude, loc.longitude]
-          : CITY_COORDINATES[loc.city] ||
-            CITY_COORDINATES[`default_${code}`] ||
-            [38.72, -9.14];
+      // Add Glowing Pulsing Radar Marker (Pawn) ONLY IF THE USER IS CURRENTLY USING THE WEBSITE
+      if ((loc.activeCount ?? 0) > 0) {
+        const coords: [number, number] =
+          loc.latitude !== undefined && loc.longitude !== undefined
+            ? [loc.latitude, loc.longitude]
+            : CITY_COORDINATES[loc.city] ||
+              CITY_COORDINATES[`default_${code}`] ||
+              [38.72, -9.14];
 
-      // Custom pulsing DivIcon
-      const pulseIcon = L.divIcon({
-        className: 'custom-pulse-pin',
-        html: `
-          <div style="position: relative; width: 24px; height: 24px;">
-            <div style="position: absolute; inset: 0; border-radius: 9999px; background-color: ${color}; opacity: 0.75; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-            <div style="position: absolute; inset: 4px; border-radius: 9999px; background-color: ${color}; box-shadow: 0 0 10px ${color}; border: 2px solid #ffffff;"></div>
-          </div>
-        `,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-      });
+        // Custom pulsing DivIcon representing an active user pawn
+        const pulseIcon = L.divIcon({
+          className: 'custom-pulse-pin',
+          html: `
+            <div style="position: relative; width: 28px; height: 28px;">
+              <div style="position: absolute; inset: 0; border-radius: 9999px; background-color: #10b981; opacity: 0.85; animation: ping 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+              <div style="position: absolute; inset: 4px; border-radius: 9999px; background-color: #059669; box-shadow: 0 0 14px #34d399; border: 2px solid #ffffff; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: bold; font-family: monospace;">
+                ${loc.activeCount}
+              </div>
+            </div>
+          `,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+        });
 
-      const marker = L.marker(coords, { icon: pulseIcon }).addTo(map);
-      marker.bindPopup(`
-        <div style="font-family: sans-serif; font-size: 12px; color: #f8fafc; line-height: 1.4;">
-          <div style="font-size: 14px; font-weight: bold; margin-bottom: 2px;">
-            ${getCountryFlag(loc.countryCode)} ${[loc.city, loc.region, loc.country].filter(Boolean).join(', ')}
+        const marker = L.marker(coords, { icon: pulseIcon }).addTo(map);
+        marker.bindPopup(`
+          <div style="font-family: sans-serif; font-size: 12px; color: #f8fafc; line-height: 1.4;">
+            <div style="font-size: 14px; font-weight: bold; margin-bottom: 2px;">
+              ${getCountryFlag(loc.countryCode)} ${[loc.city, loc.region, loc.country].filter(Boolean).join(', ')}
+            </div>
+            <div style="color: #34d399; font-weight: bold; font-size: 13px; margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+              🟢 Active now · ${loc.activeCount} ${loc.activeCount === 1 ? 'user' : 'users'} online
+            </div>
+            <div style="color: #cbd5e1; font-size: 11px; margin-top: 2px;">${loc.count} total historical ${loc.count === 1 ? 'visitor' : 'visitors'} (${loc.pct}% traffic share)</div>
+            ${loc.region || loc.postalCode ? `<div style="color: #94a3b8; font-size: 10px; margin-top: 3px;">📍 ${[loc.region, loc.postalCode ? `Postal Code ${loc.postalCode}` : ''].filter(Boolean).join(' · ')}</div>` : ''}
           </div>
-          <div style="color: ${color}; font-weight: bold; font-size: 13px; margin-top: 4px;">${loc.pct}% Live Traffic</div>
-          <div style="color: #cbd5e1; font-size: 11px;">${loc.count} unique ${loc.count === 1 ? 'visitor' : 'visitors'}</div>
-          ${loc.region || loc.postalCode ? `<div style="color: #94a3b8; font-size: 10px; margin-top: 3px;">📍 ${[loc.region, loc.postalCode ? `Postal Code ${loc.postalCode}` : ''].filter(Boolean).join(' · ')}</div>` : ''}
-        </div>
-      `);
+        `);
+      }
     });
 
     return () => {
@@ -251,10 +257,11 @@ export const ChoroplethWorldMap: React.FC<ChoroplethWorldMapProps> = ({ location
     };
   }, [locations]);
 
-  // Handle focus on top location
+  // Handle focus on top location (prefer active location if available)
   const handleFocusTop = () => {
     if (!mapInstanceRef.current || locations.length === 0) return;
-    const top = locations[0];
+    const topActive = locations.find((l) => (l.activeCount ?? 0) > 0);
+    const top = topActive || locations[0];
     const coords: [number, number] =
       top.latitude !== undefined && top.longitude !== undefined
         ? [top.latitude, top.longitude]
@@ -270,6 +277,8 @@ export const ChoroplethWorldMap: React.FC<ChoroplethWorldMapProps> = ({ location
     mapInstanceRef.current.flyTo([35.0, -10.0], 3, { duration: 1.2 });
   };
 
+  const totalActiveUsers = locations.reduce((sum, loc) => sum + (loc.activeCount || 0), 0);
+
   return (
     <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-5 shadow-sm space-y-4 backdrop-blur-sm">
       {/* Header and Controls */}
@@ -278,12 +287,19 @@ export const ChoroplethWorldMap: React.FC<ChoroplethWorldMapProps> = ({ location
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">
             <Globe className="w-4 h-4 text-emerald-400" />
             <span>Interactive Real World Traffic Map</span>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-mono">
-              Live Geographic Basemap
-            </span>
+            {totalActiveUsers > 0 ? (
+              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono font-semibold flex items-center gap-1.5 shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span>{totalActiveUsers} Live Online Pawn{totalActiveUsers === 1 ? '' : 's'}</span>
+              </span>
+            ) : (
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 font-mono">
+                0 Active Users
+              </span>
+            )}
           </h2>
           <p className="text-xs text-slate-400">
-            Visitor connection locations with country traffic volume shading
+            Visitor connection locations with country traffic volume shading (pawns represent users currently active)
           </p>
         </div>
 
@@ -355,9 +371,16 @@ export const ChoroplethWorldMap: React.FC<ChoroplethWorldMapProps> = ({ location
                   <span>{getCountryFlag(loc.countryCode)}</span>
                   <span className="truncate">{loc.country}</span>
                 </span>
-                <span className={`font-mono font-bold ${isTop ? 'text-emerald-400' : 'text-slate-300'}`}>
-                  {loc.pct}%
-                </span>
+                {(loc.activeCount ?? 0) > 0 ? (
+                  <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    {loc.activeCount} online
+                  </span>
+                ) : (
+                  <span className={`font-mono font-bold ${isTop ? 'text-emerald-400' : 'text-slate-300'}`}>
+                    {loc.pct}%
+                  </span>
+                )}
               </div>
               <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                 <div
