@@ -7,8 +7,35 @@ interface ActivityChartProps {
 }
 
 export const ActivityChart: React.FC<ActivityChartProps> = ({ data }) => {
-  const maxEvents = Math.max(...data.map((d) => d.events), 100);
-  const maxVisitors = Math.max(...data.map((d) => d.visitors), 50);
+  if (!data || data.length === 0) {
+    return (
+      <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-5 shadow-sm flex flex-col justify-between backdrop-blur-sm h-full">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-blue-400" />
+              Activity Timeline
+            </h2>
+            <p className="text-xs text-slate-400">Daily event &amp; visitor telemetry</p>
+          </div>
+          <span className="text-xs font-mono text-slate-500">-</span>
+        </div>
+
+        <div className="w-full h-52 flex flex-col items-center justify-center text-slate-500 text-xs gap-1">
+          <span className="text-2xl font-mono text-slate-600">-</span>
+          <span>No activity telemetry received yet</span>
+        </div>
+
+        <div className="flex justify-between text-[11px] text-slate-500 border-t border-slate-800/60 pt-2 mt-2 font-mono">
+          <span>-</span>
+          <span>-</span>
+        </div>
+      </div>
+    );
+  }
+
+  const maxEvents = Math.max(...data.map((d) => d.events), 1);
+  const maxVisitors = Math.max(...data.map((d) => d.visitors), 1);
 
   return (
     <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-5 shadow-sm flex flex-col justify-between backdrop-blur-sm">

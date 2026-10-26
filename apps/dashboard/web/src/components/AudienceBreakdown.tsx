@@ -8,8 +8,8 @@ interface AudienceBreakdownProps {
 }
 
 export const AudienceBreakdown: React.FC<AudienceBreakdownProps> = ({
-  languages,
-  devices,
+  languages = [],
+  devices = [],
 }) => {
   return (
     <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-5 shadow-sm space-y-5 backdrop-blur-sm">
@@ -23,40 +23,58 @@ export const AudienceBreakdown: React.FC<AudienceBreakdownProps> = ({
 
       {/* Languages */}
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2.5">
-          Languages
-        </h3>
-        <div className="space-y-2">
-          {languages.map((lang) => (
-            <div key={lang.code} className="flex items-center justify-between text-xs">
-              <span className="flex items-center gap-2">
-                <span className="font-mono text-[11px] bg-slate-800 px-1.5 py-0.5 rounded text-amber-300 font-bold">
-                  {lang.code}
-                </span>
-                <span className="text-slate-300">{lang.name}</span>
-              </span>
-              <span className="font-semibold text-white">
-                {lang.pct}% <span className="text-[10px] text-slate-500 font-normal">({lang.count})</span>
-              </span>
-            </div>
-          ))}
+        <div className="flex items-center justify-between mb-2.5">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Languages
+          </h3>
+          {languages.length === 0 && <span className="text-xs text-slate-500 font-mono">-</span>}
         </div>
+        {languages.length === 0 ? (
+          <div className="py-2 text-xs text-slate-500 flex items-center justify-center font-mono">
+            -
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {languages.map((lang) => (
+              <div key={lang.code} className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-2">
+                  <span className="font-mono text-[11px] bg-slate-800 px-1.5 py-0.5 rounded text-amber-300 font-bold">
+                    {lang.code}
+                  </span>
+                  <span className="text-slate-300">{lang.name}</span>
+                </span>
+                <span className="font-semibold text-white">
+                  {lang.pct}% <span className="text-[10px] text-slate-500 font-normal">({lang.count})</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Devices */}
       <div className="border-t border-slate-800/60 pt-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2.5 flex items-center gap-1.5">
-          <Smartphone className="w-3.5 h-3.5 text-blue-400" />
-          Top Devices
-        </h3>
-        <div className="space-y-2">
-          {devices.map((device) => (
-            <div key={device.name} className="flex items-center justify-between text-xs">
-              <span className="text-slate-300">{device.name}</span>
-              <span className="font-semibold text-white">{device.pct}%</span>
-            </div>
-          ))}
+        <div className="flex items-center justify-between mb-2.5">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <Smartphone className="w-3.5 h-3.5 text-blue-400" />
+            Top Devices
+          </h3>
+          {devices.length === 0 && <span className="text-xs text-slate-500 font-mono">-</span>}
         </div>
+        {devices.length === 0 ? (
+          <div className="py-2 text-xs text-slate-500 flex items-center justify-center font-mono">
+            -
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {devices.map((device) => (
+              <div key={device.name} className="flex items-center justify-between text-xs">
+                <span className="text-slate-300">{device.name}</span>
+                <span className="font-semibold text-white">{device.pct}%</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

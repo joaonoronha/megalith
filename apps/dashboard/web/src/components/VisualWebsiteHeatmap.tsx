@@ -297,14 +297,24 @@ export const VisualWebsiteHeatmap: React.FC<VisualWebsiteHeatmapProps> = ({ item
                           className="w-64 sm:w-72 h-16 rounded-full blur-md"
                           style={{
                             background:
-                              'radial-gradient(ellipse, rgba(239, 68, 68, 0.95) 0%, rgba(249, 115, 22, 0.8) 40%, rgba(245, 158, 11, 0.4) 70%, transparent 85%)',
+                              weddingIntroCta && weddingIntroCta.clicks > 0
+                                ? 'radial-gradient(ellipse, rgba(239, 68, 68, 0.95) 0%, rgba(249, 115, 22, 0.8) 40%, rgba(245, 158, 11, 0.4) 70%, transparent 85%)'
+                                : 'radial-gradient(ellipse, rgba(148, 163, 184, 0.3) 0%, transparent 70%)',
                           }}
                         />
-                        <div className="absolute inset-0 rounded-full animate-ping border-2 border-red-500/70" />
-                        <div className="absolute -top-3.5 left-1/2 transform -translate-x-1/2 bg-red-600 text-white font-mono text-[10px] font-bold px-3 py-1 rounded-full shadow-2xl flex items-center gap-1.5 border border-red-200 animate-bounce whitespace-nowrap">
-                          <Flame className="w-3.5 h-3.5 fill-white" />
+                        {weddingIntroCta && weddingIntroCta.clicks > 0 && (
+                          <div className="absolute inset-0 rounded-full animate-ping border-2 border-red-500/70" />
+                        )}
+                        <div
+                          className={`absolute -top-3.5 left-1/2 transform -translate-x-1/2 font-mono text-[10px] font-bold px-3 py-1 rounded-full shadow-2xl flex items-center gap-1.5 border whitespace-nowrap ${
+                            weddingIntroCta && weddingIntroCta.clicks > 0
+                              ? 'bg-red-600 text-white border-red-200 animate-bounce'
+                              : 'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}
+                        >
+                          <Flame className="w-3.5 h-3.5 fill-current" />
                           <span>
-                            TOP CTA: SAVE THE DATE ({weddingIntroCta?.clicks || 6} clicks &middot; {weddingIntroCta?.pct || 67}%)
+                            TOP CTA: SAVE THE DATE ({weddingIntroCta ? `${weddingIntroCta.clicks} clicks · ${weddingIntroCta.pct}%` : '-'})
                           </span>
                         </div>
                       </div>
@@ -325,12 +335,20 @@ export const VisualWebsiteHeatmap: React.FC<VisualWebsiteHeatmapProps> = ({ item
                             className="w-72 sm:w-80 h-36 rounded-2xl blur-md"
                             style={{
                               background:
-                                'radial-gradient(ellipse, rgba(245, 158, 11, 0.85) 0%, rgba(234, 88, 12, 0.5) 45%, transparent 75%)',
+                                weddingVideoStats && weddingVideoStats.clicks > 0
+                                  ? 'radial-gradient(ellipse, rgba(245, 158, 11, 0.85) 0%, rgba(234, 88, 12, 0.5) 45%, transparent 75%)'
+                                  : 'radial-gradient(ellipse, rgba(148, 163, 184, 0.3) 0%, transparent 70%)',
                             }}
                           />
-                          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-amber-500 text-black font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-xl flex items-center gap-1 border border-amber-300 whitespace-nowrap">
-                            <Flame className="w-3 h-3 fill-black" />
-                            <span>Video Completions: {weddingVideoStats?.clicks || 10} full plays</span>
+                          <div
+                            className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-xl flex items-center gap-1 border whitespace-nowrap ${
+                              weddingVideoStats && weddingVideoStats.clicks > 0
+                                ? 'bg-amber-500 text-black border-amber-300'
+                                : 'bg-slate-800 text-slate-300 border-slate-700'
+                            }`}
+                          >
+                            <Flame className="w-3 h-3 fill-current" />
+                            <span>Video Completions: {weddingVideoStats ? `${weddingVideoStats.clicks} full plays` : '-'}</span>
                           </div>
                         </div>
 
@@ -373,14 +391,24 @@ export const VisualWebsiteHeatmap: React.FC<VisualWebsiteHeatmapProps> = ({ item
                           className="w-72 sm:w-80 h-20 rounded-full blur-md"
                           style={{
                             background:
-                              'radial-gradient(ellipse, rgba(239, 68, 68, 0.95) 0%, rgba(249, 115, 22, 0.8) 35%, rgba(245, 158, 11, 0.45) 65%, transparent 85%)',
+                              weddingCalendarStats && weddingCalendarStats.clicks > 0
+                                ? 'radial-gradient(ellipse, rgba(239, 68, 68, 0.95) 0%, rgba(249, 115, 22, 0.8) 35%, rgba(245, 158, 11, 0.45) 65%, transparent 85%)'
+                                : 'radial-gradient(ellipse, rgba(148, 163, 184, 0.3) 0%, transparent 70%)',
                           }}
                         />
-                        <div className="absolute inset-0 rounded-full animate-ping border-2 border-red-500/70" />
-                        <div className="absolute -top-3.5 left-1/2 transform -translate-x-1/2 bg-red-600 text-white font-mono text-[10px] font-bold px-3 py-1 rounded-full shadow-2xl flex items-center gap-1.5 border border-red-200 animate-bounce whitespace-nowrap">
-                          <Flame className="w-3.5 h-3.5 fill-white" />
+                        {weddingCalendarStats && weddingCalendarStats.clicks > 0 && (
+                          <div className="absolute inset-0 rounded-full animate-ping border-2 border-red-500/70" />
+                        )}
+                        <div
+                          className={`absolute -top-3.5 left-1/2 transform -translate-x-1/2 font-mono text-[10px] font-bold px-3 py-1 rounded-full shadow-2xl flex items-center gap-1.5 border whitespace-nowrap ${
+                            weddingCalendarStats && weddingCalendarStats.clicks > 0
+                              ? 'bg-red-600 text-white border-red-200 animate-bounce'
+                              : 'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}
+                        >
+                          <Flame className="w-3.5 h-3.5 fill-current" />
                           <span>
-                            TOP GOAL: Guardar a Data (.ics) ({weddingCalendarStats?.clicks || 3} downloads &middot; {weddingCalendarStats?.pct || 33}%)
+                            TOP GOAL: Guardar a Data (.ics) ({weddingCalendarStats ? `${weddingCalendarStats.clicks} downloads · ${weddingCalendarStats.pct}%` : '-'})
                           </span>
                         </div>
                       </div>

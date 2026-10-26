@@ -3,34 +3,39 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { App } from '../src/App';
 
 describe('Dashboard App Component', () => {
-  it('renders header, title, and initial KPI overview', () => {
+  it('renders header, title, and initial empty overview with "-" before live data is received', () => {
     render(<App />);
 
     expect(screen.getByText('Megalith Telemetry Hub')).toBeInTheDocument();
-    expect(screen.getByTestId('kpi-visitors')).toHaveTextContent('1,428');
-    expect(screen.getByTestId('kpi-pageviews')).toHaveTextContent('3,892');
+    expect(screen.getByTestId('kpi-visitors')).toHaveTextContent('-');
+    expect(screen.getByTestId('kpi-pageviews')).toHaveTextContent('-');
+    expect(screen.getByTestId('kpi-actions')).toHaveTextContent('-');
+    expect(screen.getByTestId('kpi-eng-rate')).toHaveTextContent('-');
     expect(screen.getByTestId('events-table')).toBeInTheDocument();
+    expect(screen.getByText('No telemetry events received yet (-)')).toBeInTheDocument();
   });
 
-  it('switches metrics and funnel when selecting Wedding tab', () => {
+  it('switches tabs and displays "-" when no data has been received yet for that app', () => {
     render(<App />);
 
     const weddingTab = screen.getByTestId('tab-wedding');
     fireEvent.click(weddingTab);
 
-    // Wedding metrics should update
-    expect(screen.getByTestId('kpi-visitors')).toHaveTextContent('1,024');
-    expect(screen.getByTestId('kpi-pageviews')).toHaveTextContent('2,840');
+    // Wedding metrics show '-' before live data is loaded
+    expect(screen.getByTestId('kpi-visitors')).toHaveTextContent('-');
+    expect(screen.getByTestId('kpi-pageviews')).toHaveTextContent('-');
+    expect(screen.getByTestId('kpi-actions')).toHaveTextContent('-');
     expect(screen.getByText('Save the Date Funnel')).toBeInTheDocument();
   });
 
-  it('switches metrics when selecting Portfolio tab', () => {
+  it('switches to Portfolio tab and displays "-" before live data is received', () => {
     render(<App />);
 
     const portfolioTab = screen.getByTestId('tab-portfolio');
     fireEvent.click(portfolioTab);
 
-    expect(screen.getByTestId('kpi-visitors')).toHaveTextContent('342');
+    expect(screen.getByTestId('kpi-visitors')).toHaveTextContent('-');
+    expect(screen.getByTestId('kpi-pageviews')).toHaveTextContent('-');
     expect(screen.getByText('Portfolio Engagement Funnel')).toBeInTheDocument();
   });
 
