@@ -47,7 +47,7 @@ export const GeoLocationCard: React.FC<GeoLocationCardProps> = ({ locations = []
           </div>
           <div className="text-xs">
             <div className="font-semibold text-slate-200">
-              {locations.length > 0 ? `${locations[0].city}, ${locations[0].country}` : '-'}
+              {locations.length > 0 ? `${locations[0].city ? `${locations[0].city}, ` : ''}${locations[0].country}` : '-'}
             </div>
             <div className="text-[11px] text-slate-400">
               {locations.length > 0
@@ -68,7 +68,7 @@ export const GeoLocationCard: React.FC<GeoLocationCardProps> = ({ locations = []
             locations.map((loc) => {
               const flag = getCountryFlag(loc.countryCode);
               return (
-                <div key={`${loc.country}-${loc.city}`} className="space-y-1">
+                <div key={`${loc.country}-${loc.city || 'all'}-${loc.region || ''}`} className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-base" role="img" aria-label={loc.country}>

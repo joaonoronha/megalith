@@ -167,12 +167,114 @@ function formatInteractionElement(event: string, _app: 'wedding' | 'portfolio' |
 }
 
 /**
+ * Parses HogQL geo query results into GeoLocationSegment arrays.
+ */
+export function parseGeoQueryRows(
+  rows: unknown[][],
+  isAll = false
+): Record<'wedding' | 'portfolio' | 'demo', GeoLocationSegment[]> | GeoLocationSegment[] {
+  if (isAll) {
+    const list: GeoLocationSegment[] = [];
+    for (const row of rows) {
+      const country = String(row[0] || '').trim();
+      if (!country) continue;
+      const countryCode = String(row[1] || '').trim().toUpperCase();
+      const rawCity = row[2];
+      const city = rawCity && typeof rawCity === 'string' ? rawCity.trim() : '';
+      const rawRegion = row[3];
+      const region = rawRegion && typeof rawRegion === 'string' ? rawRegion.trim() : undefined;
+      const rawPostal = row[4];
+      const postalCode = rawPostal && typeof rawPostal === 'string' ? rawPostal.trim() : undefined;
+      const latVal = Number(row[5]);
+      const latitude = !isNaN(latVal) && latVal !== 0 ? latVal : undefined;
+      const lngVal = Number(row[6]);
+      const longitude = !isNaN(lngVal) && lngVal !== 0 ? lngVal : undefined;
+      const count = Number(row[7]) || 0;
+
+      if (count > 0) {
+        list.push({
+          country,
+          countryCode,
+          city,
+          region,
+          postalCode,
+          latitude,
+          longitude,
+          count,
+          pct: 0,
+        });
+      }
+    }
+    const sum = list.reduce((acc, curr) => acc + curr.count, 0) || 1;
+    return list
+      .map((item) => ({ ...item, pct: Math.round((item.count / sum) * 100) }))
+      .sort((a, b) => b.count - a.count);
+  }
+
+  const byApp: Record<'wedding' | 'portfolio' | 'demo', GeoLocationSegment[]> = {
+    wedding: [],
+    portfolio: [],
+    demo: [],
+  };
+
+  for (const row of rows) {
+    const rawApp = String(row[0] || '');
+    if (rawApp === 'dashboard') continue;
+    const targetApp: 'wedding' | 'portfolio' | 'demo' | null =
+      rawApp === 'wedding' ? 'wedding' : rawApp === 'portfolio' ? 'portfolio' : rawApp === 'demo' ? 'demo' : null;
+    if (!targetApp) continue;
+
+    const country = String(row[1] || '').trim();
+    if (!country) continue;
+    const countryCode = String(row[2] || '').trim().toUpperCase();
+    const rawCity = row[3];
+    const city = rawCity && typeof rawCity === 'string' ? rawCity.trim() : '';
+    const rawRegion = row[4];
+    const region = rawRegion && typeof rawRegion === 'string' ? rawRegion.trim() : undefined;
+    const rawPostal = row[5];
+    const postalCode = rawPostal && typeof rawPostal === 'string' ? rawPostal.trim() : undefined;
+    const latVal = Number(row[6]);
+    const latitude = !isNaN(latVal) && latVal !== 0 ? latVal : undefined;
+    const lngVal = Number(row[7]);
+    const longitude = !isNaN(lngVal) && lngVal !== 0 ? lngVal : undefined;
+    const count = Number(row[8]) || 0;
+
+    if (count > 0) {
+      byApp[targetApp].push({
+        country,
+        countryCode,
+        city,
+        region,
+        postalCode,
+        latitude,
+        longitude,
+        count,
+        pct: 0,
+      });
+    }
+  }
+
+  for (const app of ['wedding', 'portfolio', 'demo'] as const) {
+    const sum = byApp[app].reduce((acc, curr) => acc + curr.count, 0) || 1;
+    byApp[app] = byApp[app]
+      .map((item) => ({ ...item, pct: Math.round((item.count / sum) * 100) }))
+      .sort((a, b) => b.count - a.count);
+  }
+
+  return byApp;
+}
+
+/**
  * Builds dynamic AppMetricsOverview datasets from real PostHog query results.
  */
 export function buildLiveMetrics(
   aggRows: unknown[][],
   dailyRows: unknown[][],
-  eventRows: unknown[][] = []
+  eventRows: unknown[][] = [],
+  geoRows?: unknown[][],
+  geoAllRows?: unknown[][],
+  appVisitorsRows?: unknown[][],
+  totalVisitorsRows?: unknown[][]
 ): Record<AppId, AppMetricsOverview> {
   const statsByApp: Record<'wedding' | 'portfolio' | 'demo', {
     totalEvents: number;
@@ -193,6 +295,7 @@ export function buildLiveMetrics(
     const count = Number(row[2]) || 0;
     const visitors = Number(row[3]) || 0;
 
+    if (rawApp === 'dashboard') continue;
     const targetApp: 'wedding' | 'portfolio' | 'demo' =
       rawApp === 'portfolio' || rawApp === 'demo' ? rawApp : 'wedding';
 
@@ -209,6 +312,28 @@ export function buildLiveMetrics(
     allEvents += count;
   }
 
+  // Set precise unique visitors per app from dedicated HogQL distinct_id query if available
+  if (appVisitorsRows && appVisitorsRows.length > 0) {
+    for (const row of appVisitorsRows) {
+      const rawApp = String(row[0] || '');
+      if (rawApp === 'dashboard') continue;
+      const targetApp: 'wedding' | 'portfolio' | 'demo' | null =
+        rawApp === 'wedding' ? 'wedding' : rawApp === 'portfolio' ? 'portfolio' : rawApp === 'demo' ? 'demo' : null;
+      if (targetApp) {
+        const distinctUsers = Number(row[2]) || 0;
+        statsByApp[targetApp].visitors = Math.max(statsByApp[targetApp].visitors, distinctUsers);
+      }
+    }
+  }
+
+  // Set precise total deduplicated visitors across all apps
+  if (totalVisitorsRows && totalVisitorsRows.length > 0) {
+    const trueTotalVisitors = Number(totalVisitorsRows[0][1]) || 0;
+    if (trueTotalVisitors > 0) {
+      allVisitors = trueTotalVisitors;
+    }
+  }
+
   // Fallback if visitors wasn't set by an impression event
   for (const app of ['wedding', 'portfolio', 'demo'] as const) {
     if (statsByApp[app].visitors === 0) {
@@ -216,7 +341,7 @@ export function buildLiveMetrics(
     }
   }
 
-  // Parse geo locations from raw event properties
+  // Parse geo locations from raw event properties as fallback if dedicated geo queries are absent
   const geoByApp: Record<'wedding' | 'portfolio' | 'demo', Record<string, GeoLocationSegment>> = {
     wedding: {},
     portfolio: {},
@@ -226,6 +351,7 @@ export function buildLiveMetrics(
 
   for (const row of eventRows) {
     const rawApp = String(row[3] || 'wedding');
+    if (rawApp === 'dashboard') continue;
     const targetApp: 'wedding' | 'portfolio' | 'demo' =
       rawApp === 'portfolio' || rawApp === 'demo' ? rawApp : 'wedding';
     const propsStr = row[2];
@@ -233,9 +359,10 @@ export function buildLiveMetrics(
     if (typeof propsStr === 'string' && propsStr.startsWith('{')) {
       try {
         const p = JSON.parse(propsStr);
-        const country = p['$geoip_country_name'] || 'Portugal';
-        const countryCode = p['$geoip_country_code'] || 'PT';
-        const city = p['$geoip_city_name'] || 'Lisbon';
+        const country = p['$geoip_country_name'];
+        if (!country) continue;
+        const countryCode = p['$geoip_country_code'] || '';
+        const city = p['$geoip_city_name'] || '';
         const region = p['$geoip_subdivision_1_name'] || undefined;
         const postalCode = p['$geoip_postal_code'] || undefined;
         const latitude = typeof p['$geoip_latitude'] === 'number' ? p['$geoip_latitude'] : undefined;
@@ -258,16 +385,28 @@ export function buildLiveMetrics(
     }
   }
 
-  const formatLocations = (map: Record<string, GeoLocationSegment>, total: number): GeoLocationSegment[] => {
+  const formatLocations = (map: Record<string, GeoLocationSegment>): GeoLocationSegment[] => {
     const list = Object.values(map);
     if (list.length === 0) {
-      return [{ country: 'Portugal', countryCode: 'PT', city: 'Lisbon', count: total || 1, pct: 100 }];
+      return [];
     }
     const sum = list.reduce((acc, curr) => acc + curr.count, 0) || 1;
     return list
       .map((item) => ({ ...item, pct: Math.round((item.count / sum) * 100) }))
       .sort((a, b) => b.count - a.count);
   };
+
+  const parsedGeoByApp = geoRows && geoRows.length > 0
+    ? (parseGeoQueryRows(geoRows, false) as Record<'wedding' | 'portfolio' | 'demo', GeoLocationSegment[]>)
+    : null;
+  const parsedGeoAll = geoAllRows && geoAllRows.length > 0
+    ? (parseGeoQueryRows(geoAllRows, true) as GeoLocationSegment[])
+    : null;
+
+  const weddingLocations = parsedGeoByApp ? parsedGeoByApp.wedding : formatLocations(geoByApp.wedding);
+  const portfolioLocations = parsedGeoByApp ? parsedGeoByApp.portfolio : formatLocations(geoByApp.portfolio);
+  const demoLocations = parsedGeoByApp ? parsedGeoByApp.demo : formatLocations(geoByApp.demo);
+  const allLocations = parsedGeoAll ? parsedGeoAll : formatLocations(allGeoMap);
 
   const buildAppHeatmap = (appKey: 'wedding' | 'portfolio' | 'demo'): ClickHeatMapItem[] => {
     const evMap = statsByApp[appKey].events;
@@ -365,7 +504,7 @@ export function buildLiveMetrics(
               ? [{ code: 'PT', name: 'Português', pct: 100, count: allVisitors, color: 'bg-amber-400' }]
               : [],
           devices: allVisitors > 0 ? [{ name: 'Mobile (iOS Safari)', pct: 100 }] : [],
-          locations: formatLocations(allGeoMap, allVisitors),
+          locations: allLocations,
           clickHeatmap: allHeatmap,
         }
       : {
@@ -414,7 +553,7 @@ export function buildLiveMetrics(
               ? [{ code: 'PT', name: 'Português', pct: 100, count: statsByApp.wedding.visitors, color: 'bg-amber-400' }]
               : [],
           devices: statsByApp.wedding.visitors > 0 ? [{ name: 'Mobile Safari', pct: 100 }] : [],
-          locations: formatLocations(geoByApp.wedding, statsByApp.wedding.visitors),
+          locations: weddingLocations,
           clickHeatmap: weddingHeatmap,
         }
       : {
@@ -465,7 +604,7 @@ export function buildLiveMetrics(
               ? [{ code: 'EN', name: 'English', pct: 100, count: statsByApp.portfolio.visitors, color: 'bg-blue-400' }]
               : [],
           devices: statsByApp.portfolio.visitors > 0 ? [{ name: 'Desktop / Mobile', pct: 100 }] : [],
-          locations: formatLocations(geoByApp.portfolio, statsByApp.portfolio.visitors),
+          locations: portfolioLocations,
           clickHeatmap: portfolioHeatmap,
         }
       : {
@@ -505,7 +644,7 @@ export function buildLiveMetrics(
           chart: buildChart(statsByApp.demo.totalEvents, statsByApp.demo.visitors),
           languages: [{ code: 'EN', name: 'English', pct: 100, count: statsByApp.demo.visitors, color: 'bg-blue-400' }],
           devices: [{ name: 'Container Probes', pct: 100 }],
-          locations: formatLocations(geoByApp.demo, statsByApp.demo.visitors),
+          locations: demoLocations,
           clickHeatmap: demoHeatmap,
         }
       : {
@@ -538,18 +677,38 @@ export async function fetchLiveTelemetry(
   creds: PostHogQueryCredentials
 ): Promise<LiveTelemetryResult> {
   const filter =
-    "WHERE distinct_id NOT LIKE 'test-%' AND distinct_id != 'install_verification_agent'";
+    "WHERE distinct_id NOT LIKE 'test-%' AND distinct_id != 'install_verification_agent' AND properties.app != 'dashboard'";
   const eventsQuery =
     `SELECT uuid, event, properties, properties.app, timestamp FROM events ${filter} ORDER BY timestamp DESC LIMIT 50`;
   const aggQuery =
     `SELECT event, properties.app, count(), count(DISTINCT distinct_id) FROM events ${filter} GROUP BY event, properties.app`;
   const dailyQuery =
     `SELECT toDate(timestamp) as dt, count(), count(DISTINCT distinct_id) FROM events ${filter} AND timestamp >= now() - INTERVAL 7 DAY GROUP BY dt ORDER BY dt ASC`;
+  const geoQuery =
+    `SELECT properties.app, properties.$geoip_country_name, properties.$geoip_country_code, properties.$geoip_city_name, properties.$geoip_subdivision_1_name, properties.$geoip_postal_code, avg(properties.$geoip_latitude), avg(properties.$geoip_longitude), count(DISTINCT distinct_id) FROM events ${filter} AND properties.$geoip_country_name IS NOT NULL AND properties.$geoip_country_name != '' GROUP BY properties.app, properties.$geoip_country_name, properties.$geoip_country_code, properties.$geoip_city_name, properties.$geoip_subdivision_1_name, properties.$geoip_postal_code ORDER BY count(DISTINCT distinct_id) DESC`;
+  const geoAllQuery =
+    `SELECT properties.$geoip_country_name, properties.$geoip_country_code, properties.$geoip_city_name, properties.$geoip_subdivision_1_name, properties.$geoip_postal_code, avg(properties.$geoip_latitude), avg(properties.$geoip_longitude), count(DISTINCT distinct_id) FROM events ${filter} AND properties.$geoip_country_name IS NOT NULL AND properties.$geoip_country_name != '' GROUP BY properties.$geoip_country_name, properties.$geoip_country_code, properties.$geoip_city_name, properties.$geoip_subdivision_1_name, properties.$geoip_postal_code ORDER BY count(DISTINCT distinct_id) DESC`;
+  const appVisitorsQuery =
+    `SELECT properties.app, count(), count(DISTINCT distinct_id) FROM events ${filter} GROUP BY properties.app`;
+  const totalVisitorsQuery =
+    `SELECT count(), count(DISTINCT distinct_id) FROM events ${filter}`;
 
-  const [eventsRes, aggRes, dailyRes] = await Promise.all([
+  const [
+    eventsRes,
+    aggRes,
+    dailyRes,
+    geoAppRes,
+    geoAllRes,
+    appVisitorsRes,
+    totalVisitorsRes,
+  ] = await Promise.all([
     queryPostHogHogQL(creds, eventsQuery),
     queryPostHogHogQL(creds, aggQuery).catch(() => ({ results: [], columns: [] })),
     queryPostHogHogQL(creds, dailyQuery).catch(() => ({ results: [], columns: [] })),
+    queryPostHogHogQL(creds, geoQuery).catch(() => ({ results: [], columns: [] })),
+    queryPostHogHogQL(creds, geoAllQuery).catch(() => ({ results: [], columns: [] })),
+    queryPostHogHogQL(creds, appVisitorsQuery).catch(() => ({ results: [], columns: [] })),
+    queryPostHogHogQL(creds, totalVisitorsQuery).catch(() => ({ results: [], columns: [] })),
   ]);
 
   const events: TelemetryEventItem[] = (eventsRes.results || []).map((row, idx) => {
@@ -568,7 +727,15 @@ export async function fetchLiveTelemetry(
 
   const metrics =
     aggRes.results && aggRes.results.length > 0
-      ? buildLiveMetrics(aggRes.results, dailyRes.results || [], eventsRes.results || [])
+      ? buildLiveMetrics(
+          aggRes.results,
+          dailyRes.results || [],
+          eventsRes.results || [],
+          geoAppRes.results || [],
+          geoAllRes.results || [],
+          appVisitorsRes.results || [],
+          totalVisitorsRes.results || []
+        )
       : undefined;
 
   return { events, metrics };
