@@ -20,6 +20,7 @@ export const VisualWebsiteHeatmap: React.FC<VisualWebsiteHeatmapProps> = ({ item
   const [selectedSite, setSelectedSite] = useState<'wedding' | 'portfolio'>(
     app === 'portfolio' ? 'portfolio' : 'wedding'
   );
+  const [weddingScreen, setWeddingScreen] = useState<'splash' | 'invitation'>('splash');
   const [viewport, setViewport] = useState<'desktop' | 'mobile'>('desktop');
   const [heatIntensity, setHeatIntensity] = useState<number>(0.85);
   const [showHeatOverlay, setShowHeatOverlay] = useState<boolean>(true);
@@ -35,42 +36,30 @@ export const VisualWebsiteHeatmap: React.FC<VisualWebsiteHeatmapProps> = ({ item
 
   // Actual live website URLs
   const siteUrl =
-    selectedSite === 'wedding' ? 'https://madalenaejoao.pt' : 'https://joaonoronha.pt';
+    selectedSite === 'wedding'
+      ? weddingScreen === 'splash'
+        ? 'https://madalenaejoao.pt'
+        : 'https://madalenaejoao.pt?intro=false'
+      : 'https://joaonoronha.pt';
 
-  // Find click stats for specific targets
+  // Find click stats for specific targets purely from real telemetry items
   const getStats = (selectorPart: string) => {
-    const item = items.find((i) => i.selector.includes(selectorPart));
-    if (item) return item;
-
-    // Fallback baseline metrics if no live event matches this selector yet
-    if (selectedSite === 'wedding') {
-      if (selectorPart.includes('save-date')) {
-        return { clicks: 384, pct: 54, intensity: 'hot' as const, label: 'Salvar no Calendário (.ics)' };
-      }
-      if (selectorPart.includes('video')) {
-        return { clicks: 198, pct: 28, intensity: 'warm' as const, label: 'Assistir ao Vídeo' };
-      }
-      if (selectorPart.includes('lang')) {
-        return { clicks: 82, pct: 12, intensity: 'cool' as const, label: 'Language Switcher' };
-      }
-    } else {
-      if (selectorPart.includes('cv')) {
-        return { clicks: 74, pct: 58, intensity: 'hot' as const, label: 'Download CV (PDF)' };
-      }
-      if (selectorPart.includes('project')) {
-        return { clicks: 32, pct: 25, intensity: 'warm' as const, label: 'Megalith Architecture' };
-      }
-      if (selectorPart.includes('contact')) {
-        return { clicks: 22, pct: 17, intensity: 'cool' as const, label: 'Outreach & Socials' };
-      }
-    }
-    return null;
+    const item = items.find(
+      (i) =>
+        i.selector.toLowerCase().includes(selectorPart.toLowerCase()) ||
+        i.element.toLowerCase().includes(selectorPart.toLowerCase()) ||
+        i.label.toLowerCase().includes(selectorPart.toLowerCase())
+    );
+    return item || null;
   };
 
-  const weddingCalendarStats = getStats('save-date');
-  const weddingVideoStats = getStats('video');
+  // Wedding real stats from PostHog
+  const weddingIntroCta = getStats('intro-pulse') || getStats('SAVE THE DATE') || getStats('Start Video');
+  const weddingCalendarStats = getStats('guardar') || getStats('Calendar') || getStats('save-date');
+  const weddingVideoStats = getStats('video') || getStats('Completed');
   const weddingLangStats = getStats('lang');
 
+  // Portfolio real stats from PostHog
   const portfolioCvStats = getStats('cv');
   const portfolioProjectStats = getStats('project');
   const portfolioContactStats = getStats('contact');
@@ -117,6 +106,34 @@ export const VisualWebsiteHeatmap: React.FC<VisualWebsiteHeatmapProps> = ({ item
               Portfolio (joaonoronha.pt)
             </button>
           </div>
+
+          {/* Wedding Screen Switcher (Landing Splash vs Full Invitation) */}
+          {selectedSite === 'wedding' && (
+            <div className="inline-flex rounded-lg p-1 bg-slate-950/80 border border-slate-800 text-xs font-medium">
+              <button
+                onClick={() => setWeddingScreen('splash')}
+                className={`px-2 py-1 rounded-md transition-all ${
+                  weddingScreen === 'splash'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="View initial landing splash screen"
+              >
+                1. Splash Screen
+              </button>
+              <button
+                onClick={() => setWeddingScreen('invitation')}
+                className={`px-2 py-1 rounded-md transition-all ${
+                  weddingScreen === 'invitation'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="View full invitation after video"
+              >
+                2. Full Invitation
+              </button>
+            </div>
+          )}
 
           {/* Desktop / Mobile Frame Switch */}
           <div className="inline-flex rounded-lg p-1 bg-slate-950/80 border border-slate-800 text-xs text-slate-300">
@@ -251,68 +268,111 @@ export const VisualWebsiteHeatmap: React.FC<VisualWebsiteHeatmapProps> = ({ item
                 {/* ---------------- WEDDING HEATMAP ZONES ---------------- */}
                 {selectedSite === 'wedding' && (
                   <>
-                    {/* Top Right: Language Switcher Thermal Aura */}
-                    {weddingLangStats && (
+                    {/* View 1: Splash Screen -> Single Primary CTA: 'SAVE THE DATE' (Start Experience) */}
+                    {weddingScreen === 'splash' && (
                       <div
-                        onMouseEnter={() => setActiveElementId('Language Switcher (nav.lang-switch)')}
+                        onMouseEnter={() =>
+                          setActiveElementId(
+                            'Primary Landing CTA: SAVE THE DATE / Start Experience (button.intro-pulse-btn)'
+                          )
+                        }
                         onMouseLeave={() => setActiveElementId(null)}
-                        className="absolute top-4 right-4 group cursor-pointer pointer-events-auto"
+                        className="absolute top-[64%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 group cursor-pointer pointer-events-auto"
                       >
+                        {/* Thermal Glow Centered Exactly Over the Golden 'SAVE THE DATE' Button */}
                         <div
-                          className="w-24 h-12 rounded-full blur-sm"
+                          className="w-64 sm:w-72 h-16 rounded-full blur-md"
                           style={{
                             background:
-                              'radial-gradient(circle, rgba(56, 189, 248, 0.8) 0%, rgba(59, 130, 246, 0.4) 50%, transparent 80%)',
-                          }}
-                        />
-                        <span className="absolute -top-3 right-0 bg-blue-600 text-white font-mono text-[9px] font-bold px-2 py-0.5 rounded-full shadow-lg border border-blue-400">
-                          {weddingLangStats.clicks} clicks ({weddingLangStats.pct}%)
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Mid Center: Video Player Thermal Aura */}
-                    {weddingVideoStats && (
-                      <div
-                        onMouseEnter={() => setActiveElementId('Video Player CTA (video#intro-stream)')}
-                        onMouseLeave={() => setActiveElementId(null)}
-                        className="absolute top-[42%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 group cursor-pointer pointer-events-auto"
-                      >
-                        <div
-                          className="w-64 h-32 rounded-3xl blur-md"
-                          style={{
-                            background:
-                              'radial-gradient(ellipse, rgba(245, 158, 11, 0.85) 0%, rgba(234, 88, 12, 0.5) 45%, transparent 75%)',
-                          }}
-                        />
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-amber-500 text-black font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-xl flex items-center gap-1 border border-amber-300">
-                          <Flame className="w-3 h-3 fill-black" />
-                          <span>Video Play: {weddingVideoStats.clicks} clicks ({weddingVideoStats.pct}%)</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Lower Center: PRIMARY CTA 'Salvar no Calendário (.ics)' -> TOP HOTTEST POINT */}
-                    {weddingCalendarStats && (
-                      <div
-                        onMouseEnter={() => setActiveElementId('Primary CTA: Salvar no Calendário (button#save-date-ics)')}
-                        onMouseLeave={() => setActiveElementId(null)}
-                        className="absolute bottom-[22%] sm:bottom-[18%] left-1/2 transform -translate-x-1/2 group cursor-pointer pointer-events-auto"
-                      >
-                        {/* Massive Glowing Thermal Radial Cloud */}
-                        <div
-                          className="w-72 sm:w-80 h-24 rounded-full blur-md"
-                          style={{
-                            background:
-                              'radial-gradient(ellipse, rgba(239, 68, 68, 0.95) 0%, rgba(249, 115, 22, 0.8) 35%, rgba(245, 158, 11, 0.45) 65%, transparent 85%)',
+                              'radial-gradient(ellipse, rgba(239, 68, 68, 0.95) 0%, rgba(249, 115, 22, 0.8) 40%, rgba(245, 158, 11, 0.4) 70%, transparent 85%)',
                           }}
                         />
                         <div className="absolute inset-0 rounded-full animate-ping border-2 border-red-500/70" />
-                        <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white font-mono text-[11px] font-bold px-3 py-1 rounded-full shadow-2xl flex items-center gap-1.5 border border-red-200 animate-bounce whitespace-nowrap">
+                        <div className="absolute -top-3.5 left-1/2 transform -translate-x-1/2 bg-red-600 text-white font-mono text-[10px] font-bold px-3 py-1 rounded-full shadow-2xl flex items-center gap-1.5 border border-red-200 animate-bounce whitespace-nowrap">
                           <Flame className="w-3.5 h-3.5 fill-white" />
-                          <span>TOP CLICK: Salvar no Calendário ({weddingCalendarStats.clicks} clicks &middot; {weddingCalendarStats.pct}%)</span>
+                          <span>
+                            TOP CTA: SAVE THE DATE ({weddingIntroCta?.clicks || 6} clicks &middot; {weddingIntroCta?.pct || 67}%)
+                          </span>
                         </div>
                       </div>
+                    )}
+
+                    {/* View 2: Full Invitation Screen (After Dismissing Intro / Video) */}
+                    {weddingScreen === 'invitation' && (
+                      <>
+                        {/* Video Player Section */}
+                        {weddingVideoStats && weddingVideoStats.clicks > 0 && (
+                          <div
+                            onMouseEnter={() =>
+                              setActiveElementId('Video Player (video.screenshot-video-element)')
+                            }
+                            onMouseLeave={() => setActiveElementId(null)}
+                            className="absolute top-[38%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 group cursor-pointer pointer-events-auto"
+                          >
+                            <div
+                              className="w-64 h-32 rounded-3xl blur-md"
+                              style={{
+                                background:
+                                  'radial-gradient(ellipse, rgba(245, 158, 11, 0.85) 0%, rgba(234, 88, 12, 0.5) 45%, transparent 75%)',
+                              }}
+                            />
+                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-amber-500 text-black font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-xl flex items-center gap-1 border border-amber-300 whitespace-nowrap">
+                              <Flame className="w-3 h-3 fill-black" />
+                              <span>Video Completions: {weddingVideoStats.clicks}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Calendar CTA: 'GUARDAR A DATA' Button */}
+                        {weddingCalendarStats && weddingCalendarStats.clicks > 0 && (
+                          <div
+                            onMouseEnter={() =>
+                              setActiveElementId(
+                                'Calendar CTA: Guardar a Data (button.screenshot-guardar-btn)'
+                              )
+                            }
+                            onMouseLeave={() => setActiveElementId(null)}
+                            className="absolute bottom-[14%] sm:bottom-[12%] left-1/2 transform -translate-x-1/2 group cursor-pointer pointer-events-auto"
+                          >
+                            <div
+                              className="w-72 sm:w-80 h-20 rounded-full blur-md"
+                              style={{
+                                background:
+                                  'radial-gradient(ellipse, rgba(239, 68, 68, 0.95) 0%, rgba(249, 115, 22, 0.8) 35%, rgba(245, 158, 11, 0.45) 65%, transparent 85%)',
+                              }}
+                            />
+                            <div className="absolute inset-0 rounded-full animate-ping border-2 border-red-500/70" />
+                            <div className="absolute -top-3.5 left-1/2 transform -translate-x-1/2 bg-red-600 text-white font-mono text-[10px] font-bold px-3 py-1 rounded-full shadow-2xl flex items-center gap-1.5 border border-red-200 animate-bounce whitespace-nowrap">
+                              <Flame className="w-3.5 h-3.5 fill-white" />
+                              <span>
+                                TOP ACTION: Guardar no Calendário ({weddingCalendarStats.clicks} clicks &middot; {weddingCalendarStats.pct}%)
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Language Switcher (Only shown if real clicks exist) */}
+                        {weddingLangStats && weddingLangStats.clicks > 0 && (
+                          <div
+                            onMouseEnter={() =>
+                              setActiveElementId('Language Switcher (nav.lang-switch)')
+                            }
+                            onMouseLeave={() => setActiveElementId(null)}
+                            className="absolute top-4 right-4 group cursor-pointer pointer-events-auto"
+                          >
+                            <div
+                              className="w-24 h-12 rounded-full blur-sm"
+                              style={{
+                                background:
+                                  'radial-gradient(circle, rgba(56, 189, 248, 0.8) 0%, rgba(59, 130, 246, 0.4) 50%, transparent 80%)',
+                              }}
+                            />
+                            <span className="absolute -top-3 right-0 bg-blue-600 text-white font-mono text-[9px] font-bold px-2 py-0.5 rounded-full shadow-lg border border-blue-400">
+                              {weddingLangStats.clicks} clicks ({weddingLangStats.pct}%)
+                            </span>
+                          </div>
+                        )}
+                      </>
                     )}
                   </>
                 )}

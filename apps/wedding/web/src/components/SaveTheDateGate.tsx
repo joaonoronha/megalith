@@ -44,8 +44,18 @@ export const SaveTheDateGate: React.FC<SaveTheDateGateProps> = ({
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const countdownRef = React.useRef<HTMLElement>(null);
 
+  const isIntroDisabled = React.useMemo(() => {
+    if (typeof window === 'undefined' || !window.location) return false;
+    try {
+      const val = new URLSearchParams(window.location.search).get('intro');
+      return val === 'false' || val === '0';
+    } catch {
+      return false;
+    }
+  }, []);
+
   const [introState, setIntroState] = React.useState<'active' | 'zooming' | 'dismissed'>(
-    initialShowIntro ? 'active' : 'dismissed'
+    initialShowIntro && !isIntroDisabled ? 'active' : 'dismissed'
   );
 
   React.useEffect(() => {
