@@ -17,9 +17,7 @@ interface VisualWebsiteHeatmapProps {
 }
 
 export const VisualWebsiteHeatmap: React.FC<VisualWebsiteHeatmapProps> = ({ items, app }) => {
-  const [selectedSite, setSelectedSite] = useState<'wedding' | 'portfolio'>(
-    app === 'portfolio' ? 'portfolio' : 'wedding'
-  );
+  const selectedSite: 'wedding' | 'portfolio' = app === 'portfolio' ? 'portfolio' : 'wedding';
   const [weddingView, setWeddingView] = useState<'overlay' | 'invitation'>('overlay');
   const [viewport, setViewport] = useState<'desktop' | 'mobile'>('desktop');
   const [heatIntensity, setHeatIntensity] = useState<number>(0.85);
@@ -27,12 +25,6 @@ export const VisualWebsiteHeatmap: React.FC<VisualWebsiteHeatmapProps> = ({ item
   const [interactiveMode, setInteractiveMode] = useState<boolean>(false);
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
   const [iframeKey, setIframeKey] = useState<number>(0);
-
-  // Sync selected site when parent tab switches
-  React.useEffect(() => {
-    if (app === 'portfolio') setSelectedSite('portfolio');
-    if (app === 'wedding') setSelectedSite('wedding');
-  }, [app]);
 
   // Actual live website URLs
   const siteUrl =
@@ -86,30 +78,6 @@ export const VisualWebsiteHeatmap: React.FC<VisualWebsiteHeatmapProps> = ({ item
 
         {/* Viewport and Preview Switches */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Site Switcher */}
-          <div className="inline-flex rounded-lg p-1 bg-slate-950/80 border border-slate-800 text-xs font-medium">
-            <button
-              onClick={() => setSelectedSite('wedding')}
-              className={`px-2.5 py-1 rounded-md transition-all ${
-                selectedSite === 'wedding'
-                  ? 'bg-amber-600 text-white font-semibold shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Wedding (madalenaejoao.pt)
-            </button>
-            <button
-              onClick={() => setSelectedSite('portfolio')}
-              className={`px-2.5 py-1 rounded-md transition-all ${
-                selectedSite === 'portfolio'
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Portfolio (joaonoronha.pt)
-            </button>
-          </div>
-
           {/* Wedding Views Switcher: View 1 (Overlay) vs View 2 (Post-Video Invitation) */}
           {selectedSite === 'wedding' && (
             <div className="inline-flex rounded-lg p-1 bg-slate-950/80 border border-slate-800 text-xs font-medium">
