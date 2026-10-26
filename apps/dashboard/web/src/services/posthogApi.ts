@@ -328,113 +328,206 @@ export function buildLiveMetrics(
 
   const totalPageviews = weddingViews + portfolioViews + demoViews;
   const totalVisitors = Math.max(statsByApp.wedding.visitors, statsByApp.portfolio.visitors, statsByApp.demo.visitors);
+  const totalActions = weddingSaves + portfolioCv + portfolioClicks;
+
+  const hasWeddingData = statsByApp.wedding.visitors > 0 || weddingViews > 0 || statsByApp.wedding.totalEvents > 0;
+  const hasPortfolioData = statsByApp.portfolio.visitors > 0 || portfolioViews > 0 || statsByApp.portfolio.totalEvents > 0;
+  const hasDemoData = statsByApp.demo.visitors > 0 || demoViews > 0 || statsByApp.demo.totalEvents > 0;
+  const hasAnyData = totalVisitors > 0 || totalPageviews > 0 || allVisitors > 0;
 
   return {
-    all: {
-      kpi: {
-        visitors: String(totalVisitors || allVisitors),
-        visitorsTrend: 'Live',
-        pageviews: String(totalPageviews),
-        pageviewsTrend: 'Live',
-        actions: String(weddingSaves + portfolioCv + portfolioClicks),
-        actionLabel: 'Calendar Saves & Interactions',
-        actionSub: `${weddingSaves} ICS saves · ${portfolioCv + portfolioClicks} portfolio clicks`,
-        engRate: totalPageviews > 0 ? `${Math.round(((weddingSaves + portfolioCv + portfolioClicks) / totalPageviews) * 100)}%` : '0%',
-        engLabel: 'Overall Conversion Rate',
-        engSub: 'Actions per page impression',
-      },
-      chart: buildChart(todayEvents, todayVisitors),
-      funnel: [
-        { name: '1. Page Impressions', count: weddingViews + portfolioViews, pct: 100, color: 'bg-slate-500' },
-        { name: '2. Engagement / Play', count: weddingVideoStarted || weddingViews, pct: (weddingViews + portfolioViews) > 0 ? 100 : 0, color: 'bg-blue-500' },
-        { name: '3. Video Completed', count: weddingVideoDone, pct: weddingViews > 0 ? Math.round((weddingVideoDone / weddingViews) * 100) : 0, color: 'bg-indigo-500' },
-        { name: '4. Calendar / Action Saved', count: weddingSaves, pct: weddingViews > 0 ? Math.round((weddingSaves / weddingViews) * 100) : 0, color: 'bg-emerald-500' },
-      ],
-      languages: [
-        { code: 'PT', name: 'Português', pct: 100, count: allVisitors, color: 'bg-amber-400' },
-      ],
-      devices: [
-        { name: 'Mobile (iOS Safari)', pct: 100 },
-      ],
-      locations: formatLocations(allGeoMap, allVisitors),
-      clickHeatmap: allHeatmap,
-    },
-    wedding: {
-      kpi: {
-        visitors: String(statsByApp.wedding.visitors),
-        visitorsTrend: 'Live',
-        pageviews: String(weddingViews),
-        pageviewsTrend: 'Live',
-        actions: String(weddingSaves),
-        actionLabel: 'Calendar Event Saves',
-        actionSub: `${weddingSaves} downloaded .ics invitations`,
-        engRate: weddingViews > 0 ? `${Math.round((weddingSaves / weddingViews) * 100)}%` : '0%',
-        engLabel: 'Invitation Conversion',
-        engSub: `${weddingSaves} saves / ${weddingViews} views`,
-      },
-      chart: buildChart(weddingViews, statsByApp.wedding.visitors),
-      funnel: [
-        { name: '1. Page Impression', count: weddingViews, pct: 100, color: 'bg-slate-500' },
-        { name: '2. Video Started / Watched', count: weddingVideoStarted, pct: weddingViews > 0 ? Math.round((weddingVideoStarted / weddingViews) * 100) : 0, color: 'bg-blue-500' },
-        { name: '3. Video Completed', count: weddingVideoDone, pct: weddingViews > 0 ? Math.round((weddingVideoDone / weddingViews) * 100) : 0, color: 'bg-indigo-500' },
-        { name: '4. Calendar Saved (.ics)', count: weddingSaves, pct: weddingViews > 0 ? Math.round((weddingSaves / weddingViews) * 100) : 0, color: 'bg-emerald-500' },
-      ],
-      languages: [
-        { code: 'PT', name: 'Português', pct: 100, count: statsByApp.wedding.visitors, color: 'bg-amber-400' },
-      ],
-      devices: [
-        { name: 'Mobile Safari', pct: 100 },
-      ],
-      locations: formatLocations(geoByApp.wedding, statsByApp.wedding.visitors),
-      clickHeatmap: weddingHeatmap,
-    },
-    portfolio: {
-      kpi: {
-        visitors: String(statsByApp.portfolio.visitors),
-        visitorsTrend: 'Live',
-        pageviews: String(statsByApp.portfolio.totalEvents),
-        pageviewsTrend: 'Live',
-        actions: String(portfolioCv + portfolioClicks),
-        actionLabel: 'CV & Project Clicks',
-        actionSub: `${portfolioCv} CV downloads · ${portfolioClicks} project links`,
-        engRate: portfolioViews > 0 ? `${Math.round(((portfolioCv + portfolioClicks) / portfolioViews) * 100)}%` : '0%',
-        engLabel: 'Engagement Rate',
-        engSub: 'Interactions per visitor',
-      },
-      chart: buildChart(statsByApp.portfolio.totalEvents, statsByApp.portfolio.visitors),
-      funnel: [
-        { name: '1. Landing Pageview', count: portfolioViews, pct: 100, color: 'bg-slate-500' },
-        { name: '2. Project Inspected', count: portfolioClicks, pct: portfolioViews > 0 ? Math.round((portfolioClicks / portfolioViews) * 100) : 0, color: 'bg-indigo-500' },
-        { name: '3. CV Downloaded', count: portfolioCv, pct: portfolioViews > 0 ? Math.round((portfolioCv / portfolioViews) * 100) : 0, color: 'bg-emerald-500' },
-      ],
-      languages: [
-        { code: 'EN', name: 'English', pct: 100, count: statsByApp.portfolio.visitors, color: 'bg-blue-400' },
-      ],
-      devices: [
-        { name: 'Desktop / Mobile', pct: 100 },
-      ],
-      locations: formatLocations(geoByApp.portfolio, statsByApp.portfolio.visitors),
-      clickHeatmap: portfolioHeatmap,
-    },
-    demo: {
-      kpi: {
-        visitors: String(statsByApp.demo.visitors),
-        visitorsTrend: 'Live',
-        pageviews: String(statsByApp.demo.totalEvents),
-        pageviewsTrend: 'Live',
-        actions: '0',
-        actionLabel: 'API Health Probes',
-        actionSub: '0 container checks recorded',
-        engRate: '0%',
-        engLabel: 'API Availability',
-        engSub: 'No live traffic recorded',
-      },
-      chart: buildChart(0, 0),
-      languages: [{ code: 'EN', name: 'English', pct: 100, count: 0, color: 'bg-blue-400' }],
-      devices: [{ name: 'None recorded', pct: 0 }],
-      locations: formatLocations(geoByApp.demo, statsByApp.demo.visitors),
-      clickHeatmap: demoHeatmap,
-    },
+    all: hasAnyData
+      ? {
+          kpi: {
+            visitors: String(totalVisitors || allVisitors),
+            visitorsTrend: 'Live',
+            pageviews: String(totalPageviews),
+            pageviewsTrend: 'Live',
+            actions: String(totalActions),
+            actionLabel: 'Calendar Saves & Interactions',
+            actionSub: `${weddingSaves} ICS saves · ${portfolioCv + portfolioClicks} portfolio clicks`,
+            engRate:
+              totalPageviews > 0
+                ? `${Math.round((totalActions / totalPageviews) * 100)}%`
+                : '-',
+            engLabel: 'Overall Conversion Rate',
+            engSub: 'Actions per page impression',
+          },
+          chart: buildChart(todayEvents, todayVisitors),
+          funnel: [
+            { name: '1. Page Impressions', count: weddingViews + portfolioViews, pct: 100, color: 'bg-slate-500' },
+            { name: '2. Engagement / Play', count: weddingVideoStarted || weddingViews, pct: (weddingViews + portfolioViews) > 0 ? 100 : 0, color: 'bg-blue-500' },
+            { name: '3. Video Completed', count: weddingVideoDone, pct: weddingViews > 0 ? Math.round((weddingVideoDone / weddingViews) * 100) : 0, color: 'bg-indigo-500' },
+            { name: '4. Calendar / Action Saved', count: weddingSaves, pct: weddingViews > 0 ? Math.round((weddingSaves / weddingViews) * 100) : 0, color: 'bg-emerald-500' },
+          ],
+          languages:
+            allVisitors > 0
+              ? [{ code: 'PT', name: 'Português', pct: 100, count: allVisitors, color: 'bg-amber-400' }]
+              : [],
+          devices: allVisitors > 0 ? [{ name: 'Mobile (iOS Safari)', pct: 100 }] : [],
+          locations: formatLocations(allGeoMap, allVisitors),
+          clickHeatmap: allHeatmap,
+        }
+      : {
+          kpi: {
+            visitors: '-',
+            visitorsTrend: '-',
+            pageviews: '-',
+            pageviewsTrend: '-',
+            actions: '-',
+            actionLabel: 'Calendar Saves & Interactions',
+            actionSub: '-',
+            engRate: '-',
+            engLabel: 'Overall Conversion Rate',
+            engSub: '-',
+          },
+          chart: [],
+          funnel: [],
+          languages: [],
+          devices: [],
+          locations: [],
+          clickHeatmap: [],
+        },
+    wedding: hasWeddingData
+      ? {
+          kpi: {
+            visitors: String(statsByApp.wedding.visitors),
+            visitorsTrend: 'Live',
+            pageviews: String(weddingViews),
+            pageviewsTrend: 'Live',
+            actions: String(weddingSaves),
+            actionLabel: 'Calendar Event Saves',
+            actionSub: `${weddingSaves} downloaded .ics invitations`,
+            engRate: weddingViews > 0 ? `${Math.round((weddingSaves / weddingViews) * 100)}%` : '-',
+            engLabel: 'Invitation Conversion',
+            engSub: `${weddingSaves} saves / ${weddingViews} views`,
+          },
+          chart: buildChart(weddingViews, statsByApp.wedding.visitors),
+          funnel: [
+            { name: '1. Page Impression', count: weddingViews, pct: 100, color: 'bg-slate-500' },
+            { name: '2. Video Started / Watched', count: weddingVideoStarted, pct: weddingViews > 0 ? Math.round((weddingVideoStarted / weddingViews) * 100) : 0, color: 'bg-blue-500' },
+            { name: '3. Video Completed', count: weddingVideoDone, pct: weddingViews > 0 ? Math.round((weddingVideoDone / weddingViews) * 100) : 0, color: 'bg-indigo-500' },
+            { name: '4. Calendar Saved (.ics)', count: weddingSaves, pct: weddingViews > 0 ? Math.round((weddingSaves / weddingViews) * 100) : 0, color: 'bg-emerald-500' },
+          ],
+          languages:
+            statsByApp.wedding.visitors > 0
+              ? [{ code: 'PT', name: 'Português', pct: 100, count: statsByApp.wedding.visitors, color: 'bg-amber-400' }]
+              : [],
+          devices: statsByApp.wedding.visitors > 0 ? [{ name: 'Mobile Safari', pct: 100 }] : [],
+          locations: formatLocations(geoByApp.wedding, statsByApp.wedding.visitors),
+          clickHeatmap: weddingHeatmap,
+        }
+      : {
+          kpi: {
+            visitors: '-',
+            visitorsTrend: '-',
+            pageviews: '-',
+            pageviewsTrend: '-',
+            actions: '-',
+            actionLabel: 'Calendar Event Saves',
+            actionSub: '-',
+            engRate: '-',
+            engLabel: 'Invitation Conversion',
+            engSub: '-',
+          },
+          chart: [],
+          funnel: [],
+          languages: [],
+          devices: [],
+          locations: [],
+          clickHeatmap: [],
+        },
+    portfolio: hasPortfolioData
+      ? {
+          kpi: {
+            visitors: String(statsByApp.portfolio.visitors),
+            visitorsTrend: 'Live',
+            pageviews: String(statsByApp.portfolio.totalEvents),
+            pageviewsTrend: 'Live',
+            actions: String(portfolioCv + portfolioClicks),
+            actionLabel: 'CV & Project Clicks',
+            actionSub: `${portfolioCv} CV downloads · ${portfolioClicks} project links`,
+            engRate:
+              portfolioViews > 0
+                ? `${Math.round(((portfolioCv + portfolioClicks) / portfolioViews) * 100)}%`
+                : '-',
+            engLabel: 'Engagement Rate',
+            engSub: 'Interactions per visitor',
+          },
+          chart: buildChart(statsByApp.portfolio.totalEvents, statsByApp.portfolio.visitors),
+          funnel: [
+            { name: '1. Landing Pageview', count: portfolioViews, pct: 100, color: 'bg-slate-500' },
+            { name: '2. Project Inspected', count: portfolioClicks, pct: portfolioViews > 0 ? Math.round((portfolioClicks / portfolioViews) * 100) : 0, color: 'bg-indigo-500' },
+            { name: '3. CV Downloaded', count: portfolioCv, pct: portfolioViews > 0 ? Math.round((portfolioCv / portfolioViews) * 100) : 0, color: 'bg-emerald-500' },
+          ],
+          languages:
+            statsByApp.portfolio.visitors > 0
+              ? [{ code: 'EN', name: 'English', pct: 100, count: statsByApp.portfolio.visitors, color: 'bg-blue-400' }]
+              : [],
+          devices: statsByApp.portfolio.visitors > 0 ? [{ name: 'Desktop / Mobile', pct: 100 }] : [],
+          locations: formatLocations(geoByApp.portfolio, statsByApp.portfolio.visitors),
+          clickHeatmap: portfolioHeatmap,
+        }
+      : {
+          kpi: {
+            visitors: '-',
+            visitorsTrend: '-',
+            pageviews: '-',
+            pageviewsTrend: '-',
+            actions: '-',
+            actionLabel: 'CV & Project Clicks',
+            actionSub: '-',
+            engRate: '-',
+            engLabel: 'Engagement Rate',
+            engSub: '-',
+          },
+          chart: [],
+          funnel: [],
+          languages: [],
+          devices: [],
+          locations: [],
+          clickHeatmap: [],
+        },
+    demo: hasDemoData
+      ? {
+          kpi: {
+            visitors: String(statsByApp.demo.visitors),
+            visitorsTrend: 'Live',
+            pageviews: String(statsByApp.demo.totalEvents),
+            pageviewsTrend: 'Live',
+            actions: '0',
+            actionLabel: 'API Health Probes',
+            actionSub: '0 container checks recorded',
+            engRate: '0%',
+            engLabel: 'API Availability',
+            engSub: 'Live probe stream active',
+          },
+          chart: buildChart(statsByApp.demo.totalEvents, statsByApp.demo.visitors),
+          languages: [{ code: 'EN', name: 'English', pct: 100, count: statsByApp.demo.visitors, color: 'bg-blue-400' }],
+          devices: [{ name: 'Container Probes', pct: 100 }],
+          locations: formatLocations(geoByApp.demo, statsByApp.demo.visitors),
+          clickHeatmap: demoHeatmap,
+        }
+      : {
+          kpi: {
+            visitors: '-',
+            visitorsTrend: '-',
+            pageviews: '-',
+            pageviewsTrend: '-',
+            actions: '-',
+            actionLabel: 'API Health Probes',
+            actionSub: '-',
+            engRate: '-',
+            engLabel: 'API Availability',
+            engSub: '-',
+          },
+          chart: [],
+          funnel: [],
+          languages: [],
+          devices: [],
+          locations: [],
+          clickHeatmap: [],
+        },
   };
 }
 

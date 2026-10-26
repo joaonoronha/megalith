@@ -8,7 +8,7 @@ interface EventStreamTableProps {
 }
 
 export const EventStreamTable: React.FC<EventStreamTableProps> = ({
-  events,
+  events = [],
   onRefresh,
 }) => {
   const getBadgeClass = (app: string) => {
@@ -56,18 +56,26 @@ export const EventStreamTable: React.FC<EventStreamTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/50">
-            {events.map((evt) => (
-              <tr key={evt.id} className="hover:bg-slate-800/30 transition-colors">
-                <td className="py-2.5 font-mono text-xs text-slate-100 font-medium">{evt.name}</td>
-                <td className="py-2.5">
-                  <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${getBadgeClass(evt.app)}`}>
-                    {evt.app}
-                  </span>
+            {events.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="py-8 text-center text-xs text-slate-500 font-mono">
+                  No telemetry events received yet (-)
                 </td>
-                <td className="py-2.5 font-mono text-[11px] text-slate-400">{evt.meta}</td>
-                <td className="py-2.5 text-right text-[11px] text-slate-400">{evt.timestamp}</td>
               </tr>
-            ))}
+            ) : (
+              events.map((evt) => (
+                <tr key={evt.id} className="hover:bg-slate-800/30 transition-colors">
+                  <td className="py-2.5 font-mono text-xs text-slate-100 font-medium">{evt.name}</td>
+                  <td className="py-2.5">
+                    <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${getBadgeClass(evt.app)}`}>
+                      {evt.app}
+                    </span>
+                  </td>
+                  <td className="py-2.5 font-mono text-[11px] text-slate-400">{evt.meta}</td>
+                  <td className="py-2.5 text-right text-[11px] text-slate-400">{evt.timestamp}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

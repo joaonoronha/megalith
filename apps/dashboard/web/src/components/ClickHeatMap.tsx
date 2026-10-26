@@ -1,5 +1,5 @@
 import React from 'react';
-import { MousePointerClick, Flame, Sparkles } from 'lucide-react';
+import { MousePointerClick, Flame } from 'lucide-react';
 import type { ClickHeatMapItem, AppId } from '../data/metricsData';
 
 interface ClickHeatMapProps {
@@ -7,7 +7,7 @@ interface ClickHeatMapProps {
   app: AppId;
 }
 
-export const ClickHeatMap: React.FC<ClickHeatMapProps> = ({ items, app }) => {
+export const ClickHeatMap: React.FC<ClickHeatMapProps> = ({ items = [], app }) => {
   const appTitle = app === 'all' ? 'All Web Apps' : app.charAt(0).toUpperCase() + app.slice(1);
   const totalClicks = items.reduce((acc, curr) => acc + curr.clicks, 0);
 
@@ -26,22 +26,14 @@ export const ClickHeatMap: React.FC<ClickHeatMapProps> = ({ items, app }) => {
             Click density &amp; interaction frequency across UI elements
           </p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-400 self-start sm:self-auto">
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-rose-500" /> Hot
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-amber-400" /> Warm
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-blue-400" /> Cool
-          </span>
+        <div className="flex items-center gap-2 text-xs text-slate-400 self-start sm:self-auto font-mono">
+          <span>Clicks: {totalClicks > 0 ? totalClicks : '-'}</span>
         </div>
       </div>
 
       {items.length === 0 ? (
         <div className="py-8 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-1.5">
-          <Sparkles className="w-5 h-5 text-slate-600 mb-1" />
+          <span className="text-lg font-mono text-slate-600">-</span>
           <span>No click interactions recorded for this app yet.</span>
         </div>
       ) : (
@@ -98,16 +90,16 @@ export const ClickHeatMap: React.FC<ClickHeatMapProps> = ({ items, app }) => {
                 </div>
 
                 {/* Heat Intensity Progress Bar */}
-                <div className="w-full h-2 rounded-full bg-slate-800/80 overflow-hidden">
+                <div className="w-full h-1.5 rounded-full bg-slate-800/80 overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-700 ${
+                    className={`h-full rounded-full transition-all duration-500 ${
                       isHot
-                        ? 'bg-gradient-to-r from-orange-500 via-rose-500 to-red-500 shadow-sm shadow-rose-500/40'
+                        ? 'bg-gradient-to-r from-orange-500 to-rose-500'
                         : isWarm
-                        ? 'bg-gradient-to-r from-amber-500 to-yellow-400'
-                        : 'bg-gradient-to-r from-blue-600 to-cyan-400'
+                        ? 'bg-gradient-to-r from-amber-400 to-orange-500'
+                        : 'bg-gradient-to-r from-cyan-400 to-blue-500'
                     }`}
-                    style={{ width: `${Math.max(item.pct, 4)}%` }}
+                    style={{ width: `${Math.max(item.pct, 6)}%` }}
                   />
                 </div>
               </div>
@@ -117,9 +109,9 @@ export const ClickHeatMap: React.FC<ClickHeatMapProps> = ({ items, app }) => {
       )}
 
       {totalClicks > 0 && (
-        <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Total Captured Interactions:</span>
-          <span className="font-mono font-semibold text-slate-200">{totalClicks} clicks</span>
+        <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
+          <span>Interaction Coverage</span>
+          <span className="font-semibold text-emerald-400">Live PostHog capture</span>
         </div>
       )}
     </div>

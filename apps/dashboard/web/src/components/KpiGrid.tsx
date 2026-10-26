@@ -16,12 +16,18 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ kpi }) => {
             <Users className="w-3.5 h-3.5 text-blue-400" />
             Unique Visitors
           </span>
-          <span className="text-emerald-400 font-semibold text-[11px] bg-emerald-500/10 px-1.5 py-0.5 rounded">
-            {kpi.visitorsTrend}
+          <span
+            className={`font-semibold text-[11px] px-1.5 py-0.5 rounded ${
+              kpi.visitorsTrend === '-' || !kpi.visitorsTrend
+                ? 'text-slate-500 bg-slate-800/40'
+                : 'text-emerald-400 bg-emerald-500/10'
+            }`}
+          >
+            {kpi.visitorsTrend || '-'}
           </span>
         </div>
-        <div className="text-2xl md:text-3xl font-bold tracking-tight text-white" data-testid="kpi-visitors">
-          {kpi.visitors}
+        <div className="text-2xl md:text-3xl font-bold tracking-tight text-white font-mono" data-testid="kpi-visitors">
+          {kpi.visitors || '-'}
         </div>
         <p className="text-[11px] text-slate-400 mt-1">Unique client fingerprints</p>
       </div>
@@ -33,12 +39,18 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ kpi }) => {
             <Eye className="w-3.5 h-3.5 text-indigo-400" />
             Total Impressions
           </span>
-          <span className="text-emerald-400 font-semibold text-[11px] bg-emerald-500/10 px-1.5 py-0.5 rounded">
-            {kpi.pageviewsTrend}
+          <span
+            className={`font-semibold text-[11px] px-1.5 py-0.5 rounded ${
+              kpi.pageviewsTrend === '-' || !kpi.pageviewsTrend
+                ? 'text-slate-500 bg-slate-800/40'
+                : 'text-emerald-400 bg-emerald-500/10'
+            }`}
+          >
+            {kpi.pageviewsTrend || '-'}
           </span>
         </div>
-        <div className="text-2xl md:text-3xl font-bold tracking-tight text-white" data-testid="kpi-pageviews">
-          {kpi.pageviews}
+        <div className="text-2xl md:text-3xl font-bold tracking-tight text-white font-mono" data-testid="kpi-pageviews">
+          {kpi.pageviews || '-'}
         </div>
         <p className="text-[11px] text-slate-400 mt-1">Total pageviews &amp; reloads</p>
       </div>
@@ -50,14 +62,20 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ kpi }) => {
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span className="truncate">{kpi.actionLabel}</span>
           </span>
-          <span className="text-indigo-400 font-semibold text-[11px] bg-indigo-500/10 px-1.5 py-0.5 rounded shrink-0">
-            Goals
+          <span
+            className={`font-semibold text-[11px] px-1.5 py-0.5 rounded shrink-0 ${
+              kpi.actions === '-'
+                ? 'text-slate-500 bg-slate-800/40'
+                : 'text-indigo-400 bg-indigo-500/10'
+            }`}
+          >
+            {kpi.actions === '-' ? '-' : 'Goals'}
           </span>
         </div>
-        <div className="text-2xl md:text-3xl font-bold tracking-tight text-white" data-testid="kpi-actions">
-          {kpi.actions}
+        <div className="text-2xl md:text-3xl font-bold tracking-tight text-white font-mono" data-testid="kpi-actions">
+          {kpi.actions || '-'}
         </div>
-        <p className="text-[11px] text-slate-400 mt-1 truncate">{kpi.actionSub}</p>
+        <p className="text-[11px] text-slate-400 mt-1 truncate">{kpi.actionSub || '-'}</p>
       </div>
 
       {/* 4. Engagement / Completion */}
@@ -67,14 +85,20 @@ export const KpiGrid: React.FC<KpiGridProps> = ({ kpi }) => {
             <TrendingUp className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span className="truncate">{kpi.engLabel}</span>
           </span>
-          <span className="text-emerald-400 font-semibold text-[11px] bg-emerald-500/10 px-1.5 py-0.5 rounded shrink-0">
-            High
+          <span
+            className={`font-semibold text-[11px] px-1.5 py-0.5 rounded shrink-0 ${
+              kpi.engRate === '-'
+                ? 'text-slate-500 bg-slate-800/40'
+                : 'text-emerald-400 bg-emerald-500/10'
+            }`}
+          >
+            {kpi.engRate === '-' ? '-' : 'Rate'}
           </span>
         </div>
-        <div className="text-2xl md:text-3xl font-bold tracking-tight text-white" data-testid="kpi-eng-rate">
-          {kpi.engRate}
+        <div className="text-2xl md:text-3xl font-bold tracking-tight text-white font-mono" data-testid="kpi-eng-rate">
+          {kpi.engRate || '-'}
         </div>
-        <p className="text-[11px] text-slate-400 mt-1 truncate">{kpi.engSub}</p>
+        <p className="text-[11px] text-slate-400 mt-1 truncate">{kpi.engSub || '-'}</p>
       </div>
     </section>
   );

@@ -11,8 +11,7 @@ import { AudienceBreakdown } from './components/AudienceBreakdown';
 import { EventStreamTable } from './components/EventStreamTable';
 import { PostHogSettingsModal } from './components/PostHogSettingsModal';
 import {
-  METRICS_DATA,
-  INITIAL_EVENTS,
+  EMPTY_METRICS_DATA,
   type AppId,
   type AppMetricsOverview,
   type TelemetryEventItem,
@@ -30,7 +29,7 @@ export function App() {
   const [isFromEnv, setIsFromEnv] = useState<boolean>(Boolean(envCreds));
   const [currentApp, setCurrentApp] = useState<AppId>('all');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [events, setEvents] = useState<TelemetryEventItem[]>(INITIAL_EVENTS);
+  const [events, setEvents] = useState<TelemetryEventItem[]>([]);
   const [liveMetrics, setLiveMetrics] = useState<Record<AppId, AppMetricsOverview> | null>(null);
 
   // Automatically attempt live sync when credentials are available
@@ -51,8 +50,6 @@ export function App() {
           setIsLive(true);
         }
       } catch (err: unknown) {
-        // When environment credentials are provided, remain in live mode
-        // with the established telemetry baseline if read permissions are restricted.
         if (isMounted) {
           setIsLive(true);
           const msg = err instanceof Error ? err.message : String(err);
@@ -70,7 +67,7 @@ export function App() {
     if (isLive && liveMetrics) {
       return liveMetrics[currentApp] || liveMetrics.all;
     }
-    return METRICS_DATA[currentApp] || METRICS_DATA.all;
+    return EMPTY_METRICS_DATA[currentApp] || EMPTY_METRICS_DATA.all;
   }, [currentApp, isLive, liveMetrics]);
 
   const filteredEvents = useMemo(() => {
@@ -105,19 +102,22 @@ export function App() {
     setCredentials(null);
     setLiveMetrics(null);
     setIsSettingsOpen(false);
-    setEvents(INITIAL_EVENTS);
+    setEvents([]);
   };
 
-  const handleRefreshEvents = () => {
-    // Append a simulated live event if in demo feed
-    const newEvt: TelemetryEventItem = {
-      id: String(Date.now()),
-      name: currentApp === 'portfolio' ? 'portfolio_project_clicked' : 'wedding_viewed',
-      app: currentApp === 'all' ? 'wedding' : currentApp,
-      meta: 'locale: pt-PT · realtime update',
-      timestamp: 'Just now',
-    };
-    setEvents((prev) => [newEvt, ...prev.slice(0, 15)]);
+  const handleRefreshEvents = async () => {
+    if (!credentials) return;
+    try {
+      const liveData = await fetchLiveTelemetry(credentials);
+      if (liveData.events) {
+        setEvents(liveData.events);
+      }
+      if (liveData.metrics) {
+        setLiveMetrics(liveData.metrics);
+      }
+    } catch (err: unknown) {
+      console.warn('PostHog refresh note:', err);
+    }
   };
 
   return (
