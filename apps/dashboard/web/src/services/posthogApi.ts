@@ -171,8 +171,37 @@ function formatInteractionElement(event: string, _app: 'wedding' | 'portfolio' |
  */
 export function parseGeoQueryRows(
   rows: unknown[][],
-  isAll = false
+  isAll = false,
+  activeRows: unknown[][] = []
 ): Record<'wedding' | 'portfolio' | 'demo', GeoLocationSegment[]> | GeoLocationSegment[] {
+  // Build lookup map of currently active users per location
+  const activeMap: Record<string, number> = {};
+  if (isAll) {
+    for (const aRow of activeRows) {
+      const country = String(aRow[0] || '').trim();
+      const rawCity = aRow[2];
+      const city = rawCity && typeof rawCity === 'string' ? rawCity.trim() : '';
+      const rawRegion = aRow[3];
+      const region = rawRegion && typeof rawRegion === 'string' ? rawRegion.trim() : '';
+      const key = `${country}-${city}-${region}`;
+      activeMap[key] = (activeMap[key] || 0) + (Number(aRow[7]) || 0);
+    }
+  } else {
+    for (const aRow of activeRows) {
+      const rawApp = String(aRow[0] || '');
+      const targetApp =
+        rawApp === 'wedding' ? 'wedding' : rawApp === 'portfolio' ? 'portfolio' : rawApp === 'demo' ? 'demo' : null;
+      if (!targetApp) continue;
+      const country = String(aRow[1] || '').trim();
+      const rawCity = aRow[3];
+      const city = rawCity && typeof rawCity === 'string' ? rawCity.trim() : '';
+      const rawRegion = aRow[4];
+      const region = rawRegion && typeof rawRegion === 'string' ? rawRegion.trim() : '';
+      const key = `${targetApp}-${country}-${city}-${region}`;
+      activeMap[key] = (activeMap[key] || 0) + (Number(aRow[8]) || 0);
+    }
+  }
+
   if (isAll) {
     const list: GeoLocationSegment[] = [];
     for (const row of rows) {
@@ -190,6 +219,8 @@ export function parseGeoQueryRows(
       const lngVal = Number(row[6]);
       const longitude = !isNaN(lngVal) && lngVal !== 0 ? lngVal : undefined;
       const count = Number(row[7]) || 0;
+      const key = `${country}-${city}-${region || ''}`;
+      const activeCount = activeMap[key] || 0;
 
       if (count > 0) {
         list.push({
@@ -202,6 +233,7 @@ export function parseGeoQueryRows(
           longitude,
           count,
           pct: 0,
+          activeCount,
         });
       }
     }
@@ -238,6 +270,8 @@ export function parseGeoQueryRows(
     const lngVal = Number(row[7]);
     const longitude = !isNaN(lngVal) && lngVal !== 0 ? lngVal : undefined;
     const count = Number(row[8]) || 0;
+    const key = `${targetApp}-${country}-${city}-${region || ''}`;
+    const activeCount = activeMap[key] || 0;
 
     if (count > 0) {
       byApp[targetApp].push({
@@ -250,6 +284,7 @@ export function parseGeoQueryRows(
         longitude,
         count,
         pct: 0,
+        activeCount,
       });
     }
   }
@@ -274,7 +309,9 @@ export function buildLiveMetrics(
   geoRows?: unknown[][],
   geoAllRows?: unknown[][],
   appVisitorsRows?: unknown[][],
-  totalVisitorsRows?: unknown[][]
+  totalVisitorsRows?: unknown[][],
+  activeGeoRows?: unknown[][],
+  activeGeoAllRows?: unknown[][]
 ): Record<AppId, AppMetricsOverview> {
   const statsByApp: Record<'wedding' | 'portfolio' | 'demo', {
     totalEvents: number;
@@ -397,10 +434,10 @@ export function buildLiveMetrics(
   };
 
   const parsedGeoByApp = geoRows && geoRows.length > 0
-    ? (parseGeoQueryRows(geoRows, false) as Record<'wedding' | 'portfolio' | 'demo', GeoLocationSegment[]>)
+    ? (parseGeoQueryRows(geoRows, false, activeGeoRows || []) as Record<'wedding' | 'portfolio' | 'demo', GeoLocationSegment[]>)
     : null;
   const parsedGeoAll = geoAllRows && geoAllRows.length > 0
-    ? (parseGeoQueryRows(geoAllRows, true) as GeoLocationSegment[])
+    ? (parseGeoQueryRows(geoAllRows, true, activeGeoAllRows || []) as GeoLocationSegment[])
     : null;
 
   const weddingLocations = parsedGeoByApp ? parsedGeoByApp.wedding : formatLocations(geoByApp.wedding);
@@ -692,6 +729,10 @@ export async function fetchLiveTelemetry(
     `SELECT properties.app, count(), count(DISTINCT distinct_id) FROM events ${filter} GROUP BY properties.app`;
   const totalVisitorsQuery =
     `SELECT count(), count(DISTINCT distinct_id) FROM events ${filter}`;
+  const activeGeoQuery =
+    `SELECT properties.app, properties.$geoip_country_name, properties.$geoip_country_code, properties.$geoip_city_name, properties.$geoip_subdivision_1_name, properties.$geoip_postal_code, avg(properties.$geoip_latitude), avg(properties.$geoip_longitude), count(DISTINCT distinct_id) as active_count FROM events ${filter} AND timestamp >= now() - INTERVAL 5 MINUTE AND properties.$geoip_country_name IS NOT NULL AND properties.$geoip_country_name != '' GROUP BY properties.app, properties.$geoip_country_name, properties.$geoip_country_code, properties.$geoip_city_name, properties.$geoip_subdivision_1_name, properties.$geoip_postal_code HAVING argMax(event, timestamp) != '$pageleave' OR dateDiff('second', max(timestamp), now()) <= 30`;
+  const activeGeoAllQuery =
+    `SELECT properties.$geoip_country_name, properties.$geoip_country_code, properties.$geoip_city_name, properties.$geoip_subdivision_1_name, properties.$geoip_postal_code, avg(properties.$geoip_latitude), avg(properties.$geoip_longitude), count(DISTINCT distinct_id) as active_count FROM events ${filter} AND timestamp >= now() - INTERVAL 5 MINUTE AND properties.$geoip_country_name IS NOT NULL AND properties.$geoip_country_name != '' GROUP BY properties.$geoip_country_name, properties.$geoip_country_code, properties.$geoip_city_name, properties.$geoip_subdivision_1_name, properties.$geoip_postal_code HAVING argMax(event, timestamp) != '$pageleave' OR dateDiff('second', max(timestamp), now()) <= 30`;
 
   const [
     eventsRes,
@@ -701,6 +742,8 @@ export async function fetchLiveTelemetry(
     geoAllRes,
     appVisitorsRes,
     totalVisitorsRes,
+    activeGeoAppRes,
+    activeGeoAllRes,
   ] = await Promise.all([
     queryPostHogHogQL(creds, eventsQuery),
     queryPostHogHogQL(creds, aggQuery).catch(() => ({ results: [], columns: [] })),
@@ -709,6 +752,8 @@ export async function fetchLiveTelemetry(
     queryPostHogHogQL(creds, geoAllQuery).catch(() => ({ results: [], columns: [] })),
     queryPostHogHogQL(creds, appVisitorsQuery).catch(() => ({ results: [], columns: [] })),
     queryPostHogHogQL(creds, totalVisitorsQuery).catch(() => ({ results: [], columns: [] })),
+    queryPostHogHogQL(creds, activeGeoQuery).catch(() => ({ results: [], columns: [] })),
+    queryPostHogHogQL(creds, activeGeoAllQuery).catch(() => ({ results: [], columns: [] })),
   ]);
 
   const events: TelemetryEventItem[] = (eventsRes.results || []).map((row, idx) => {
@@ -734,7 +779,9 @@ export async function fetchLiveTelemetry(
           geoAppRes.results || [],
           geoAllRes.results || [],
           appVisitorsRes.results || [],
-          totalVisitorsRes.results || []
+          totalVisitorsRes.results || [],
+          activeGeoAppRes.results || [],
+          activeGeoAllRes.results || []
         )
       : undefined;
 

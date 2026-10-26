@@ -139,4 +139,24 @@ describe('posthogApi service', () => {
       pct: 14, // 1 / 7
     });
   });
+
+  it('assigns activeCount strictly to locations with users currently using the website', () => {
+    const rawGeoRows = [
+      ['wedding', 'Portugal', 'PT', 'Lisbon', 'Lisbon', '1000-001', 38.72, -9.14, 6],
+      ['wedding', 'Switzerland', 'CH', null, null, null, 47.14, 8.15, 1],
+    ];
+
+    // Only Lisbon has users active right now in the last 5 minutes
+    const activeRows = [
+      ['wedding', 'Portugal', 'PT', 'Lisbon', 'Lisbon', '1000-001', 38.72, -9.14, 2],
+    ];
+
+    const parsed = parseGeoQueryRows(rawGeoRows, false, activeRows) as Record<'wedding' | 'portfolio' | 'demo', any[]>;
+
+    // Lisbon should have activeCount = 2 (triggering the live pawn)
+    expect(parsed.wedding[0].activeCount).toBe(2);
+
+    // Switzerland should have activeCount = 0 (no pawn rendered on map)
+    expect(parsed.wedding[1].activeCount).toBe(0);
+  });
 });

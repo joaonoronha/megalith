@@ -50,6 +50,7 @@ export interface GeoLocationSegment {
   accuracyKm?: number;
   count: number;
   pct: number;
+  activeCount?: number;
 }
 
 export interface ClickHeatMapItem {

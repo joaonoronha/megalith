@@ -17,6 +17,7 @@ function getCountryFlag(countryCode: string): string {
 
 export const GeoLocationCard: React.FC<GeoLocationCardProps> = ({ locations = [] }) => {
   const totalVisitors = locations.reduce((sum, loc) => sum + loc.count, 0);
+  const totalActive = locations.reduce((sum, loc) => sum + (loc.activeCount || 0), 0);
 
   return (
     <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-5 shadow-sm space-y-4 backdrop-blur-sm flex flex-col justify-between">
@@ -38,7 +39,7 @@ export const GeoLocationCard: React.FC<GeoLocationCardProps> = ({ locations = []
         <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/60 flex items-center gap-3">
           <div className="relative w-10 h-10 rounded-full bg-indigo-950/80 border border-indigo-500/40 flex items-center justify-center shrink-0">
             <Navigation className="w-5 h-5 text-indigo-400 transform -rotate-45" />
-            {locations.length > 0 && (
+            {totalActive > 0 && (
               <>
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500" />
@@ -86,11 +87,19 @@ export const GeoLocationCard: React.FC<GeoLocationCardProps> = ({ locations = []
                         )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="font-bold text-white font-mono">{loc.pct}%</span>{' '}
-                      <span className="text-[10px] text-slate-500 font-normal">
-                        ({loc.count})
-                      </span>
+                    <div className="text-right flex items-center gap-1.5">
+                      {(loc.activeCount ?? 0) > 0 && (
+                        <span className="text-[10px] text-emerald-400 font-mono font-medium bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          {loc.activeCount} live
+                        </span>
+                      )}
+                      <div>
+                        <span className="font-bold text-white font-mono">{loc.pct}%</span>{' '}
+                        <span className="text-[10px] text-slate-500 font-normal">
+                          ({loc.count})
+                        </span>
+                      </div>
                     </div>
                   </div>
 
