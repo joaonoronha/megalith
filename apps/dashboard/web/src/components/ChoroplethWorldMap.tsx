@@ -209,43 +209,96 @@ export const ChoroplethWorldMap: React.FC<ChoroplethWorldMapProps> = ({ location
         `);
       }
 
-      // Add Glowing Pulsing Radar Marker (Pawn) ONLY IF THE USER IS CURRENTLY USING THE WEBSITE
-      if ((loc.activeCount ?? 0) > 0) {
-        const coords: [number, number] =
-          loc.latitude !== undefined && loc.longitude !== undefined
-            ? [loc.latitude, loc.longitude]
-            : CITY_COORDINATES[loc.city] ||
-              CITY_COORDINATES[`default_${code}`] ||
-              [38.72, -9.14];
+      const coords: [number, number] =
+        loc.latitude !== undefined && loc.longitude !== undefined
+          ? [loc.latitude, loc.longitude]
+          : CITY_COORDINATES[loc.city] ||
+            CITY_COORDINATES[`default_${code}`] ||
+            [38.72, -9.14];
 
-        // Custom pulsing DivIcon representing an active user pawn
+      const flag = getCountryFlag(loc.countryCode);
+      const isLiveNow = (loc.activeCount ?? 0) > 0;
+
+      // 1. Flag Marker: Defines places in the map where users have visited from
+      const flagIcon = L.divIcon({
+        className: 'visited-flag-marker',
+        html: `
+          <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); pointer-events: auto; cursor: pointer;">
+            <div style="
+              display: inline-flex;
+              align-items: center;
+              gap: 4px;
+              background: ${isLiveNow ? 'rgba(6, 78, 59, 0.95)' : 'rgba(15, 23, 42, 0.92)'};
+              backdrop-filter: blur(6px);
+              border: 1px solid ${isLiveNow ? '#34d399' : 'rgba(148, 163, 184, 0.4)'};
+              border-radius: 6px;
+              padding: 2px 6px;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+              white-space: nowrap;
+              transition: transform 0.15s ease;
+            ">
+              <span style="font-size: 14px; line-height: 1;" role="img" aria-label="${loc.country}">${flag}</span>
+              <span style="color: #f8fafc; font-size: 11px; font-weight: 600; font-family: ui-sans-serif, system-ui, sans-serif;">
+                ${loc.city || loc.country}
+              </span>
+              <span style="
+                color: ${isLiveNow ? '#a7f3d0' : '#38bdf8'};
+                font-size: 10px;
+                font-weight: 700;
+                font-family: monospace;
+                background: ${isLiveNow ? 'rgba(16, 185, 129, 0.25)' : 'rgba(56, 189, 248, 0.15)'};
+                padding: 1px 4px;
+                border-radius: 3px;
+                border: 1px solid ${isLiveNow ? 'rgba(52, 211, 153, 0.4)' : 'rgba(56, 189, 248, 0.25)'};
+              ">
+                ${loc.count}
+              </span>
+            </div>
+            <!-- Pin needle stem pointing to exact coordinate -->
+            <div style="width: 2px; height: 6px; background: ${isLiveNow ? '#34d399' : 'rgba(148, 163, 184, 0.7)'}; margin-top: -1px;"></div>
+            <div style="width: 4px; height: 4px; border-radius: 9999px; background: ${isLiveNow ? '#34d399' : '#38bdf8'}; box-shadow: 0 0 6px ${isLiveNow ? '#34d399' : '#38bdf8'};"></div>
+          </div>
+        `,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      });
+
+      const flagMarker = L.marker(coords, { icon: flagIcon, zIndexOffset: isLiveNow ? 200 : 100 }).addTo(map);
+      flagMarker.bindPopup(`
+        <div style="font-family: sans-serif; font-size: 12px; color: #f8fafc; line-height: 1.4;">
+          <div style="font-size: 14px; font-weight: bold; margin-bottom: 2px; display: flex; align-items: center; gap: 4px;">
+            <span>${flag}</span>
+            <span>${[loc.city, loc.region, loc.country].filter(Boolean).join(', ')}</span>
+          </div>
+          <div style="color: #38bdf8; font-weight: bold; font-size: 12px; margin-top: 3px;">
+            ${loc.count} recorded ${loc.count === 1 ? 'visitor' : 'visitors'} (${loc.pct}% traffic share)
+          </div>
+          ${isLiveNow ? `
+            <div style="color: #34d399; font-weight: bold; font-size: 11px; margin-top: 3px; display: flex; align-items: center; gap: 4px;">
+              🟢 Currently online: ${loc.activeCount} ${loc.activeCount === 1 ? 'user' : 'users'}
+            </div>
+          ` : ''}
+          ${loc.region || loc.postalCode ? `<div style="color: #94a3b8; font-size: 10px; margin-top: 3px;">📍 ${[loc.region, loc.postalCode ? `Postal Code ${loc.postalCode}` : ''].filter(Boolean).join(' · ')}</div>` : ''}
+        </div>
+      `);
+
+      // 2. User's Pawn: ONLY shown if a user is CURRENTLY using the website
+      if (isLiveNow) {
         const pulseIcon = L.divIcon({
           className: 'custom-pulse-pin',
           html: `
-            <div style="position: relative; width: 28px; height: 28px;">
+            <div style="position: relative; width: 28px; height: 28px; transform: translate(-50%, 6px);">
               <div style="position: absolute; inset: 0; border-radius: 9999px; background-color: #10b981; opacity: 0.85; animation: ping 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
               <div style="position: absolute; inset: 4px; border-radius: 9999px; background-color: #059669; box-shadow: 0 0 14px #34d399; border: 2px solid #ffffff; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: bold; font-family: monospace;">
                 ${loc.activeCount}
               </div>
             </div>
           `,
-          iconSize: [28, 28],
-          iconAnchor: [14, 14],
+          iconSize: [0, 0],
+          iconAnchor: [0, 0],
         });
 
-        const marker = L.marker(coords, { icon: pulseIcon }).addTo(map);
-        marker.bindPopup(`
-          <div style="font-family: sans-serif; font-size: 12px; color: #f8fafc; line-height: 1.4;">
-            <div style="font-size: 14px; font-weight: bold; margin-bottom: 2px;">
-              ${getCountryFlag(loc.countryCode)} ${[loc.city, loc.region, loc.country].filter(Boolean).join(', ')}
-            </div>
-            <div style="color: #34d399; font-weight: bold; font-size: 13px; margin-top: 4px; display: flex; align-items: center; gap: 4px;">
-              🟢 Active now · ${loc.activeCount} ${loc.activeCount === 1 ? 'user' : 'users'} online
-            </div>
-            <div style="color: #cbd5e1; font-size: 11px; margin-top: 2px;">${loc.count} total historical ${loc.count === 1 ? 'visitor' : 'visitors'} (${loc.pct}% traffic share)</div>
-            ${loc.region || loc.postalCode ? `<div style="color: #94a3b8; font-size: 10px; margin-top: 3px;">📍 ${[loc.region, loc.postalCode ? `Postal Code ${loc.postalCode}` : ''].filter(Boolean).join(' · ')}</div>` : ''}
-          </div>
-        `);
+        L.marker(coords, { icon: pulseIcon, zIndexOffset: 300 }).addTo(map);
       }
     });
 
@@ -328,17 +381,29 @@ export const ChoroplethWorldMap: React.FC<ChoroplethWorldMapProps> = ({ location
         <div ref={mapContainerRef} className="w-full h-full z-10" />
 
         {/* Floating Traffic Scale Legend */}
-        <div className="absolute bottom-4 right-4 z-[400] bg-slate-900/90 border border-slate-700/80 rounded-lg p-2.5 shadow-2xl text-xs backdrop-blur-md">
-          <div className="text-[10px] text-slate-400 font-semibold mb-1.5">Traffic Density</div>
-          <div className="flex items-center gap-1.5 text-[10px]">
-            <span className="w-3 h-3 rounded bg-indigo-900 border border-indigo-500" title="1-15%" />
-            <span className="w-3 h-3 rounded bg-blue-600 border border-blue-400" title="15-35%" />
-            <span className="w-3 h-3 rounded bg-cyan-600 border border-cyan-300" title="35-65%" />
-            <span
-              className="w-3 h-3 rounded bg-emerald-500 border border-emerald-300 shadow-sm shadow-emerald-500/50"
-              title="65-100%"
-            />
-            <span className="text-emerald-400 font-bold ml-1">Highest</span>
+        <div className="absolute bottom-4 right-4 z-[400] bg-slate-900/90 border border-slate-700/80 rounded-lg p-2.5 shadow-2xl text-xs backdrop-blur-md space-y-2">
+          <div className="flex items-center gap-3 text-[10px] pb-1.5 border-b border-slate-800">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs">🚩</span>
+              <span className="text-slate-300 font-medium">Visited Place</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="text-emerald-300 font-medium">Active Pawn</span>
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] text-slate-400 font-semibold mb-1">Country Traffic Share</div>
+            <div className="flex items-center gap-1.5 text-[10px]">
+              <span className="w-3 h-3 rounded bg-indigo-900 border border-indigo-500" title="1-15%" />
+              <span className="w-3 h-3 rounded bg-blue-600 border border-blue-400" title="15-35%" />
+              <span className="w-3 h-3 rounded bg-cyan-600 border border-cyan-300" title="35-65%" />
+              <span
+                className="w-3 h-3 rounded bg-emerald-500 border border-emerald-300 shadow-sm shadow-emerald-500/50"
+                title="65-100%"
+              />
+              <span className="text-emerald-400 font-bold ml-1">Highest</span>
+            </div>
           </div>
         </div>
       </div>
