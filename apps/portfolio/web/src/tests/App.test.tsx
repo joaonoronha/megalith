@@ -9,10 +9,16 @@ describe("App Component", () => {
     expect(screen.getByText(/Engineering leader building/i)).toBeInTheDocument();
   });
 
-  it("renders key stats including 9 direct reports", () => {
+  it("renders key stats including ~15 remote team members led", () => {
     render(<App />);
-    expect(screen.getByText("9")).toBeInTheDocument();
-    expect(screen.getByText("Direct reports")).toBeInTheDocument();
+    expect(screen.getByText("~15")).toBeInTheDocument();
+    expect(screen.getByText("Remote team members led")).toBeInTheDocument();
+  });
+
+  it("renders managerial way of working in About section", () => {
+    render(<App />);
+    expect(screen.getByText(/Leading remote teams across global time zones/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Spec-first development/i).length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders experience timeline with Dialpad, Hugo Boss, and AT&T", () => {

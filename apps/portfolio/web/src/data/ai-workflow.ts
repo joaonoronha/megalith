@@ -22,175 +22,196 @@ export interface AiWorkflowData {
 }
 
 export const aiWorkflowData: AiWorkflowData = {
-  title: "How I Build Software with AI",
+  title: "How We Work and Build with AI",
   subtitle:
-    "A specification-driven engineering methodology combining rigorous product clarity with agentic code generation and uncompromising human verification.",
+    "A spec-first approach for remote teams: clear technical contracts, practical AI assistance, local verification, and early deadlock resolution.",
   featureWorkflow: [
     {
       num: "01",
-      title: "Understand the Product",
-      iconName: "Lightbulb",
-      summary: "Every feature starts with deep problem clarity, not code.",
+      title: "Spec-first development",
+      iconName: "FileText",
+      summary: "Write architecture specs and review them in pull requests before writing code.",
       body: [
-        "Every feature starts with understanding the real user problem.",
-        "I partner closely with Product and Design to deconstruct requirements, identify edge cases early, and define success metrics.",
-        "Only once the core problem and customer expectations are crystal clear do I begin thinking about implementation.",
+        "Before writing code, engineers write an architecture spec and review it in a pull request.",
+        "Getting agreement on system constraints upfront cuts down on meetings and gives teammates in other time zones the context they need to work independently.",
+        "This prevents costly rewrites late in a release cycle and makes system design explicit.",
+      ],
+      bullets: [
+        "Architecture specs reviewed in pull requests before implementation",
+        "Early agreement on data models, system boundaries, and constraints",
+        "Fewer sync meetings and greater autonomy across time zones",
       ],
     },
     {
       num: "02",
-      title: "Challenge the Requirements",
-      iconName: "MessageSquare",
-      summary: "Use LLMs to aggressively interrogate assumptions before building.",
+      title: "AI-assisted scaffolding and planning",
+      iconName: "Terminal",
+      summary: "Scaffold boilerplate code and break down implementation steps.",
       body: [
-        "Once a PRD or technical proposal is drafted, I feed it into an LLM.",
-        "The objective is not code generation—it is challenging assumptions.",
-        "I direct the AI to expose ambiguities, surface unhandled edge cases, question architectural trade-offs, and stress-test the model before a single line of code is written.",
+        "Once a spec is settled, we use AI tools to scaffold boilerplate code and break down implementation steps.",
+        "I review the plan with the engineer to confirm it matches our platform patterns and design system.",
+        "AI handles mechanical boilerplate, while engineers stay focused on system architecture and product logic.",
+      ],
+      bullets: [
+        "Scaffolding component boilerplate and type definitions with AI tools",
+        "Breaking large features into modular, reviewable pull requests",
+        "Reviewing implementation plans before code generation",
       ],
     },
     {
       num: "03",
-      title: "Build the Implementation Prompt",
-      iconName: "FileText",
-      summary: "Crafting unambiguous, specification-driven contracts for coding agents.",
+      title: "Breaking discussion deadlocks",
+      iconName: "GitBranch",
+      summary: "Direct investigation, quick prototypes, and practical testing.",
       body: [
-        "After stress-testing requirements, I synthesize a comprehensive implementation brief.",
-        "This specification contains everything necessary for deterministic, high-quality agentic implementation:",
+        "When async discussions drag on, I step in to investigate the issue directly or use AI tools to build quick prototypes and evaluate trade-offs with domain experts in Confluence.",
+        "If a thread stops making progress, we pick a direction, ship an initial version, and adjust based on real results.",
       ],
       bullets: [
-        "Product objectives & acceptance criteria",
-        "Target architecture & module boundaries",
-        "Technical constraints & backwards-compatibility requirements",
-        "Specific coding conventions, lint rules, and test mandates",
-        "Rollout considerations & failure modes",
+        "Investigating directly when discussions stall in tickets or comment threads",
+        "Building quick prototypes to test assumptions in hours instead of days",
+        "Evaluating trade-offs with domain experts in Confluence",
+        "Picking a clear direction, shipping an initial version, and adjusting from real usage",
       ],
-      tail: "The fidelity of the implementation is a direct reflection of the clarity of the specification.",
     },
     {
       num: "04",
-      title: "Agentic Implementation",
-      iconName: "Terminal",
-      summary: "Autonomous execution within isolated worktrees guided by strict plans.",
+      title: "Local build verification and QA walkthroughs",
+      iconName: "CheckCircle2",
+      summary: "Verify builds locally and record walkthroughs for QA.",
       body: [
-        "I leverage agentic workflows to execute implementation.",
-        "Rather than impulsively generating code, the agent follows a disciplined sequence:",
+        "I verify builds locally to check real-world behavior, edge cases, and performance before merging.",
+        "To make handoffs smooth across time zones, engineers record short video walkthroughs showing the flow, test coverage, and key paths for QA.",
       ],
       bullets: [
-        "Scans the codebase to understand established patterns",
-        "Maps dependencies and surrounding architecture",
-        "Raises clarifying questions and flags unknowns",
-        "Produces a step-by-step implementation plan for review",
+        "Local build execution and automated test verification",
+        "Recorded video walkthroughs for QA teammates in other time zones",
+        "Clear validation checklists that speed up test sign-off",
       ],
-      tail:
-        "Only once the plan is verified does code generation proceed. All development takes place inside isolated Git worktrees, allowing multiple parallel tracks with zero workspace pollution.",
     },
     {
       num: "05",
-      title: "Meticulous Human Review",
+      title: "Managing review queues",
       iconName: "Eye",
-      summary: "Treating AI-generated code with the same scrutiny as human PRs.",
-      body: ["Every generated change is reviewed manually. I scrutinize:"],
-      bullets: [
-        "Logical correctness and boundary conditions",
-        "Long-term maintainability and readability",
-        "Architectural consistency with monorepo patterns",
-        "Runtime performance and memory profiles",
-        "True product behaviour against specifications",
+      summary: "Simplified checklists, prompt reciprocal reviews, and cross-project reviews.",
+      body: [
+        "Generating code faster with AI quickly overwhelmed our review queue.",
+        "We simplified our review checklist to focus on maintainability, readability, and consistency with existing patterns.",
+        "We set an expectation that engineers review incoming PRs promptly if they want their own reviewed quickly, and I ask engineers to review code across project boundaries to help clear backlogs.",
       ],
-      tail:
-        "Because coding agents adhere strictly to repository rules and design systems, reviews focus on design judgment rather than surface-level formatting.",
+      bullets: [
+        "Simplified review checklist prioritizing maintainability over formatting nitpicks",
+        "Reciprocal review expectations: review incoming PRs promptly to keep work moving",
+        "Cross-project review allocation to clear queue backlogs and prevent knowledge silos",
+      ],
     },
     {
       num: "06",
-      title: "Hands-on Verification & Tests",
-      iconName: "CheckCircle2",
-      summary: "Automated test suites paired with rigorous local manual verification.",
-      body: ["Before proposing or merging any pull request, I:"],
-      bullets: [
-        "Execute automated test suites and verify clean exits",
-        "Run the feature locally to validate end-to-end user flows",
-        "Probe real-world failure modes and latency limits",
-        "Confirm zero regressions against existing contracts",
+      title: "Public ship summaries",
+      iconName: "Sparkles",
+      summary: "Keep distributed teams aligned with transparent release updates.",
+      body: [
+        "When changes ship, we post brief summaries in public channels so Product, Design, QA, and adjacent engineering teams know what went out.",
+        "This keeps everyone informed across our bi-weekly release schedule without requiring extra sync meetings.",
       ],
-      tail: "Only after passing full verification is work handed to QA and scheduled for release.",
+      bullets: [
+        "Clear release notes with visual demos and links to documentation",
+        "Instant visibility for Product, Support, and adjacent engineering teams",
+        "Consistent communication across our customer-facing products",
+      ],
     },
     {
       num: "07",
-      title: "Continuous Process Codification",
+      title: "Dedicated maintenance and quick pivots",
       iconName: "Layers",
-      summary: "Turning repeated patterns into durable skills and guidelines.",
+      summary: "Reserve sprint capacity for maintenance and handle priority shifts smoothly.",
       body: [
-        "As we deliver features, I continuously identify recurring friction and patterns.",
-        "Whenever a repeated debugging pattern or scaffolding routine emerges, I codify it into reusable agentic skills, rules, or tooling scripts.",
-        "This compound learning permanently accelerates subsequent iterations across the entire squad.",
+        "I always reserve sprint capacity for KTLO (keep-the-lights-on) work so maintenance and live escalations don't derail planned deliverables.",
+        "At the same time, I am used to fast-paced environments where priorities can shift from one week to the next.",
+        "When we need to pivot mid-cycle, we discuss the trade-offs with stakeholders right away and realign team scope to the new direction.",
+      ],
+      bullets: [
+        "Protected sprint capacity prevents maintenance from delaying roadmap deliverables",
+        "Readiness to handle mid-cycle priority adjustments without confusion",
+        "Immediate trade-off discussions with stakeholders when project scope changes",
       ],
     },
   ],
   debugWorkflow: [
     {
       num: "01",
-      title: "Triage & Blast Radius",
+      title: "Direct investigation and triage",
       iconName: "Search",
-      summary: "Narrowing the problem space before touching any code.",
+      summary: "Isolate root causes before writing code.",
       body: [
-        "Before writing a single fix, I locate the exact failure boundary.",
-        "This involves collecting telemetry, analyzing customer session logs, reproducing the issue in an isolated test, and scoping the blast radius.",
+        "Before touching code, we isolate the failure boundary using telemetry, customer logs, and reproducible tests in isolated environments.",
+        "I step in directly whenever an engineer is stuck on a hard operational issue.",
       ],
     },
     {
       num: "02",
-      title: "Systematic Root-Cause Analysis",
+      title: "Quick prototypes and trade-offs",
       iconName: "GitBranch",
-      summary: "Disciplined hypothesis testing rather than guesswork.",
+      summary: "Test hypotheses with domain experts.",
       body: [
-        "Once reproducible, I provide a concise synopsis to the diagnostic agent.",
-        "The agent executes a systematic root-cause sequence: inspecting stack traces, validating state transitions, and formulating testable hypotheses.",
+        "We formulate testable hypotheses and use AI tools to quickly generate minimal reproducers and patch prototypes.",
+        "We evaluate architectural trade-offs in Confluence with domain specialists before settling on a permanent fix.",
       ],
     },
     {
       num: "03",
-      title: "Targeted Implementation",
+      title: "Targeted fix and regression tests",
       iconName: "Wrench",
-      summary: "Minimal blast radius patch adhering to project invariants.",
+      summary: "Minimal patch paired with automated test coverage.",
       body: [
-        "The agent implements the targeted fix alongside a regression test that fails before the patch and passes after it.",
+        "We implement the targeted fix alongside a regression test that fails before the patch and cleanly passes afterward.",
       ],
     },
     {
       num: "04",
-      title: "Verification & Release",
+      title: "Verification and release",
       iconName: "SquareCheck",
-      summary: "Regression confirmation and safe rollout.",
+      summary: "Local build verification, recorded walkthrough, and release inclusion.",
       body: [
-        "Every fix is reviewed manually and verified against staging environments prior to production inclusion in our bi-weekly release cadence.",
+        "The fix is verified locally, accompanied by a quick walkthrough video, reviewed promptly via cross-project PR, and rolled out safely in our bi-weekly release schedule.",
       ],
     },
   ],
   principles: [
     {
-      title: "AI accelerates execution, not thinking",
+      title: "Asynchronous teams need written clarity and obvious priorities",
       body:
-        "Code generation is no longer the bottleneck. True problem formulation, architectural design, and empathy for the user are where value is created.",
+        "Working across wide time zones (North America, Europe, Asia-Pacific) taught me that remote teams only stay aligned when technical plans are written down clearly and team priorities are obvious.",
     },
     {
-      title: "Better prompts come from better specifications",
+      title: "Spec-first development reduces meetings",
       body:
-        "The quality and elegance of generated software is a direct function of the intellectual rigor and clarity in the engineering specification behind it.",
+        "Reviewing architecture specs in pull requests before coding cuts down on sync meetings and gives teammates across time zones the context to work independently.",
     },
     {
-      title: "Code review is non-negotiable",
+      title: "Prototypes resolve discussions faster than comments",
       body:
-        "Every change is inspected as though written by an external engineer. AI-generated code must earn trust through rigorous verification—never assume it.",
+        "When discussions drag on, building a quick prototype and testing real trade-offs beats circular debates. Pick a direction, ship an initial version, and adjust from real results.",
     },
     {
-      title: "Codified workflows compound indefinitely",
+      title: "Review speed must match generation speed",
       body:
-        "One-off prompts provide ephemeral wins. Reusable skills, lint rules, and codified architecture guidelines compound velocity across the entire organization.",
+        "Generating code faster with AI can quickly overwhelm review queues. Simplified checklists, reciprocal reviews, and cross-project support keep pull requests moving.",
     },
     {
-      title: "Engineering judgment remains human",
+      title: "Proactive planning preserves product continuity",
       body:
-        "Trade-offs, failure resilience, people leadership, and system aesthetics remain human responsibilities. AI enables engineering leaders to operate at 10x leverage.",
+        "Partnering closely with product managers on quarterly planning sheets (LOE, target dates, design dependencies, 30/60/90-day Gantt charts) keeps execution stable through team changes.",
+    },
+    {
+      title: "Reserve maintenance capacity to protect commitments",
+      body:
+        "Reserving sprint capacity for maintenance and live escalations keeps roadmap work predictable, while giving the team room to handle mid-cycle pivots.",
+    },
+    {
+      title: "Stay close to the code and support the team",
+      body:
+        "I stay close to the code by pair programming and reviewing complex changes. In 1:1s, we walk through trade-offs together so engineers make the technical call.",
     },
   ],
 };

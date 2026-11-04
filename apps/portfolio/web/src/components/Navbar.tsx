@@ -42,10 +42,10 @@ export function Navbar({ onSelectAiMode, isAiView }: NavbarProps) {
             }`}
           >
             <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-            <span>How I Build with AI</span>
+            <span>Building with AI</span>
           </button>
           <a href="#toolbox" className="hover:text-slate-900 transition-colors">
-            Toolbox
+            Skills
           </a>
           <a href="#contact" className="hover:text-slate-900 transition-colors">
             Contact
@@ -110,14 +110,14 @@ export function Navbar({ onSelectAiMode, isAiView }: NavbarProps) {
             className="flex items-center gap-2 text-blue-600 font-semibold py-1 w-full text-left"
           >
             <Sparkles className="w-4 h-4" />
-            <span>How I Build with AI</span>
+            <span>Building with AI</span>
           </button>
           <a
             href="#toolbox"
             onClick={() => setMobileMenuOpen(false)}
             className="block text-slate-700 hover:text-slate-900 py-1 font-medium"
           >
-            Toolbox
+            Skills
           </a>
           <a
             href="#contact"

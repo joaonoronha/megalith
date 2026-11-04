@@ -10,19 +10,15 @@ export function ContactSection() {
     <section id="contact" className="border-t border-slate-200/90 bg-slate-50/70 py-24 md:py-36 text-center">
       <div className="mx-auto max-w-4xl px-6 space-y-8">
         <div className="text-xs uppercase tracking-[0.25em] text-blue-600 font-bold">
-          05 — Say hello
+          05 / Contact
         </div>
 
-        <h2 className="font-serif text-5xl sm:text-6xl md:text-7xl leading-[1.05] text-slate-900 text-balance font-normal">
-          Let's build something{" "}
-          <em className="text-blue-600 italic font-medium">
-            worth shipping.
-          </em>
+        <h2 className="font-serif text-4xl sm:text-5xl md:text-6xl leading-[1.05] text-slate-900 text-balance font-normal">
+          Get in touch.
         </h2>
 
         <p className="text-slate-600 text-lg md:text-xl font-light max-w-xl mx-auto leading-relaxed text-pretty">
-          Always open to conversations about engineering leadership, agentic AI architecture, high-velocity squads, and
-          building product-first cultures.
+          Open to conversations about engineering leadership, agentic AI, and building remote teams.
         </p>
 
         {/* Primary Contact Buttons */}
@@ -49,7 +45,7 @@ export function ContactSection() {
             className="px-6 py-3.5 rounded-full border border-slate-200 hover:border-slate-300 bg-white text-slate-700 text-sm font-medium transition shadow-xs flex items-center gap-2 no-print"
           >
             <Printer className="w-4 h-4 text-slate-500" />
-            <span>Print Executive Résumé</span>
+            <span>Print résumé</span>
           </button>
         </div>
 

@@ -102,7 +102,7 @@ export function HowIBuildWithAi({ onBack, isStandalone = false }: HowIBuildWithA
               : "text-slate-700 hover:text-slate-900"
           }`}
         >
-          Feature Delivery Sequence (7 Stages)
+          Feature delivery sequence (7 stages)
         </button>
         <button
           type="button"
@@ -113,7 +113,7 @@ export function HowIBuildWithAi({ onBack, isStandalone = false }: HowIBuildWithA
               : "text-slate-700 hover:text-slate-900"
           }`}
         >
-          Systematic Diagnostics &amp; Bug Fixing
+          Systematic diagnostics and bug fixing
         </button>
       </div>
 
@@ -178,10 +178,10 @@ export function HowIBuildWithAi({ onBack, isStandalone = false }: HowIBuildWithA
             Philosophy
           </div>
           <h3 className="font-serif text-3xl md:text-4xl text-slate-900 font-normal">
-            Guiding Principles for AI-Native Engineering
+            Guiding principles for engineering with AI
           </h3>
           <p className="mt-2 text-slate-500 text-sm font-light">
-            How we maintain architectural integrity, human ownership, and long-term maintainability.
+            Maintaining architectural integrity, engineering ownership, and maintainability.
           </p>
         </div>
 
@@ -205,11 +205,10 @@ export function HowIBuildWithAi({ onBack, isStandalone = false }: HowIBuildWithA
           <div className="p-6 rounded-2xl border border-blue-200 bg-blue-50/70 space-y-3 sm:col-span-2 lg:col-span-1 card-print">
             <div className="flex items-center gap-2 text-blue-800 font-bold text-sm">
               <ShieldAlert className="w-4 h-4 text-blue-700" />
-              <span>The Cardinal Invariant</span>
+              <span>Core principle</span>
             </div>
             <p className="text-sm text-slate-800 leading-relaxed font-normal">
-              Never let an agent guess what a human engineer should have specified. High velocity is a byproduct of high
-              clarity, not rapid prompt iteration.
+              Do not let an agent guess what a spec should make explicit. Clear specifications prevent wasted review cycles.
             </p>
           </div>
         </div>

@@ -10,7 +10,7 @@ export function Footer() {
           <span>© {currentYear} {profile.name}. All rights reserved.</span>
         </div>
         <div className="font-serif italic text-slate-700 text-sm">
-          Lisbon → the world.
+          Based in Lisbon, Portugal.
         </div>
       </div>
     </footer>

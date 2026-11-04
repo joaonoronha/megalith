@@ -7,7 +7,7 @@ export function Toolbox() {
         <div className="grid md:grid-cols-12 gap-10 mb-14">
           <div className="md:col-span-4">
             <div className="text-xs uppercase tracking-[0.25em] text-blue-600 font-bold mb-4">
-              03 — Toolbox
+              03 / Skills and tools
             </div>
             <h2 className="font-serif text-4xl md:text-5xl leading-tight text-slate-900">
               What I reach for.
