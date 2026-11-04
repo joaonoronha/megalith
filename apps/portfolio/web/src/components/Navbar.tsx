@@ -43,8 +43,8 @@ export function Navbar({ onSelectAiMode, isAiView }: NavbarProps) {
                 : "bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/80"
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-            <span>Building with AI</span>
+            <Sparkles className={`w-3.5 h-3.5 transition-colors ${isAiView ? "text-white" : "text-blue-600"}`} />
+            <span>How I build with AI</span>
           </button>
           <a href="#toolbox" className="hover:text-slate-900 transition-colors">
             Skills
@@ -110,10 +110,12 @@ export function Navbar({ onSelectAiMode, isAiView }: NavbarProps) {
               onSelectAiMode();
               setMobileMenuOpen(false);
             }}
-            className="flex items-center gap-2 text-blue-600 font-semibold py-1 w-full text-left"
+            className={`flex items-center gap-2 py-2 px-3 rounded-xl font-semibold w-full text-left transition ${
+              isAiView ? "bg-blue-600 text-white" : "text-blue-600 hover:bg-blue-50"
+            }`}
           >
-            <Sparkles className="w-4 h-4" />
-            <span>Building with AI</span>
+            <Sparkles className={`w-4 h-4 ${isAiView ? "text-white" : "text-blue-600"}`} />
+            <span>How I build with AI</span>
           </button>
           <a
             href="#toolbox"

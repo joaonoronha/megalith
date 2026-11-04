@@ -17,14 +17,15 @@ export interface AiWorkflowData {
   title: string;
   subtitle: string;
   featureWorkflow: WorkflowStepItem[];
+  dailyCadence: WorkflowStepItem[];
   debugWorkflow: WorkflowStepItem[];
   principles: PrincipleItem[];
 }
 
 export const aiWorkflowData: AiWorkflowData = {
-  title: "How We Work and Build with AI",
+  title: "How I Work and Build with AI",
   subtitle:
-    "A spec-first approach for remote teams: clear technical contracts, practical AI assistance, local verification, and early deadlock resolution.",
+    "A daily operating model for distributed engineering: grounding agentic velocity in written clarity, hands-on technical leadership, spec-first pull requests, and asynchronous trust across global time zones.",
   featureWorkflow: [
     {
       num: "01",
@@ -32,30 +33,30 @@ export const aiWorkflowData: AiWorkflowData = {
       iconName: "FileText",
       summary: "Write architecture specs and review them in pull requests before writing code.",
       body: [
-        "Before writing code, engineers write an architecture spec and review it in a pull request.",
-        "Getting agreement on system constraints upfront cuts down on meetings and gives teammates in other time zones the context they need to work independently.",
-        "This prevents costly rewrites late in a release cycle and makes system design explicit.",
+        "Before writing code, engineers author an architecture spec and review it in a pull request.",
+        "Getting agreement on system constraints upfront cuts down on meetings and gives teammates across North America, Europe, and Asia-Pacific the context they need to execute autonomously.",
+        "This prevents costly rewrites late in a release cycle and makes system design explicit from day one.",
       ],
       bullets: [
-        "Architecture specs reviewed in pull requests before implementation",
-        "Early agreement on data models, system boundaries, and constraints",
-        "Fewer sync meetings and greater autonomy across time zones",
+        "Architecture specs reviewed in pull requests before code is generated",
+        "Early agreement on data models, system boundaries, and operational constraints",
+        "Fewer sync meetings and greater autonomy across global time zones",
       ],
     },
     {
       num: "02",
-      title: "AI-assisted scaffolding and planning",
+      title: "AI-assisted scaffolding and implementation",
       iconName: "Terminal",
       summary: "Scaffold boilerplate code and break down implementation steps.",
       body: [
-        "Once a spec is settled, we use AI tools to scaffold boilerplate code and break down implementation steps.",
-        "I review the plan with the engineer to confirm it matches our platform patterns and design system.",
-        "AI handles mechanical boilerplate, while engineers stay focused on system architecture and product logic.",
+        "Once a spec is approved, we pair with AI tools to scaffold boilerplate code, generate type definitions, and break down implementation steps.",
+        "I review the technical plan with the engineer to confirm it matches our platform patterns and design system.",
+        "AI handles mechanical boilerplate, while engineers stay focused on system architecture, business logic, and edge cases.",
       ],
       bullets: [
         "Scaffolding component boilerplate and type definitions with AI tools",
         "Breaking large features into modular, reviewable pull requests",
-        "Reviewing implementation plans before code generation",
+        "Reviewing implementation plans before autonomous code generation",
       ],
     },
     {
@@ -80,7 +81,7 @@ export const aiWorkflowData: AiWorkflowData = {
       iconName: "CheckCircle2",
       summary: "Verify builds locally and record walkthroughs for QA.",
       body: [
-        "I verify builds locally to check real-world behavior, edge cases, and performance before merging.",
+        "We verify builds locally to check real-world behavior, edge cases, accessibility, and performance before merging.",
         "To make handoffs smooth across time zones, engineers record short video walkthroughs showing the flow, test coverage, and key paths for QA.",
       ],
       bullets: [
@@ -134,6 +135,72 @@ export const aiWorkflowData: AiWorkflowData = {
         "Protected sprint capacity prevents maintenance from delaying roadmap deliverables",
         "Readiness to handle mid-cycle priority adjustments without confusion",
         "Immediate trade-off discussions with stakeholders when project scope changes",
+      ],
+    },
+  ],
+  dailyCadence: [
+    {
+      num: "01",
+      title: "Async morning triage across global time zones",
+      iconName: "Clock",
+      summary: "Review overnight updates, unblock pull requests, and maintain high momentum.",
+      body: [
+        "Managing teams across North America, Europe, and Asia-Pacific starts with an asynchronous morning scan.",
+        "I review overnight pull request queues, ticket escalations, and CI test results so engineers wake up to unblocked reviews, actionable feedback, and zero waiting time.",
+        "This asynchronous rhythm gives distributed teammates full autonomy without requiring sync standups.",
+      ],
+      bullets: [
+        "Morning queue triage unblocking PRs and reviews before time-zone overlaps",
+        "Async written updates replace blocking sync standup meetings",
+        "Continuous delivery momentum across a 24-hour global cycle",
+      ],
+    },
+    {
+      num: "02",
+      title: "Product partnership and 30/60/90-day Gantt continuity",
+      iconName: "CalendarDays",
+      summary: "Co-own roadmaps with PMs, balance dependencies, and maintain execution stability.",
+      body: [
+        "Navigating periods of PM turnover made proactive product planning a central part of my engineering leadership.",
+        "I partner closely with product managers each quarter on detailed planning sheets outlining level of effort (LOE), target date ranges, and design dependencies, alongside a 30/60/90-day Gantt chart.",
+        "I also maintain a comprehensive PM onboarding guide so incoming product managers understand team velocity, technical constraints, and ongoing deliverables immediately.",
+      ],
+      bullets: [
+        "Quarterly 30/60/90-day Gantt sheets and realistic LOE estimations",
+        "Managing design and architecture dependencies upfront",
+        "Structured onboarding guides for incoming PMs to preserve team momentum",
+      ],
+    },
+    {
+      num: "03",
+      title: "Hands-on technical proximity and pair programming",
+      iconName: "Code2",
+      summary: "Stay close to the code, pair on hard problems, and review complex architecture.",
+      body: [
+        "I believe effective engineering managers must remain technically credible and close to the codebase.",
+        "I regularly pair program with engineers, review complex architecture pull requests, and dive in directly when someone encounters a difficult bug or tricky production escalation.",
+        "This proximity builds mutual trust and allows me to guide system decisions based on real code constraints rather than abstract theory.",
+      ],
+      bullets: [
+        "Regular pair programming sessions on complex features and refactors",
+        "Diving into difficult operational escalations alongside the team",
+        "Guiding architecture with hands-on system understanding",
+      ],
+    },
+    {
+      num: "04",
+      title: "Psychologically safe 1:1s and collaborative coaching",
+      iconName: "MessageSquareHeart",
+      summary: "Open, candid conversations where engineers own technical solutions.",
+      body: [
+        "In 1:1s, I keep discussions direct, open, and respectful. Engineers know they can bring up any question, concern, or friction without hesitation.",
+        "When an engineer seeks guidance, we walk through scenarios, constraints, and trade-offs together so they develop the insight to make the architectural call themselves.",
+        "I provide consistent, predictable performance feedback so people always know where they stand and can seize growth opportunities early.",
+      ],
+      bullets: [
+        "High psychological safety where questions and ideas are welcomed openly",
+        "Guiding engineers through trade-offs so they own technical decisions",
+        "Consistent performance feedback and clear pathways for career growth",
       ],
     },
   ],
