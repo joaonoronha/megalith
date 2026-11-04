@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { initAnalytics } from "@megalith/analytics";
+import { initAnalytics } from "@/utils/analytics";
 import { App } from "./App";
 import "./styles/index.css";
 
