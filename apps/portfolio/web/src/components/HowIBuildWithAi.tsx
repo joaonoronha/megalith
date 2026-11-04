@@ -14,6 +14,12 @@ import {
   Sparkles,
   ArrowLeft,
   ShieldAlert,
+  Clock,
+  CalendarDays,
+  Code2,
+  MessageSquareHeart,
+  Workflow,
+  Users2,
 } from "lucide-react";
 import { aiWorkflowData } from "@/data/ai-workflow";
 
@@ -22,8 +28,10 @@ interface HowIBuildWithAiProps {
   isStandalone?: boolean;
 }
 
+type TabType = "daily-rhythm" | "management" | "debug";
+
 export function HowIBuildWithAi({ onBack, isStandalone = false }: HowIBuildWithAiProps) {
-  const [activeTab, setActiveTab] = useState<"feature" | "debug">("feature");
+  const [activeTab, setActiveTab] = useState<TabType>("daily-rhythm");
 
   const getStepIcon = (iconName: string) => {
     switch (iconName) {
@@ -49,13 +57,25 @@ export function HowIBuildWithAi({ onBack, isStandalone = false }: HowIBuildWithA
         return <Wrench className="w-5 h-5 text-blue-600" />;
       case "SquareCheck":
         return <SquareCheck className="w-5 h-5 text-blue-600" />;
+      case "Clock":
+        return <Clock className="w-5 h-5 text-blue-600" />;
+      case "CalendarDays":
+        return <CalendarDays className="w-5 h-5 text-blue-600" />;
+      case "Code2":
+        return <Code2 className="w-5 h-5 text-blue-600" />;
+      case "MessageSquareHeart":
+        return <MessageSquareHeart className="w-5 h-5 text-blue-600" />;
       default:
         return <Sparkles className="w-5 h-5 text-blue-600" />;
     }
   };
 
   const currentWorkflow =
-    activeTab === "feature" ? aiWorkflowData.featureWorkflow : aiWorkflowData.debugWorkflow;
+    activeTab === "daily-rhythm"
+      ? aiWorkflowData.featureWorkflow
+      : activeTab === "management"
+      ? aiWorkflowData.dailyCadence
+      : aiWorkflowData.debugWorkflow;
 
   return (
     <div id="ai-workflow" className="mx-auto max-w-6xl px-6 py-16 md:py-24">
@@ -77,12 +97,12 @@ export function HowIBuildWithAi({ onBack, isStandalone = false }: HowIBuildWithA
       <div className="max-w-3xl mb-14">
         <div className="flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-blue-600 font-bold mb-4">
           <Sparkles className="w-4 h-4 text-blue-600" />
-          <span>Engineering Methodology</span>
+          <span>Daily operating system &middot; Agentic engineering</span>
         </div>
         <h2 className="font-serif text-4xl sm:text-5xl md:text-6xl leading-[1.05] tracking-tight text-slate-900 text-balance font-normal">
-          How I build software with{" "}
+          How I lead, build, and ship{" "}
           <span className="italic text-blue-600 font-medium">
-            AI agents
+            every day
           </span>
           .
         </h2>
@@ -92,28 +112,42 @@ export function HowIBuildWithAi({ onBack, isStandalone = false }: HowIBuildWithA
       </div>
 
       {/* Workflow Tabs Switcher */}
-      <div className="flex flex-wrap items-center gap-3 p-1.5 rounded-2xl bg-slate-100 border border-slate-200 w-fit mb-12 shadow-2xs no-print">
+      <div className="flex flex-wrap items-center gap-2.5 p-1.5 rounded-2xl bg-slate-100 border border-slate-200 w-fit mb-12 shadow-2xs no-print">
         <button
           type="button"
-          onClick={() => setActiveTab("feature")}
-          className={`px-5 py-2.5 rounded-xl text-sm font-medium transition ${
-            activeTab === "feature"
+          onClick={() => setActiveTab("daily-rhythm")}
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-2 ${
+            activeTab === "daily-rhythm"
               ? "bg-blue-600 text-white font-bold shadow-xs"
-              : "text-slate-700 hover:text-slate-900"
+              : "text-slate-700 hover:text-slate-900 bg-transparent"
           }`}
         >
-          Feature delivery sequence (7 stages)
+          <Workflow className={`w-4 h-4 ${activeTab === "daily-rhythm" ? "text-white" : "text-blue-600"}`} />
+          <span>Daily engineering rhythm (7 stages)</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("management")}
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-2 ${
+            activeTab === "management"
+              ? "bg-blue-600 text-white font-bold shadow-xs"
+              : "text-slate-700 hover:text-slate-900 bg-transparent"
+          }`}
+        >
+          <Users2 className={`w-4 h-4 ${activeTab === "management" ? "text-white" : "text-blue-600"}`} />
+          <span>Management &amp; team rhythm (4 pillars)</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("debug")}
-          className={`px-5 py-2.5 rounded-xl text-sm font-medium transition ${
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition flex items-center gap-2 ${
             activeTab === "debug"
               ? "bg-blue-600 text-white font-bold shadow-xs"
-              : "text-slate-700 hover:text-slate-900"
+              : "text-slate-700 hover:text-slate-900 bg-transparent"
           }`}
         >
-          Systematic diagnostics and bug fixing
+          <Wrench className={`w-4 h-4 ${activeTab === "debug" ? "text-white" : "text-blue-600"}`} />
+          <span>Diagnostics &amp; incident triage (4 stages)</span>
         </button>
       </div>
 
@@ -138,7 +172,7 @@ export function HowIBuildWithAi({ onBack, isStandalone = false }: HowIBuildWithA
                   </h3>
                 </div>
                 <span className="px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 font-mono text-xs font-semibold">
-                  Stage {step.num}
+                  Part {step.num}
                 </span>
               </div>
 
