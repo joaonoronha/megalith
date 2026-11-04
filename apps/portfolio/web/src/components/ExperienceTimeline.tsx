@@ -33,7 +33,7 @@ export function ExperienceTimeline() {
       <div className="grid md:grid-cols-12 gap-10 mb-16">
         <div className="md:col-span-5">
           <div className="text-xs uppercase tracking-[0.25em] text-blue-600 font-bold mb-4">
-            02 — Experience
+            02 / Experience
           </div>
           <h2 className="font-serif text-4xl md:text-5xl leading-tight text-slate-900">
             A decade of shipping software.
@@ -120,7 +120,7 @@ function RoleCard({
           <div className="p-6 rounded-2xl border border-blue-100 bg-blue-50/50 space-y-3.5">
             <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-blue-700 font-bold">
               <Users className="w-4 h-4" />
-              <span>Leadership &amp; People Operations</span>
+              <span>Leadership and team operations</span>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
               {item.leadership.teamSize && (
@@ -168,7 +168,7 @@ function RoleCard({
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-600 font-bold">
               <Briefcase className="w-4 h-4 text-blue-600" />
-              <span>Key Initiatives &amp; Architectural Deliveries</span>
+              <span>Key initiatives and architecture</span>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               {item.projects.map((proj) => (
@@ -188,7 +188,7 @@ function RoleCard({
           <div className="pt-2">
             <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-600 font-bold mb-3">
               <Terminal className="w-4 h-4 text-blue-600" />
-              <span>Technologies &amp; Systems Used</span>
+              <span>Technologies</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {Object.entries(item.stack).flatMap(([category, list]) =>
@@ -210,7 +210,7 @@ function RoleCard({
           <div className="pt-2 border-t border-slate-200">
             <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-blue-700 font-bold mb-2.5">
               <Award className="w-4 h-4 text-blue-600" />
-              <span>Key Outcomes &amp; Recognition</span>
+              <span>Outcomes and recognition</span>
             </div>
             <ul className="space-y-1.5 text-sm text-slate-700">
               {item.achievements.map((ach) => (
@@ -238,9 +238,9 @@ function ProjectCard({ project, isExpanded, onToggle }: ProjectCardProps) {
     <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-3.5 hover:border-blue-300 hover:shadow-sm transition shadow-2xs card-print">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <span className="text-2xl" role="img" aria-label="Icon">
-            {project.icon || "🚀"}
-          </span>
+          <div className="p-2 rounded-lg bg-blue-50 border border-blue-100 text-blue-600">
+            <Terminal className="w-4 h-4" />
+          </div>
           <h4 className="font-bold text-slate-900 text-base">{project.name}</h4>
         </div>
         <button
@@ -293,7 +293,7 @@ function ProjectCard({ project, isExpanded, onToggle }: ProjectCardProps) {
 
         {project.impactPoints && (
           <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-800 shadow-2xs">
-            <span className="font-bold block mb-1 text-slate-900">Impact Highlights:</span>
+            <span className="font-bold block mb-1 text-slate-900">Impact highlights:</span>
             <ul className="space-y-1 pl-3 font-light">
               {project.impactPoints.map((pt, i) => (
                 <li key={i} className="list-disc">

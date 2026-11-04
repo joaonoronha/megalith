@@ -46,136 +46,130 @@ export const experience: ExperienceItem[] = [
     id: "dialpad-em",
     company: "Dialpad",
     role: "Engineering Manager",
-    period: "Oct 2024 — Present",
+    period: "Oct 2024 - Present",
     short:
-      "Lead a team of 9 engineers delivering the entire Agentic Frontend and the Ingestion Source Pipeline E2E while steering architecture and release cadence.",
+      "Manage fully remote teams of ~15 people across North America, Europe, and Asia-Pacific (PMs, designers, direct reports, engineers on loan), leading the Agentic Frontend and Ingestion Source Pipeline end to end.",
     overview:
-      "Leading 9 engineers building Dialpad's Agentic AI platform, with full end-to-end ownership across the agentic frontend and ingestion source pipelines. Hands-on in technical strategy, platform architecture, and system design. DRI for QA ↔ Engineering and owner of the bi-weekly beta and production release cadence.",
+      "Managing fully remote teams of around 15 people across North America, Europe, and Asia-Pacific, including product managers, designers, direct reports, and engineers on loan from other teams. I lead Dialpad's Agentic Frontend and Ingestion Source Pipeline end to end, coordinating architecture, bi-weekly releases, and asynchronous alignment across time zones.",
     projects: [
       {
         name: "Agentic Skill Builder",
-        icon: "🧠",
         description:
-          "A no-code surface that lets non-technical users author and orchestrate AI agents through prompts, guardrails, and MCP actions.",
+          "A tool that lets non-technical users build and test AI agents through prompts, guardrails, and tool actions.",
         challenges:
-          "Designing a safe authoring model where non-engineers compose LLM behaviour, tool calls, and guardrails without producing brittle or unpredictable agents.",
+          "Designing an authoring workflow where non-engineers can define agent behavior, tool calls, and safety rules without creating brittle agents.",
         responsibilities: [
-          "Owned end-to-end architecture and technical delivery",
-          "Designed the ProseMirror-based interactive editor and real-time LLM-powered linter",
-          "Partnered closely with Product and Design on the human authoring paradigm",
+          "Led architecture and delivery across the frontend team",
+          "Built the ProseMirror-based editor and real-time rule verification",
+          "Partnered with Product and Design on the authoring interface",
         ],
         technologies: ["Vue 3", "TypeScript", "ProseMirror", "MCP", "Claude"],
         impact:
-          "Unlocked agent creation for non-technical teams across a customer base of 70,000+ organisations.",
+          "Allowed non-technical teams to create and test agents across Dialpad's customer base of 70,000+ organizations.",
       },
       {
-        name: "Ingestion Source Pipeline E2E",
-        icon: "⚡",
+        name: "Ingestion Source Pipeline",
         description:
-          "End-to-end architecture connecting customer enterprise knowledge sources into the Dialpad agentic ecosystem.",
+          "The data pipeline connecting customer enterprise knowledge sources into Dialpad's AI systems.",
         challenges:
-          "Handling heterogeneous external data sources, ensuring high-throughput extraction and resilient synchronization without impacting conversational latency.",
+          "Handling diverse third-party data sources, keeping sync reliable, and handling failures without slowing down live conversations.",
         responsibilities: [
-          "Steered end-to-end architecture across frontend configuration and ingestion worker pipelines",
-          "Established robust verification and error recovery protocols",
+          "Guided the architecture between frontend configuration and background ingestion services",
+          "Established automated verification and retry logic for sync jobs",
         ],
         technologies: ["TypeScript", "Node.js", "Python", "GCP Datastore", "Kafka"],
         impact:
-          "Drives automated context injection for enterprise agents with zero customer engineering required.",
+          "Feeds up-to-date customer knowledge into AI responses automatically without requiring custom integration code from customers.",
       },
       {
         name: "Skill Mining",
-        icon: "🔍",
         description:
-          "Automated discovery of reusable agent skills from real customer voice and chat conversations to seed the Skill Builder.",
+          "Automated discovery of common customer questions and conversation patterns to seed the Skill Builder.",
         responsibilities: [
-          "Shaped the technical approach with Product, Engineering, and ML squads",
-          "Owned the frontend architecture, UX flow, and delivery",
+          "Coordinated the technical approach with Product, Engineering, and ML teams",
+          "Led frontend architecture, review, and release",
         ],
         technologies: ["Vue 3", "TypeScript", "LLM Pipelines"],
         impact:
-          "Eliminated the cold-start problem for new enterprise agent deployments by surfacing high-signal skills automatically.",
+          "Helped new customers deploy agents faster by suggesting high-frequency skills directly from their conversation logs.",
       },
       {
-        name: "Agentic Frontend Platform",
-        icon: "🚀",
+        name: "Frontend Platform",
         description:
-          "The shared frontend foundation and component primitives that 50+ engineers across the company build agentic products on.",
+          "The shared frontend foundation and component library that 50+ engineers build agentic products on.",
         responsibilities: [
-          "Defined core architectural patterns, design tokens, and Dialtone integration",
-          "Onboarded and mentored engineers across multiple squads",
+          "Defined shared patterns, component tokens, and integration with the Dialtone design system",
+          "Onboarded and supported engineers across multiple teams",
         ],
         technologies: ["Vue 3", "TypeScript", "Dialtone", "Vite"],
         impact:
-          "Standardised how agentic surfaces are built org-wide, drastically cutting time-to-first-feature for new teams.",
+          "Standardized how agentic interfaces are built org-wide, helping squads release new surfaces faster.",
       },
     ],
     leadership: {
-      teamSize: "9 direct reports",
-      mentoring: "1:1s, professional growth plans, career pathing, and architectural coaching",
-      performanceReviews: "Full-cycle performance reviews, calibration, and compensation alignment",
-      hiring: "Delivered team expansion, hiring panels, and career promotions",
-      crossFunctional: "Continuous partnership with Product, Design, QA, and Machine Learning",
-      releaseOwnership: "Owner of bi-weekly production and beta release cadence",
-      qa: "DRI for QA ↔ Engineering coordination and test health",
+      teamSize: "~15 people (direct reports, PMs, designers, and engineers on loan across North America, Europe, and Asia-Pacific)",
+      mentoring: "Open 1:1s, pair programming, and walking through trade-offs together so engineers make the technical call",
+      performanceReviews: "Continuous feedback with no surprises, annual performance reviews, and promotions",
+      hiring: "Led interview loops, hiring decisions, and team onboarding",
+      crossFunctional: "Quarterly planning sheets (LOE, target dates, design dependencies, 30/60/90-day Gantt charts) and PM onboarding guides",
+      releaseOwnership: "Bi-weekly release cadence with dedicated sprint capacity for maintenance and mid-cycle pivots",
+      qa: "DRI for QA and engineering coordination, video walkthroughs, and public release notes",
     },
     stack: {
       frontend: ["React", "TypeScript", "Vue 3", "ProseMirror", "Dialtone"],
       backend: ["Node.js", "Go", "Python"],
       infrastructure: ["Docker", "Kubernetes", "Google Cloud Datastore"],
-      ai: ["Claude", "Model Context Protocol (MCP)", "LLM Linting", "Agentic Workflows"],
-      devx: ["Vite", "Spec-Driven Engineering", "LLM-Assisted Delivery"],
+      ai: ["Claude", "Model Context Protocol (MCP)", "LLM Pipelines", "Agentic Workflows"],
+      devx: ["Spec-First Development", "Vite", "30/60/90-Day Gantt", "AI-Assisted Scaffolding"],
     },
     achievements: [
-      "Promoted to Engineering Manager leading 9 direct reports",
-      "Owner of the platform 50+ engineers build on",
-      "Bi-weekly release cadence sustained across production and beta with zero major regressions",
+      "Built a reliable remote operating rhythm for ~15 cross-functional teammates across three global regions",
+      "Promoted to Engineering Manager following consistent delivery",
+      "Established spec-first pull requests, reciprocal reviews, and quarterly roadmap planning",
+      "Maintained a bi-weekly release schedule across production and beta with dedicated maintenance capacity",
     ],
   },
   {
     id: "dialpad-senior",
     company: "Dialpad",
     role: "Senior Software Engineer",
-    period: "May 2023 — Oct 2024",
+    period: "May 2023 - Oct 2024",
     short:
-      "Led technical initiatives integrating Kare's acquired AI products into Dialpad, rebuilding customer-facing chat and knowledge tooling.",
+      "Led frontend work integrating Kare's acquired AI products into Dialpad, rebuilding customer chat and knowledge tooling.",
     overview:
-      "Led technical initiatives integrating Kare's acquired AI products into Dialpad, rebuilding customer-facing chat and knowledge tooling and modernising the codebase to modern TypeScript and component architectures.",
+      "Led technical initiatives integrating Kare's acquired AI products into Dialpad. Rebuilt customer chat and internal knowledge tools, and modernized the codebase to TypeScript and modern component patterns.",
     projects: [
       {
         name: "Customer Chat Rebuild",
-        icon: "💬",
         description:
-          "Rewrote the customer-facing chat product on top of Dialpad's core design system and real-time infrastructure.",
+          "Rewrote the customer-facing chat product using Dialpad's core design system and messaging backend.",
         responsibilities: [
-          "Led frontend architecture and state management redesign",
-          "Partnered with Product and Design on the unified UX",
+          "Led frontend architecture and state management refactoring",
+          "Partnered with Product and Design on user experience improvements",
         ],
-        technologies: ["Vue 3", "React 17", "Redux", "TypeScript", "Node.js"],
-        impact: "Delivered a rock-solid, scalable foundation for AI chat experiences across web and mobile.",
+        technologies: ["Vue 3", "React", "Redux", "TypeScript", "Node.js"],
+        impact: "Delivered a stable, accessible chat foundation for customer support teams.",
       },
       {
-        name: "Knowledge Management Application",
-        icon: "📚",
+        name: "Knowledge Management Tooling",
         description:
-          "Rebuilt the internal knowledge management application powering AI answers and agent workflows.",
+          "Rebuilt the internal knowledge management interface that powers automated answers.",
         technologies: ["Vue 3", "TypeScript"],
-        impact: "Enabled faster iteration and instant verification for knowledge-backed AI features.",
+        impact: "Made it easier for teams to test and update knowledge-backed answers.",
       },
       {
-        name: "TypeScript Organization Migration",
-        icon: "🛠️",
+        name: "TypeScript Migration",
         description:
-          "Migrated legacy JavaScript surfaces to strict TypeScript across acquired products.",
-        impact: "Significantly reduced runtime regressions and accelerated developer velocity.",
+          "Migrated legacy JavaScript surfaces to TypeScript across acquired products.",
+        impact: "Caught bugs before production and improved build and test speed.",
       },
     ],
     leadership: {
-      mentoring: "Mentored engineers on frontend architecture, state management, and modern tooling",
+      mentoring: "Mentored engineers on frontend architecture and modern TypeScript patterns",
       crossFunctional: "Close day-to-day partnership with Product and Design",
     },
     stack: {
-      frontend: ["Vue 2/3", "React 17", "Redux", "TypeScript", "JavaScript"],
+      frontend: ["Vue 2/3", "React", "Redux", "TypeScript", "JavaScript"],
       backend: ["Node.js"],
       infrastructure: ["Docker"],
     },
@@ -188,23 +182,22 @@ export const experience: ExperienceItem[] = [
     id: "dialpad-swe",
     company: "Dialpad",
     role: "Software Engineer",
-    period: "Jun 2021 — May 2023",
+    period: "Jun 2021 - May 2023",
     short:
       "Joined through the Kare acquisition and rebuilt AI chat products within the Dialpad ecosystem.",
     overview:
-      "Joined Dialpad through the Kare acquisition and contributed to rebuilding AI chat products used across a platform serving 70,000+ customers.",
+      "Joined Dialpad through the Kare acquisition, helping rebuild AI chat products used across customer communication channels.",
     projects: [
       {
         name: "AI Chat Integration",
-        icon: "🤖",
         description:
-          "Contributed to the integration of Kare's AI chat into Dialpad's unified customer experience surfaces.",
+          "Integrated Kare's AI chat into Dialpad's communication surfaces.",
         technologies: ["Vue", "TypeScript", "Node.js"],
-        impact: "Shipped customer-facing AI chat to 70,000+ customers.",
+        impact: "Shipped customer-facing AI chat across customer accounts.",
       },
     ],
     stack: {
-      frontend: ["Vue", "React 17", "Redux", "TypeScript", "JavaScript"],
+      frontend: ["Vue", "React", "Redux", "TypeScript", "JavaScript"],
       backend: ["Node.js"],
     },
     achievements: [
@@ -215,94 +208,90 @@ export const experience: ExperienceItem[] = [
   },
   {
     id: "hugo-boss",
-    company: "Hugo Boss — Lisbon Nearshore",
+    company: "Hugo Boss, Lisbon Nearshore",
     role: "Frontend Developer",
-    period: "2018 — 2021",
+    period: "2018 - 2021",
     short:
-      "Led frontend development across enterprise applications and owned multiple internal products end-to-end.",
+      "Led frontend development for internal enterprise applications and vendor portals.",
     overview:
-      "Led frontend development across enterprise applications at Hugo Boss's Lisbon Nearshore hub, owning multiple products and building vendor integration platforms.",
+      "Led frontend development across internal enterprise applications at Hugo Boss's Lisbon Nearshore office, maintaining and refactoring business-critical tools.",
     projects: [
       {
         name: "Profit Calculation Platform",
-        icon: "📊",
         description:
-          "A business-critical enterprise application used by Hugo Boss to calculate the profitability of individual clothing items globally.",
+          "An internal tool used to calculate margins and profitability for clothing items globally.",
         challenges:
-          "A legacy ASP.NET application with high technical debt that had become difficult to maintain and evolve without risking critical financial reporting.",
+          "A legacy ASP.NET codebase that had become difficult to update without risking accounting calculations.",
         solution:
-          "Refactored the application, modernizing large parts of the codebase while preserving all business-critical accounting logic.",
+          "Refactored the application, modernizing the frontend while keeping financial calculations intact.",
         impactPoints: [
-          "Improved maintainability of a business-critical application",
-          "Substantially reduced technical debt in a complex codebase",
-          "Enabled continuous feature evolution without disrupting day-to-day fashion business operations",
+          "Improved maintainability for an internal tool used across product lines",
+          "Reduced technical debt and made future updates easier",
+          "Kept existing financial logic working without downtime",
         ],
         technologies: ["ASP.NET", "C#", "jQuery", "Kendo UI"],
       },
       {
         name: "Digital Showroom",
-        icon: "👔",
         description:
-          "Enabled internal teams and global partners to browse and manage clothing collections digitally.",
+          "An application that allowed internal teams and partners to browse and order clothing collections digitally.",
         challenges:
-          "Required high-fidelity visual rendering, rapid search, and fluid performance across diverse partner devices.",
+          "Fast catalog search and high-resolution image rendering across diverse devices.",
         solution:
-          "Contributed to the development and maintenance of the platform, collaborating with cross-functional European teams for stable releases.",
+          "Built new interface features and worked with European teams on stable deployments.",
         impactPoints: [
-          "Delivered new interactive functionality for enterprise wholesale buyers",
-          "Maintained a high-reliability platform supporting multi-market fashion collections",
+          "Added catalog browsing features for wholesale buyers",
+          "Maintained a stable catalog platform across seasonal collection launches",
         ],
         technologies: ["Angular", "Node.js", "TypeScript"],
       },
     ],
     leadership: {
-      crossFunctional: "Worked across distributed enterprise teams and external international vendors",
+      crossFunctional: "Coordinated with European engineering teams and external partners",
     },
     stack: {
       frontend: ["Angular", "TypeScript", "jQuery", "Kendo UI"],
       backend: ["ASP.NET", "C#", "Node.js"],
     },
-    achievements: ["Owned multiple enterprise products end-to-end across full lifecycles"],
+    achievements: ["Owned frontend architecture for internal business applications"],
   },
   {
     id: "att",
     company: "AT&T",
     role: "Backup, Storage & Automation Specialist",
-    period: "2017 — 2018",
+    period: "2017 - 2018",
     short:
-      "Served as EMEA automation SME, orchestrating backup automation across 10,000+ Linux servers.",
+      "Automation specialist for the EMEA Backup and Storage team, building tools to reduce manual infrastructure tasks.",
     overview:
-      "Worked as the Automation Subject Matter Expert for the EMEA Backup & Storage organisation, building internal automation platforms, developer tooling, and operational systems that eliminated manual work across enterprise infrastructure fleets.",
+      "Served as an automation specialist for the EMEA Backup and Storage team, writing scripts and tools that reduced manual maintenance across server infrastructure.",
     projects: [
       {
         name: "Enterprise Backup Upgrade Automation",
-        icon: "⚙️",
         description:
-          "Automated backup software upgrades across a fleet of 10,000+ Linux servers.",
+          "Automated backup software upgrades across more than 10,000 Linux servers.",
         challenges:
-          "Upgrading backup software across 10,000+ production Linux servers was a manual, high-risk operational chore requiring extensive manual intervention.",
+          "Upgrading enterprise backup software across 10,000+ servers was previously a manual, repetitive process that required individual server checks.",
         solution:
-          "Designed and developed a Python-based automation platform that orchestrated upgrade execution, validation, pre-flight checks, and reporting across the fleet.",
+          "Developed Python automation that orchestrated deployment, pre-flight checks, and reporting across the server fleet.",
         impactPoints: [
-          "Successfully automated upgrades across 10,000+ Linux servers",
-          "Eliminated hundreds of hours of manual operational risk",
-          "Drastically increased upgrade reliability and repeatability across data centers",
-          "Enabled operations to execute upgrades in parallel with zero downtime",
+          "Automated software updates across 10,000+ Linux servers",
+          "Cut hours of repetitive manual checks for operations engineers",
+          "Made deployment steps consistent across data centers",
+          "Allowed the operations team to run upgrades in parallel with clear logs",
         ],
         technologies: ["Python", "Shell Scripting", "Linux"],
       },
       {
-        name: "Internal Automation Platform",
-        icon: "🔧",
+        name: "Internal Automation Scripts",
         description:
-          "Developed operational scripts and internal tooling to streamline workflows across the EMEA Backup & Storage organization.",
+          "Automated routine storage checks and operational tasks across the team.",
         challenges:
-          "Daily infrastructure operations were slowed down by disparate, manual checks and disparate storage vendor interfaces.",
+          "Daily operations relied on manual checks across different storage systems.",
         solution:
-          "Standardized common workflows with Python scripts and command-line automation adopted across regional engineering pods.",
+          "Wrote Python and shell scripts to standardize routine checks and automate common operational tasks.",
         impactPoints: [
-          "Reduced manual operational overhead across EMEA",
-          "Improved consistency and auditability of day-to-day infrastructure changes",
+          "Reduced routine manual tickets for the EMEA team",
+          "Standardized recurring operational checks",
         ],
         technologies: ["Python", "Bash", "Enterprise Storage"],
       },
@@ -310,12 +299,12 @@ export const experience: ExperienceItem[] = [
     stack: {
       backend: ["Python", "Shell Scripting"],
       infrastructure: ["Linux", "Enterprise Backup Systems"],
-      devx: ["Internal Tooling", "Process Automation", "Operational Platforms"],
+      devx: ["Internal Tooling", "Process Automation"],
     },
     achievements: [
-      "Automation Subject Matter Expert for the EMEA Backup & Storage organisation",
-      "Designed and delivered an automation platform used to upgrade 10,000+ Linux servers",
-      "Built internal developer tooling that eliminated hundreds of hours of operational overhead",
+      "Subject matter expert for EMEA backup automation",
+      "Automated server maintenance across 10,000+ Linux machines",
+      "Built internal tooling that reduced routine operations overhead",
     ],
   },
 ];

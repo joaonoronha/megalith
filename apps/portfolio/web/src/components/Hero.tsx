@@ -31,9 +31,10 @@ export function Hero({ onExploreAi }: HeroProps) {
           </h1>
 
           <p className="mt-8 max-w-xl text-lg md:text-xl text-slate-600 leading-relaxed text-pretty font-light">
-            I'm <strong className="font-semibold text-slate-900">João Noronha</strong> — Engineering Manager at{" "}
+            I'm <strong className="font-semibold text-slate-900">João Noronha</strong>, Engineering Manager at{" "}
             <span className="text-slate-900 font-medium">Dialpad</span>. Ten years shipping SaaS, AI platforms, and
-            developer tooling. Leading the <span className="text-blue-600 font-semibold">agentic frontend</span> and{" "}
+            developer tooling. Managing fully remote teams of ~15 people across North America, Europe, and Asia-Pacific,
+            leading the <span className="text-blue-600 font-semibold">agentic frontend</span> and{" "}
             <span className="text-blue-600 font-semibold">ingestion source pipeline</span> end-to-end.
           </p>
 
@@ -82,7 +83,7 @@ export function Hero({ onExploreAi }: HeroProps) {
               />
               <div className="p-3.5 bg-white border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 font-mono">
                 <span className="font-semibold text-slate-800">João Noronha</span>
-                <span className="font-serif italic text-blue-700 text-sm">— Lisbon, Portugal</span>
+                <span className="font-serif italic text-blue-700 text-sm">Lisbon, Portugal</span>
               </div>
             </div>
           </div>

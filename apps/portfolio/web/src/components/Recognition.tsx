@@ -7,15 +7,15 @@ export function Recognition() {
       <div className="grid md:grid-cols-12 gap-10 mb-12">
         <div className="md:col-span-5">
           <div className="text-xs uppercase tracking-[0.25em] text-blue-600 font-bold mb-4">
-            04 — Recognition
+            04 / Background and highlights
           </div>
           <h2 className="font-serif text-4xl md:text-5xl leading-tight text-slate-900">
-            Outcomes &amp; milestones.
+            Milestones and highlights.
           </h2>
         </div>
         <div className="md:col-span-7 flex items-end">
           <p className="text-slate-600 text-lg leading-relaxed font-light">
-            Recognized consistently for speed of execution, technical excellence, and team mentorship.
+            Consistent delivery, team mentorship, and engineering contributions across startups and scale-ups.
           </p>
         </div>
       </div>
