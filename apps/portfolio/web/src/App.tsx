@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { trackEvent, AnalyticsEvents } from "@megalith/analytics";
+import { trackEvent, AnalyticsEvents } from "@/utils/analytics";
 import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
 import { AboutSection } from "@/components/AboutSection";
