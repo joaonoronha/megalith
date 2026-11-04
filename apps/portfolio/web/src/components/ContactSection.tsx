@@ -1,8 +1,10 @@
 import { Mail, Phone, ExternalLink, Printer, Github, Linkedin } from "lucide-react";
 import { profile } from "@/data/profile";
+import { trackEvent, AnalyticsEvents } from "@/utils/analytics";
 
 export function ContactSection() {
   const handlePrint = () => {
+    trackEvent(AnalyticsEvents.PORTFOLIO_CV_DOWNLOADED);
     window.print();
   };
 
@@ -25,6 +27,7 @@ export function ContactSection() {
         <div className="pt-4 flex flex-wrap justify-center items-center gap-4">
           <a
             href={`mailto:${profile.contact.email}`}
+            onClick={() => trackEvent(AnalyticsEvents.PORTFOLIO_CONTACT_CLICKED, { channel: "email" })}
             className="px-6 py-3.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold tracking-wide transition shadow-md hover:shadow-blue-500/20 flex items-center gap-2"
           >
             <Mail className="w-4 h-4" />
@@ -33,6 +36,7 @@ export function ContactSection() {
 
           <a
             href={`tel:${profile.contact.phone}`}
+            onClick={() => trackEvent(AnalyticsEvents.PORTFOLIO_CONTACT_CLICKED, { channel: "phone" })}
             className="px-6 py-3.5 rounded-full border border-slate-300 hover:border-slate-400 bg-white text-slate-800 text-sm font-semibold transition shadow-xs flex items-center gap-2"
           >
             <Phone className="w-4 h-4 text-blue-600" />

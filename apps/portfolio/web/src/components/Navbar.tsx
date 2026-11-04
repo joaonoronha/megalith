@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Printer, Mail, Menu, X, Sparkles } from "lucide-react";
 import { profile } from "@/data/profile";
+import { trackEvent, AnalyticsEvents } from "@/utils/analytics";
 
 interface NavbarProps {
   onSelectAiMode: () => void;
@@ -11,6 +12,7 @@ export function Navbar({ onSelectAiMode, isAiView }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handlePrint = () => {
+    trackEvent(AnalyticsEvents.PORTFOLIO_CV_DOWNLOADED);
     window.print();
   };
 
@@ -66,6 +68,7 @@ export function Navbar({ onSelectAiMode, isAiView }: NavbarProps) {
 
           <a
             href={`mailto:${profile.contact.email}`}
+            onClick={() => trackEvent(AnalyticsEvents.PORTFOLIO_CONTACT_CLICKED, { channel: "email" })}
             className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold tracking-wide transition shadow-sm hover:shadow-blue-500/20"
           >
             <Mail className="w-3.5 h-3.5" />

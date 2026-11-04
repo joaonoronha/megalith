@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Users, Award, Briefcase, Terminal } from "lucide-react";
 import { experience, ExperienceItem, Project } from "@/data/experience";
+import { trackEvent, AnalyticsEvents } from "@/utils/analytics";
 
 export function ExperienceTimeline() {
   const [expandedRoles, setExpandedRoles] = useState<Record<string, boolean>>({
@@ -21,10 +22,16 @@ export function ExperienceTimeline() {
   };
 
   const toggleProject = (name: string) => {
-    setExpandedProjects((prev) => ({
-      ...prev,
-      [name]: !prev[name],
-    }));
+    setExpandedProjects((prev) => {
+      const willExpand = !prev[name];
+      if (willExpand) {
+        trackEvent(AnalyticsEvents.PORTFOLIO_PROJECT_CLICKED, { project: name });
+      }
+      return {
+        ...prev,
+        [name]: willExpand,
+      };
+    });
   };
 
   return (
