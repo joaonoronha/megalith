@@ -20,4 +20,6 @@ products:
     manifest: apps/wedding/product.yaml
   - id: dashboard
     manifest: apps/dashboard/product.yaml
+  - id: eventflow
+    manifest: apps/eventflow/product.yaml
 
