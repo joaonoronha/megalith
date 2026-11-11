@@ -5,6 +5,8 @@ import { X } from "lucide-react";
 import { createEventAction, createQuoteAction } from "@/app/actions";
 
 interface Props {
+  currentUser: { id: string; name: string; email: string; role: string } | null;
+  initialUsers: any[];
   initialEvents: any[];
   initialItems: any[];
   initialClients: any[];
@@ -14,6 +16,8 @@ interface Props {
 }
 
 export default function EventFlowApp({
+  currentUser,
+  initialUsers,
   initialEvents,
   initialItems,
   initialClients,
@@ -21,6 +25,11 @@ export default function EventFlowApp({
   initialMovements,
   initialTemplate,
 }: Props) {
+  const [user, setUser] = useState(currentUser);
+  const [teamUsers, setTeamUsers] = useState(initialUsers);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showNewUserModal, setShowNewUserModal] = useState(false);
+
   const [activeTab, setActiveTab] = useState<
     "home" | "calendar" | "events" | "inventory" | "more"
   >("home");
@@ -592,17 +601,107 @@ export default function EventFlowApp({
           </section>
         )}
 
-        {/* TAB 5: MORE (Quotes, Clients, Finance) */}
+        {/* TAB 5: MORE (Quotes, Clients, Finance & Equipa/Auth) */}
         {activeTab === "more" && (
-          <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs space-y-4">
-            <h2 className="text-[20px] font-bold">Gestão & Definições</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs space-y-6">
+            <div>
+              <h2 className="text-[20px] font-bold text-[#111111]">Gestão & Definições</h2>
+              <p className="text-xs text-[#8e8e93]">
+                Definições da agência, equipa com acesso admin e ferramentas comerciais
+              </p>
+            </div>
+
+            {/* User Session Info Card */}
+            <div className="p-4 rounded-[16px] bg-[#f8f8fa] border border-[#ececf0] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#111111] text-white flex items-center justify-center font-bold text-sm">
+                  {user ? user.name.slice(0, 2).toUpperCase() : "CFM"}
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-[#111111]">
+                    {user ? user.name : "Sessão não iniciada"}
+                  </div>
+                  <div className="text-xs text-[#8e8e93]">
+                    {user ? `${user.email} · Acesso ${user.role}` : "Inicia sessão para gerir a agência"}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                {user ? (
+                  <form
+                    action={async () => {
+                      const { logoutAction } = await import("@/app/actions");
+                      await logoutAction();
+                      setUser(null);
+                    }}
+                  >
+                    <button
+                      type="submit"
+                      className="px-3.5 py-1.5 rounded-[10px] bg-white border border-[#ececf0] text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
+                    >
+                      Terminar sessão
+                    </button>
+                  </form>
+                ) : (
+                  <button
+                    onClick={() => setShowLoginModal(true)}
+                    className="px-4 py-2 rounded-[10px] bg-[#111111] text-white text-xs font-semibold hover:bg-black transition"
+                  >
+                    Iniciar sessão
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Team Accounts Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-sm text-[#111111]">Equipa CFM & Contas de Acesso</h3>
+                  <p className="text-xs text-[#8e8e93]">Utilizadores autorizados com acesso administrativo</p>
+                </div>
+
+                <button
+                  onClick={() => setShowNewUserModal(true)}
+                  className="px-3.5 py-1.5 rounded-[10px] bg-[#111111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition"
+                >
+                  <span>＋</span>
+                  <span>Criar conta</span>
+                </button>
+              </div>
+
+              <div className="divide-y divide-[#ececf0] border border-[#ececf0] rounded-[16px] overflow-hidden">
+                {teamUsers.map((u: any) => (
+                  <div key={u.id} className="p-3.5 bg-white flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-[#f2f2f7] text-[#111111] flex items-center justify-center font-bold text-xs">
+                        {u.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="font-bold text-sm text-[#111111]">{u.name}</div>
+                        <div className="text-[11px] text-[#8e8e93]">{u.email}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#eaf8ee] text-[#24793a] capitalize">
+                        {u.role}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Tools Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               <div
                 onClick={() => setShowQuoteWizard(true)}
                 className="cursor-pointer p-4 rounded-xl border border-[#ececf0] bg-[#f8f8fa] hover:bg-white transition"
               >
                 <div className="font-bold text-sm">Orçamentos</div>
-                <div className="text-xs text-[#8e8e93]">Criar, exportar e enviar propostas</div>
+                <div className="text-xs text-[#8e8e93]">Criar, exportar e enviar propostas comerciais</div>
               </div>
               <div className="p-4 rounded-xl border border-[#ececf0] bg-[#f8f8fa]">
                 <div className="font-bold text-sm">Clientes CRM</div>
@@ -769,9 +868,267 @@ export default function EventFlowApp({
           }}
         />
       )}
+
+      {/* LOGIN MODAL */}
+      {showLoginModal && (
+        <LoginModal
+          onClose={() => setShowLoginModal(false)}
+          onSuccess={(loggedInUser) => {
+            setUser(loggedInUser);
+            setShowLoginModal(false);
+          }}
+        />
+      )}
+
+      {/* CREATE NEW USER MODAL */}
+      {showNewUserModal && (
+        <NewUserModal
+          onClose={() => setShowNewUserModal(false)}
+          onCreated={(newUser) => {
+            setTeamUsers((prev: any[]) => [...prev, newUser]);
+            setShowNewUserModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }
+
+// -------------------------------------------------------------
+// LOGIN MODAL COMPONENT
+// -------------------------------------------------------------
+function LoginModal({
+  onClose,
+  onSuccess,
+}: {
+  onClose: () => void;
+  onSuccess: (user: any) => void;
+}) {
+  const [email, setEmail] = useState("admin@cfmeventos.pt");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { loginAction } = await import("@/app/actions");
+      const formData = new FormData();
+      formData.set("email", email);
+      formData.set("password", password);
+
+      const res = await loginAction(formData);
+      if (res.success) {
+        onSuccess({
+          email,
+          name: "Administrador CFM",
+          role: "admin",
+        });
+      } else {
+        setError(res.error || "Erro ao iniciar sessão.");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Erro inesperado.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-[22px] w-full max-w-sm border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-[17px] font-bold text-[#111111]">Iniciar Sessão</h2>
+            <p className="text-[11px] text-[#8e8e93] mt-0.5">Acesso administrativo CFM Eventos</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93]"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-[12px] bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">Email</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">Palavra-passe</label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••••••"
+              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-2.5 rounded-[12px] bg-[#111111] hover:bg-black text-white text-xs font-bold transition shadow-xs mt-2"
+          >
+            {isLoading ? "A verificar..." : "Entrar"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// NEW USER MODAL COMPONENT (CREATE TEAM ACCOUNT)
+// -------------------------------------------------------------
+function NewUserModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (user: any) => void;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("admin");
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { createUserAction } = await import("@/app/actions");
+      const formData = new FormData();
+      formData.set("name", name);
+      formData.set("email", email);
+      formData.set("password", password);
+      formData.set("role", role);
+
+      const res = await createUserAction(formData);
+      if (res.success && "id" in res) {
+        onCreated({
+          id: res.id,
+          name,
+          email,
+          role,
+        });
+      } else {
+        setError("error" in res ? res.error : "Erro ao criar utilizador.");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Erro inesperado.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-[22px] w-full max-w-sm border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-[17px] font-bold text-[#111111]">Criar Conta de Equipa</h2>
+            <p className="text-[11px] text-[#8e8e93] mt-0.5">Adicionar utilizador com acesso admin</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93]"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-[12px] bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">Nome Completo *</label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex: Sofia Ribeiro"
+              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">Email *</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="exemplo@cfmeventos.pt"
+              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">Palavra-passe Inicial *</label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Definir palavra-passe"
+              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">Nível de Acesso</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            >
+              <option value="admin">Administrador (Total)</option>
+              <option value="producer">Gestor / Produtor de Eventos</option>
+              <option value="warehouse">Armazém / Logística</option>
+            </select>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-2.5 rounded-[12px] bg-[#111111] hover:bg-black text-white text-xs font-bold transition shadow-xs mt-2"
+          >
+            {isLoading ? "A guardar conta..." : "Criar Conta de Acesso"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 
 // -------------------------------------------------------------
 // EVENT WIZARD MODAL COMPONENT

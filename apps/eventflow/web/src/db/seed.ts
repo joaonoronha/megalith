@@ -30,10 +30,17 @@ export async function seed() {
     id: "usr-admin-1",
     name: "Administrador CFM",
     email: "admin@cfmeventos.pt",
-    passwordHash: "demo_hash_pbkdf2",
+    passwordHash: "$2b$10$gecd5wrGUNDqja3JnT6zDuF3d3HpjXfTS1H91s7iIVesuM3/WzDAG",
     role: "admin",
     createdAt: new Date(),
-  }).onConflictDoNothing();
+  }).onConflictDoUpdate({
+    target: users.id,
+    set: {
+      passwordHash: "$2b$10$gecd5wrGUNDqja3JnT6zDuF3d3HpjXfTS1H91s7iIVesuM3/WzDAG",
+      email: "admin@cfmeventos.pt",
+      role: "admin",
+    },
+  });
 
   // 3. Clients
   const clientMastercard = {
