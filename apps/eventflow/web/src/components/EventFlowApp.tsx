@@ -1,32 +1,7 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import {
-  Calendar as CalendarIcon,
-  Layers,
-  Package,
-  FileText,
-  DollarSign,
-  Users,
-  Search,
-  Plus,
-  ArrowUpRight,
-  ArrowDownLeft,
-  Clock,
-  MapPin,
-  CheckCircle2,
-  AlertTriangle,
-  ChevronRight,
-  ChevronLeft,
-  ExternalLink,
-  Copy,
-  Check,
-  Building2,
-  X,
-  Wrench,
-  AlertCircle,
-  Sparkles,
-} from "lucide-react";
+import React, { useState } from "react";
+import { X } from "lucide-react";
 import { createEventAction, createQuoteAction } from "@/app/actions";
 
 interface Props {
@@ -47,21 +22,18 @@ export default function EventFlowApp({
   initialTemplate,
 }: Props) {
   const [activeTab, setActiveTab] = useState<
-    "home" | "calendar" | "events" | "inventory" | "quotes" | "finance" | "clients"
+    "home" | "calendar" | "events" | "inventory" | "more"
   >("home");
 
   const [eventsList, setEventsList] = useState(initialEvents);
   const [quotesList, setQuotesList] = useState(initialQuotes);
-  const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   // Wizard Modals
   const [showEventWizard, setShowEventWizard] = useState(false);
   const [showQuoteWizard, setShowQuoteWizard] = useState(false);
 
-  // Mini Calendar State
-  // Default to October 2026 to match prototype sample events
-  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date("2026-10-01"));
-  const [selectedCalendarDay, setSelectedCalendarDay] = useState<number | null>(6);
+  // Selected calendar day
+  const [selectedDay, setSelectedDay] = useState(30);
 
   // Financial aggregates
   const totalEntradas = initialMovements
@@ -78,958 +50,701 @@ export default function EventFlowApp({
 
   const resultadoLiquido = totalEntradas - totalSaidas - totalInvestido;
 
-  const handleStatusChange = (eventId: string, newStatus: string) => {
-    setEventsList((prev) =>
-      prev.map((evt) => (evt.id === eventId ? { ...evt, status: newStatus } : evt))
-    );
-  };
-
-  const copyQuoteLink = (token: string) => {
-    const url = `${window.location.origin}/proposta/${token}`;
-    navigator.clipboard.writeText(url);
-    setCopiedToken(token);
-    setTimeout(() => setCopiedToken(null), 2000);
-  };
-
-  const statusColors: Record<string, { bg: string; text: string; label: string }> = {
-    planeamento: { bg: "bg-gray-100", text: "text-gray-700", label: "Planeamento" },
-    orcamento: { bg: "bg-purple-100", text: "text-purple-700", label: "Orçamento" },
-    confirmado: { bg: "bg-emerald-100", text: "text-emerald-700", label: "Confirmado" },
-    preparacao: { bg: "bg-amber-100", text: "text-amber-700", label: "Preparação" },
-    em_curso: { bg: "bg-blue-100", text: "text-blue-700", label: "Em curso" },
-    devolucao: { bg: "bg-teal-100", text: "text-teal-700", label: "Devolução" },
-    concluido: { bg: "bg-green-100", text: "text-green-700", label: "Concluído" },
-    cancelado: { bg: "bg-rose-100", text: "text-rose-700", label: "Cancelado" },
-  };
-
-  // Calendar calculations
-  const year = currentCalendarDate.getFullYear();
-  const month = currentCalendarDate.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayOfWeek = (new Date(year, month, 1).getDay() + 6) % 7; // Monday = 0
-
-  // Find events on dates in current month
-  const eventsByDay = useMemo(() => {
-    const map = new Map<number, any[]>();
-    eventsList.forEach((evt) => {
-      const d = new Date(evt.startDate);
-      if (d.getFullYear() === year && d.getMonth() === month) {
-        const day = d.getDate();
-        const list = map.get(day) || [];
-        list.push(evt);
-        map.set(day, list);
-      }
-    });
-    return map;
-  }, [eventsList, year, month]);
-
-  const monthName = new Intl.DateTimeFormat("pt-PT", { month: "long", year: "numeric" }).format(
-    currentCalendarDate
-  );
-
-  const selectedDayEvents = selectedCalendarDay ? eventsByDay.get(selectedCalendarDay) || [] : [];
-
   return (
-    <div className="min-h-screen bg-[#f8f8fa] pb-24 text-[#111111]">
-      {/* Top Navigation */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-[#ececf0] px-4 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-black text-white flex items-center justify-center font-black text-sm tracking-tighter shadow-sm">
-              EF
-            </div>
-            <div>
-              <span className="font-bold text-sm tracking-tight text-[#111111]">EventFlow</span>
-              <span className="text-xs text-[#8e8e93] ml-2">CFM Eventos</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[#eaf8ee] text-[#24793a]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#34c759]"></span>
-              Turso Edge DB Conectado
-            </span>
-            <div className="w-8 h-8 rounded-full bg-[#ececf0] flex items-center justify-center text-xs font-semibold text-[#555]">
-              CFM
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content View */}
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <div className="min-h-screen bg-[#f5f5f7] text-[#111111] pb-28 font-sans antialiased">
+      {/* Main Content Area */}
+      <main className="max-w-[940px] mx-auto px-4 pt-8 pb-10">
         {/* TAB 1: HOME */}
         {activeTab === "home" && (
-          <div className="space-y-6">
-            {/* Search Bar */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-[#8e8e93] absolute left-4 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Pesquisar artigos, eventos, clientes, orçamentos..."
-                className="w-full bg-white border border-[#ececf0] rounded-2xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#007aff] shadow-xs"
-              />
-            </div>
+          <section className="space-y-4">
+            {/* Header Greeting */}
+            <div className="mb-4">
+              <h1 className="text-[36px] sm:text-[39px] font-extrabold tracking-[-1.5px] text-[#111111] leading-none mb-3.5">
+                Olá CFM Eventos.
+              </h1>
 
-            {/* Financial Overview Card */}
-            <div className="bg-white border border-[#ececf0] rounded-2xl p-6 shadow-xs">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-base font-bold tracking-tight">Resumo Financeiro Operacional</h2>
-                  <p className="text-xs text-[#8e8e93]">Valores em tempo real calculados pelo ledger</p>
-                </div>
-                <button
-                  onClick={() => setActiveTab("finance")}
-                  className="text-xs font-medium text-[#007aff] hover:underline"
-                >
-                  Ver detalhe →
-                </button>
+              {/* Search bar matching prototype */}
+              <div className="w-full max-w-[720px] h-[50px] bg-white border border-[#ececf0] rounded-[15px] px-4 flex items-center gap-3 shadow-[0_1px_0_rgba(0,0,0,0.015)]">
+                <span className="text-[19px] text-[#6e6e73]">⌕</span>
+                <input
+                  type="text"
+                  placeholder="Pesquisar artigos, eventos, clientes..."
+                  className="w-full text-[14px] text-[#111111] placeholder-[#8e8e93] bg-transparent outline-none"
+                />
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-4 rounded-xl bg-[#f8f8fa] border border-[#ececf0]">
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-[#24793a] mb-1">
-                    <ArrowDownLeft className="w-3.5 h-3.5" />
-                    <span>Entradas</span>
-                  </div>
-                  <div className="text-xl font-bold tracking-tight">
-                    €{totalEntradas.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-[11px] text-[#8e8e93] mt-0.5">Recebido este período</div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#f8f8fa] border border-[#ececf0]">
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-[#a62a24] mb-1">
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                    <span>Saídas</span>
-                  </div>
-                  <div className="text-xl font-bold tracking-tight">
-                    €{totalSaidas.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-[11px] text-[#8e8e93] mt-0.5">Despesas operacionais</div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#f8f8fa] border border-[#ececf0]">
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-[#845000] mb-1">
-                    <Package className="w-3.5 h-3.5" />
-                    <span>Investido</span>
-                  </div>
-                  <div className="text-xl font-bold tracking-tight">
-                    €{totalInvestido.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-[11px] text-[#8e8e93] mt-0.5">Novo material & stock</div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#f8f8fa] border border-[#ececf0]">
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-[#007aff] mb-1">
-                    <DollarSign className="w-3.5 h-3.5" />
-                    <span>Resultado Líquido</span>
-                  </div>
-                  <div className="text-xl font-bold tracking-tight">
-                    €{resultadoLiquido.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="text-[11px] text-[#8e8e93] mt-0.5">Entradas − saídas − invest.</div>
-                </div>
-              </div>
-
-              {/* 2 ACTION BUTTONS UNDER FINANCE: Novo evento & Novo orcamento */}
-              <div className="mt-5 pt-4 border-t border-[#ececf0] flex flex-wrap items-center gap-3">
+              {/* CTAs right under search */}
+              <div className="flex flex-wrap items-center gap-2.5 mt-3">
                 <button
                   onClick={() => setShowEventWizard(true)}
-                  className="px-4 py-2.5 rounded-xl bg-[#007aff] hover:bg-[#0062cc] text-white text-xs font-bold flex items-center gap-2 shadow-xs transition"
+                  className="min-h-[44px] px-4 py-2.5 rounded-[12px] bg-[#111111] hover:bg-black text-white text-[13px] font-semibold flex items-center gap-1.5 transition shadow-xs"
                 >
-                  <Plus className="w-4 h-4" />
+                  <span className="text-base font-normal leading-none">＋</span>
                   <span>Novo evento</span>
                 </button>
 
                 <button
                   onClick={() => setShowQuoteWizard(true)}
-                  className="px-4 py-2.5 rounded-xl bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[#111111] text-xs font-bold flex items-center gap-2 shadow-xs transition"
+                  className="min-h-[44px] px-4 py-2.5 rounded-[12px] bg-white border border-black/10 hover:bg-[#f8f8fa] text-[#111111] text-[13px] font-semibold flex items-center gap-1.5 transition shadow-xs"
                 >
-                  <FileText className="w-4 h-4 text-[#007aff]" />
+                  <span className="text-base font-normal leading-none">＋</span>
                   <span>Novo orçamento</span>
                 </button>
               </div>
             </div>
 
-            {/* ROW 1: 2/3 PROXIMOS EVENTOS + 1/3 CALENDAR PICKER */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* 2/3 Column: Próximos Eventos */}
-              <div className="lg:col-span-8 bg-white border border-[#ececf0] rounded-2xl p-6 shadow-xs flex flex-col justify-between">
+            {/* Resumo Financeiro Card */}
+            <div className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+              {/* Head */}
+              <div className="flex items-center justify-between mb-4">
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h2 className="text-base font-bold tracking-tight">Próximos eventos</h2>
-                      <p className="text-xs text-[#8e8e93]">Lista cronológica com detalhes e estado operacional</p>
-                    </div>
-                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#f2f2f5] text-[#3a3a3c]">
-                      {eventsList.length} eventos
-                    </span>
+                  <div className="text-[18px] font-bold tracking-[-0.35px] text-[#111111]">
+                    Resumo financeiro
                   </div>
-
-                  {/* List of Events */}
-                  <div className="divide-y divide-[#ececf0]">
-                    {eventsList.map((evt) => {
-                      const d = new Date(evt.startDate);
-                      const dayNumber = d.getDate().toString().padStart(2, "0");
-                      const monthShort = d
-                        .toLocaleDateString("pt-PT", { month: "short" })
-                        .replace(".", "")
-                        .toUpperCase();
-
-                      const formattedDateHour = `${d.getDate()} de ${d.toLocaleDateString("pt-PT", {
-                        month: "long",
-                      })} · ${d.toLocaleTimeString("pt-PT", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}`;
-
-                      const statusInfo = statusColors[evt.status] || {
-                        bg: "bg-gray-100",
-                        text: "text-gray-700",
-                        label: evt.status,
-                      };
-
-                      return (
-                        <div
-                          key={evt.id}
-                          className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                        >
-                          {/* Left Column: Image with Day Overlay + Title + Muted Bytext */}
-                          <div className="flex items-center gap-3.5">
-                            {/* Image with day badge overlay */}
-                            <div className="relative w-24 h-16 sm:w-28 sm:h-18 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 shadow-xs border border-black/5">
-                              {evt.coverImageUrl ? (
-                                <img
-                                  src={evt.coverImageUrl}
-                                  alt={evt.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full bg-[#ececf0] flex items-center justify-center text-xs font-bold text-[#8e8e93]">
-                                  CFM
-                                </div>
-                              )}
-                              {/* Day overlay pill on the image */}
-                              <div className="absolute bottom-1.5 left-1.5 bg-black/75 backdrop-blur-md text-white px-2 py-0.5 rounded-lg text-center flex items-center gap-1">
-                                <span className="text-xs font-black leading-none">{dayNumber}</span>
-                                <span className="text-[9px] font-semibold tracking-wider text-white/80 leading-none">
-                                  {monthShort}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Title & Bytext */}
-                            <div>
-                              <h3 className="font-bold text-sm text-[#111111] hover:text-[#007aff] transition cursor-pointer">
-                                {evt.name}
-                              </h3>
-                              <div className="text-xs text-[#8e8e93] mt-0.5 flex flex-wrap items-center gap-1.5">
-                                <span>{formattedDateHour}</span>
-                                {evt.venue && (
-                                  <>
-                                    <span>·</span>
-                                    <span className="flex items-center gap-0.5">
-                                      <MapPin className="w-3 h-3 text-[#8e8e93]" />
-                                      {evt.venue}
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Right Column: Status */}
-                          <div className="flex items-center gap-2 sm:self-center">
-                            <select
-                              value={evt.status}
-                              onChange={(e) => handleStatusChange(evt.id, e.target.value)}
-                              className={`text-xs font-bold px-3 py-1.5 rounded-xl border border-transparent cursor-pointer focus:outline-none shadow-xs transition ${statusInfo.bg} ${statusInfo.text}`}
-                            >
-                              <option value="planeamento">Planeamento</option>
-                              <option value="orcamento">Orçamento</option>
-                              <option value="confirmado">Confirmado</option>
-                              <option value="preparacao">Preparação</option>
-                              <option value="em_curso">Em curso</option>
-                              <option value="devolucao">Devolução</option>
-                              <option value="concluido">Concluído</option>
-                              <option value="cancelado">Cancelado</option>
-                            </select>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* 1/3 Column: Calendar Picker of the Current Month */}
-              <div className="lg:col-span-4 bg-white border border-[#ececf0] rounded-2xl p-6 shadow-xs flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h2 className="text-base font-bold tracking-tight capitalize">{monthName}</h2>
-                      <p className="text-xs text-[#8e8e93]">Dias com eventos assinalados</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() =>
-                          setCurrentCalendarDate(
-                            new Date(year, month - 1, 1)
-                          )
-                        }
-                        className="w-7 h-7 rounded-lg border border-[#ececf0] flex items-center justify-center text-[#8e8e93] hover:text-[#111111]"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() =>
-                          setCurrentCalendarDate(
-                            new Date(year, month + 1, 1)
-                          )
-                        }
-                        className="w-7 h-7 rounded-lg border border-[#ececf0] flex items-center justify-center text-[#8e8e93] hover:text-[#111111]"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Calendar Grid */}
-                  <div className="grid grid-cols-7 text-center text-[11px] font-semibold text-[#8e8e93] mb-2">
-                    <div>Seg</div>
-                    <div>Ter</div>
-                    <div>Qua</div>
-                    <div>Qui</div>
-                    <div>Sex</div>
-                    <div>Sáb</div>
-                    <div>Dom</div>
-                  </div>
-
-                  <div className="grid grid-cols-7 gap-1 text-center">
-                    {/* Empty leading days */}
-                    {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-                      <div key={`blank-${i}`} className="h-8"></div>
-                    ))}
-
-                    {/* Day numbers */}
-                    {Array.from({ length: daysInMonth }).map((_, i) => {
-                      const day = i + 1;
-                      const hasEvents = eventsByDay.has(day);
-                      const isSelected = selectedCalendarDay === day;
-
-                      return (
-                        <button
-                          key={`day-${day}`}
-                          onClick={() => setSelectedCalendarDay(day)}
-                          className={`h-8 rounded-lg text-xs font-semibold relative flex flex-col items-center justify-center transition ${
-                            isSelected
-                              ? "bg-[#007aff] text-white shadow-xs font-bold"
-                              : hasEvents
-                              ? "bg-[#eaf8ee] text-[#24793a] font-bold hover:bg-[#d8f2df]"
-                              : "text-[#3a3a3c] hover:bg-[#f2f2f5]"
-                          }`}
-                        >
-                          <span>{day}</span>
-                          {hasEvents && !isSelected && (
-                            <span className="w-1 h-1 rounded-full bg-[#34c759] absolute bottom-1"></span>
-                          )}
-                        </button>
-                      );
-                    })}
+                  <div className="text-[12px] text-[#8e8e93]">
+                    Outubro 2026 · valores demonstrativos
                   </div>
                 </div>
 
-                {/* Selected Day Event Preview */}
-                <div className="mt-5 pt-4 border-t border-[#ececf0]">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#8e8e93] mb-2">
-                    {selectedCalendarDay
-                      ? `Eventos no dia ${selectedCalendarDay} de ${monthName}`
-                      : "Seleciona um dia"}
-                  </div>
-
-                  {selectedDayEvents.length > 0 ? (
-                    <div className="space-y-2">
-                      {selectedDayEvents.map((e) => (
-                        <div
-                          key={e.id}
-                          className="p-2.5 rounded-xl bg-[#f8f8fa] border border-[#ececf0] text-xs flex items-center justify-between"
-                        >
-                          <div>
-                            <span className="font-bold text-[#111111]">{e.name}</span>
-                            <div className="text-[11px] text-[#8e8e93]">
-                              {e.venue || "Local a confirmar"}
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white text-[#007aff] border border-[#ececf0]">
-                            {e.status}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-[#8e8e93] italic py-2">
-                      Nenhum evento agendado para esta data.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* ROW 2: 2/3 INVENTÁRIO + 1/3 ACTIONABLE ITEMS */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* 2/3 Column: Inventário */}
-              <div className="lg:col-span-8 bg-white border border-[#ececf0] rounded-2xl p-6 shadow-xs">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h2 className="text-base font-bold tracking-tight">Inventário & Stock Disponível</h2>
-                    <p className="text-xs text-[#8e8e93]">
-                      Catálogo de materiais, stock em armazém e reservas ativas
-                    </p>
-                  </div>
+                <div className="flex items-center gap-2.5">
                   <button
-                    onClick={() => setActiveTab("inventory")}
-                    className="text-xs font-semibold text-[#007aff] hover:underline"
+                    onClick={() => setActiveTab("more")}
+                    className="text-[13px] font-semibold text-[#007aff] hover:underline"
                   >
-                    Ver catálogo completo →
+                    Ver detalhe →
+                  </button>
+                  <button
+                    onClick={() => setShowEventWizard(true)}
+                    className="w-[34px] h-[34px] rounded-full bg-[#1c1c1e] text-white flex items-center justify-center font-bold text-base hover:bg-black transition shadow-xs"
+                    aria-label="Adicionar"
+                  >
+                    ＋
                   </button>
                 </div>
+              </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {initialItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="p-3.5 rounded-xl border border-[#ececf0] bg-[#fafafa] flex gap-3.5 items-center"
-                    >
-                      <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 border border-black/5">
-                        <img
-                          src={item.imageUrl}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+              {/* 4 Metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5">
+                  <div className="text-[12px] text-[#8e8e93] mb-1.5">Entradas</div>
+                  <div className="text-[24px] font-bold tracking-[-0.7px] text-[#217a3b]">
+                    €12.450
+                  </div>
+                  <div className="text-[11px] text-[#8e8e93] mt-1">Recebido este mês</div>
+                </div>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-[#8e8e93] uppercase">
-                            {item.sku}
-                          </span>
-                          <span className="text-xs font-bold text-[#007aff]">
-                            €{item.unitPrice.toFixed(2)}/dia
-                          </span>
-                        </div>
-                        <h4 className="font-bold text-xs text-[#111111] truncate">{item.name}</h4>
-                        <div className="text-[11px] text-[#8e8e93] mt-0.5">{item.warehouseLocation}</div>
+                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5">
+                  <div className="text-[12px] text-[#8e8e93] mb-1.5">Saídas</div>
+                  <div className="text-[24px] font-bold tracking-[-0.7px] text-[#b04a3f]">
+                    €4.380
+                  </div>
+                  <div className="text-[11px] text-[#8e8e93] mt-1">Despesas operacionais</div>
+                </div>
 
-                        <div className="mt-2 flex items-center justify-between text-[11px]">
-                          <span className="text-[#8e8e93]">Stock total:</span>
-                          <span className="font-bold text-[#111111]">{item.totalQuantity} un.</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5">
+                  <div className="text-[12px] text-[#8e8e93] mb-1.5">Investido</div>
+                  <div className="text-[24px] font-bold tracking-[-0.7px] text-[#8c6417]">
+                    €2.150
+                  </div>
+                  <div className="text-[11px] text-[#8e8e93] mt-1">Material e equipamento</div>
+                </div>
+
+                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5">
+                  <div className="text-[12px] text-[#8e8e93] mb-1.5">Resultado líquido</div>
+                  <div className="text-[24px] font-bold tracking-[-0.7px] text-[#111111]">
+                    €5.920
+                  </div>
+                  <div className="text-[11px] text-[#8e8e93] mt-1">
+                    Entradas − saídas − investimento
+                  </div>
                 </div>
               </div>
 
-              {/* 1/3 Column: Actionable Items & Alerts */}
-              <div className="lg:col-span-4 bg-white border border-[#ececf0] rounded-2xl p-6 shadow-xs flex flex-col justify-between">
+              {/* Footer */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-[#ececf0] pt-3.5 mt-3.5 text-[12px] text-[#8e8e93]">
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h2 className="text-base font-bold tracking-tight">Ações Requeridas</h2>
-                      <p className="text-xs text-[#8e8e93]">Pontos críticos que exigem intervenção</p>
-                    </div>
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
-                  </div>
-
-                  <div className="space-y-3">
-                    {/* Action 1: Low stock */}
-                    <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200/60 text-xs">
-                      <div className="flex items-start gap-2.5">
-                        <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <span className="font-bold text-amber-900 block">Stock Baixo: Vela LED Âmbar</span>
-                          <span className="text-amber-800/80 text-[11px] block mt-0.5">
-                            Apenas 8 disponíveis. Stock mínimo (20) em risco para a Mastercard Gala.
-                          </span>
-                        </div>
-                      </div>
-                      <div className="mt-2.5 flex justify-end">
-                        <button
-                          onClick={() => setActiveTab("inventory")}
-                          className="px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-amber-900 font-bold text-[10px] hover:bg-amber-100/50"
-                        >
-                          Ver stock
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Action 2: Damaged gear */}
-                    <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200/60 text-xs">
-                      <div className="flex items-start gap-2.5">
-                        <Wrench className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <span className="font-bold text-rose-900 block">3 Cadeiras Chiavari Danificadas</span>
-                          <span className="text-rose-800/80 text-[11px] block mt-0.5">
-                            Devolvidas com avaria no evento anterior. Requerem reparação ou abate.
-                          </span>
-                        </div>
-                      </div>
-                      <div className="mt-2.5 flex justify-end">
-                        <button
-                          onClick={() => alert("Triagem de manutenção aberta para MOB-CHA-001")}
-                          className="px-2.5 py-1 rounded-lg bg-white border border-rose-300 text-rose-900 font-bold text-[10px] hover:bg-rose-100/50"
-                        >
-                          Fazer triagem
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Action 3: Upcoming event needing prep */}
-                    <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200/60 text-xs">
-                      <div className="flex items-start gap-2.5">
-                        <Clock className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <span className="font-bold text-blue-900 block">Preparação Pendente</span>
-                          <span className="text-blue-800/80 text-[11px] block mt-0.5">
-                            Mastercard Gala (6 Out): faltam carregar 214 unidades para o camião.
-                          </span>
-                        </div>
-                      </div>
-                      <div className="mt-2.5 flex justify-end">
-                        <button
-                          onClick={() => setActiveTab("events")}
-                          className="px-2.5 py-1 rounded-lg bg-white border border-blue-300 text-blue-900 font-bold text-[10px] hover:bg-blue-100/50"
-                        >
-                          Ver ficha de carga
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  Faturado <strong className="text-[#111111] font-semibold">€15.650</strong> · A
+                  receber <strong className="text-[#111111] font-semibold">€3.200</strong>
                 </div>
-
-                <div className="mt-4 pt-3 border-t border-[#ececf0] text-[11px] text-[#8e8e93] text-center">
-                  Todos os alertas são atualizados em tempo real com base no armazém.
+                <div>
+                  Margem operacional{" "}
+                  <strong className="text-[#111111] font-semibold">47,6%</strong>
                 </div>
               </div>
             </div>
-          </div>
+
+            {/* Layout Grid: Left Stack (2/3) + Right Stack (1/3) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
+              {/* LEFT STACK (2/3 width = 8 cols) */}
+              <div className="lg:col-span-7 space-y-3.5">
+                {/* CARD 1: Próximos eventos */}
+                <div className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-[18px] font-bold tracking-[-0.35px] text-[#111111]">
+                      Próximos eventos
+                    </h3>
+                    <button
+                      onClick={() => setActiveTab("events")}
+                      className="text-[12px] text-[#8e8e93] hover:text-[#007aff] cursor-pointer"
+                    >
+                      Ver todos →
+                    </button>
+                  </div>
+
+                  <div className="divide-y divide-[#f0f0f3]">
+                    {/* Item 1: Casamento Marta & João */}
+                    <div className="py-3.5 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        {/* Event Photo with Day 03 Overlay */}
+                        <div
+                          className="w-[58px] h-[58px] rounded-[14px] flex-shrink-0 bg-cover bg-center relative overflow-hidden border border-black/5"
+                          style={{
+                            backgroundImage: `url("https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=600&q=80")`,
+                          }}
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+                          <span className="absolute left-2 bottom-1.5 text-white text-[13px] font-extrabold tracking-[-0.2px] drop-shadow-sm">
+                            03
+                          </span>
+                        </div>
+
+                        <div>
+                          <div className="text-[14px] font-bold text-[#111111]">
+                            Casamento Marta & João
+                          </div>
+                          <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                            Sáb · 3 Out · 14:00 · Quinta da Serra
+                          </div>
+                        </div>
+                      </div>
+
+                      <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-[#eaf8ee] text-[#24793a]">
+                        Confirmado
+                      </span>
+                    </div>
+
+                    {/* Item 2: Mastercard Gala */}
+                    <div className="py-3.5 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        {/* Event Photo with Day 06 Overlay */}
+                        <div
+                          className="w-[58px] h-[58px] rounded-[14px] flex-shrink-0 bg-cover bg-center relative overflow-hidden border border-black/5"
+                          style={{
+                            backgroundImage: `url("https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?auto=format&fit=crop&w=600&q=80")`,
+                          }}
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+                          <span className="absolute left-2 bottom-1.5 text-white text-[13px] font-extrabold tracking-[-0.2px] drop-shadow-sm">
+                            06
+                          </span>
+                        </div>
+
+                        <div>
+                          <div className="text-[14px] font-bold text-[#111111]">Mastercard Gala</div>
+                          <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                            Ter · 6 Out · 18:00 · Estufa Fria
+                          </div>
+                        </div>
+                      </div>
+
+                      <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-[#fff4df] text-[#9a5b00]">
+                        Preparação
+                      </span>
+                    </div>
+
+                    {/* Item 3: L'Oréal Brand Dinner */}
+                    <div className="py-3.5 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        {/* Event Photo with Day 09 Overlay */}
+                        <div
+                          className="w-[58px] h-[58px] rounded-[14px] flex-shrink-0 bg-cover bg-center relative overflow-hidden border border-black/5"
+                          style={{
+                            backgroundImage: `url("https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&w=600&q=80")`,
+                          }}
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+                          <span className="absolute left-2 bottom-1.5 text-white text-[13px] font-extrabold tracking-[-0.2px] drop-shadow-sm">
+                            09
+                          </span>
+                        </div>
+
+                        <div>
+                          <div className="text-[14px] font-bold text-[#111111]">
+                            L'Oréal Brand Dinner
+                          </div>
+                          <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                            Sex · 9 Out · 19:30 · Lisboa
+                          </div>
+                        </div>
+                      </div>
+
+                      <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-[#f2f2f4] text-[#48484a]">
+                        Planeamento
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* CARD 2: Inventário */}
+                <div className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-[18px] font-bold tracking-[-0.35px] text-[#111111]">
+                      Inventário
+                    </h3>
+                    <button
+                      onClick={() => setActiveTab("inventory")}
+                      className="text-[12px] text-[#8e8e93] hover:text-[#007aff] cursor-pointer"
+                    >
+                      Abrir inventário →
+                    </button>
+                  </div>
+
+                  <div className="divide-y divide-[#f0f0f3]">
+                    {/* Item 1 */}
+                    <div className="py-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-[42px] h-[42px] rounded-[10px] bg-[#f2f2f4] flex items-center justify-center text-[21px] flex-shrink-0">
+                          🪑
+                        </div>
+                        <div>
+                          <div className="text-[14px] font-bold text-[#111111]">
+                            Cadeira Chiavari Dourada
+                          </div>
+                          <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                            42 disponíveis de 60
+                          </div>
+                        </div>
+                      </div>
+                      <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-[#eaf8ee] text-[#24793a]">
+                        Disponível
+                      </span>
+                    </div>
+
+                    {/* Item 2 */}
+                    <div className="py-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-[42px] h-[42px] rounded-[10px] bg-[#f2f2f4] flex items-center justify-center text-[21px] flex-shrink-0">
+                          🕯️
+                        </div>
+                        <div>
+                          <div className="text-[14px] font-bold text-[#111111]">Vela LED Âmbar</div>
+                          <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                            8 disponíveis · mínimo 20
+                          </div>
+                        </div>
+                      </div>
+                      <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-[#fff4df] text-[#9a5b00]">
+                        Baixo
+                      </span>
+                    </div>
+
+                    {/* Item 3 */}
+                    <div className="py-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-[42px] h-[42px] rounded-[10px] bg-[#f2f2f4] flex items-center justify-center text-[21px] flex-shrink-0">
+                          ◉
+                        </div>
+                        <div>
+                          <div className="text-[14px] font-bold text-[#111111]">Mesa Redonda 180</div>
+                          <div className="text-[12px] text-[#8e8e93] mt-0.5">
+                            22 disponíveis de 30
+                          </div>
+                        </div>
+                      </div>
+                      <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-[#eaf8ee] text-[#24793a]">
+                        Disponível
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT STACK (1/3 width = 5 cols) */}
+              <div className="lg:col-span-5 space-y-3.5">
+                {/* CARD 1: Mini Month Calendar */}
+                <div className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <div className="text-[18px] font-bold tracking-[-0.35px] text-[#111111]">
+                        Outubro
+                      </div>
+                      <div className="text-[12px] text-[#8e8e93]">2026</div>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab("calendar")}
+                      className="text-[12px] text-[#8e8e93] hover:text-[#007aff] cursor-pointer"
+                    >
+                      Abrir →
+                    </button>
+                  </div>
+
+                  {/* Day of Week Labels */}
+                  <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-[#8e8e93] font-medium mb-1">
+                    <div>S</div>
+                    <div>T</div>
+                    <div>Q</div>
+                    <div>Q</div>
+                    <div>S</div>
+                    <div>S</div>
+                    <div>D</div>
+                  </div>
+
+                  {/* Calendar Grid matching prototype */}
+                  <div className="grid grid-cols-7 gap-1 text-center text-[12px]">
+                    {/* Blanks */}
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">1</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">2</div>
+                    <div className="h-8 flex items-center justify-center rounded-[9px] bg-[#f0f0f2] text-[#3a3a3c] font-semibold">
+                      3
+                    </div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">4</div>
+
+                    <div className="h-8 flex items-center justify-center text-[#454549]">5</div>
+                    <div className="h-8 flex items-center justify-center rounded-[9px] bg-[#f0f0f2] text-[#3a3a3c] font-semibold">
+                      6
+                    </div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">7</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">8</div>
+                    <div className="h-8 flex items-center justify-center rounded-[9px] bg-[#f0f0f2] text-[#3a3a3c] font-semibold">
+                      9
+                    </div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">10</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">11</div>
+
+                    <div className="h-8 flex items-center justify-center text-[#454549]">12</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">13</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">14</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">15</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">16</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">17</div>
+                    <div className="h-8 flex items-center justify-center rounded-[9px] bg-[#f0f0f2] text-[#3a3a3c] font-semibold">
+                      18
+                    </div>
+
+                    <div className="h-8 flex items-center justify-center text-[#454549]">19</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">20</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">21</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">22</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">23</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">24</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">25</div>
+
+                    <div className="h-8 flex items-center justify-center text-[#454549]">26</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">27</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">28</div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">29</div>
+                    <div className="h-8 flex items-center justify-center rounded-[9px] bg-[#111] text-white font-bold">
+                      30
+                    </div>
+                    <div className="h-8 flex items-center justify-center text-[#454549]">31</div>
+                    <div></div>
+                  </div>
+                </div>
+
+                {/* CARD 2: Alertas importantes */}
+                <div className="pt-1">
+                  <div className="flex items-center gap-2.5 mb-2.5 px-1">
+                    <div className="w-[34px] h-[34px] rounded-[11px] bg-white text-[#ff3b30] border border-[#ff3b30]/15 flex items-center justify-center font-bold text-[16px] shadow-xs">
+                      !
+                    </div>
+                    <div>
+                      <div className="text-[14px] font-bold text-[#111111]">
+                        Alertas importantes
+                      </div>
+                      <div className="text-[12px] text-[#8e8e93]">3 itens requerem atenção</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {/* Alert 1 */}
+                    <div
+                      onClick={() => setActiveTab("inventory")}
+                      className="cursor-pointer bg-[#ff9f0a]/[0.115] border border-[#ff9f0a]/[0.17] text-[#845000] rounded-[15px] p-3.5 flex items-center gap-3 transition hover:opacity-90"
+                    >
+                      <div className="w-[9px] h-[9px] rounded-full bg-[#ff9f0a] flex-shrink-0"></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-bold text-[#845000]">
+                          Velas LED abaixo do mínimo
+                        </div>
+                        <div className="text-[11px] text-[#845000]/70 mt-0.5">
+                          8 disponíveis · mínimo 20
+                        </div>
+                      </div>
+                      <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full bg-white/70 text-[#845000]">
+                        Stock
+                      </span>
+                    </div>
+
+                    {/* Alert 2 */}
+                    <div
+                      onClick={() => setActiveTab("inventory")}
+                      className="cursor-pointer bg-[#ff3b30]/[0.09] border border-[#ff3b30]/[0.16] text-[#a62a24] rounded-[15px] p-3.5 flex items-center gap-3 transition hover:opacity-90"
+                    >
+                      <div className="w-[9px] h-[9px] rounded-full bg-[#ff3b30] flex-shrink-0"></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-bold text-[#a62a24]">
+                          3 cadeiras danificadas
+                        </div>
+                        <div className="text-[11px] text-[#a62a24]/70 mt-0.5">
+                          Cadeira Chiavari Dourada
+                        </div>
+                      </div>
+                      <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full bg-white/70 text-[#a62a24]">
+                        Dano
+                      </span>
+                    </div>
+
+                    {/* Alert 3 */}
+                    <div
+                      onClick={() => setActiveTab("events")}
+                      className="cursor-pointer bg-[#ff9f0a]/[0.115] border border-[#ff9f0a]/[0.17] text-[#845000] rounded-[15px] p-3.5 flex items-center gap-3 transition hover:opacity-90"
+                    >
+                      <div className="w-[9px] h-[9px] rounded-full bg-[#ff9f0a] flex-shrink-0"></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-bold text-[#845000]">
+                          Mastercard Gala em preparação
+                        </div>
+                        <div className="text-[11px] text-[#845000]/70 mt-0.5">
+                          Material ainda não está 100% preparado
+                        </div>
+                      </div>
+                      <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full bg-white/70 text-[#845000]">
+                        Evento
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
         )}
 
-        {/* TAB 2: CALENDAR FULL */}
+        {/* TAB 2: CALENDAR */}
         {activeTab === "calendar" && (
-          <div className="bg-white border border-[#ececf0] rounded-2xl p-6 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-bold tracking-tight">Calendário Completo de Produção</h2>
-                <p className="text-xs text-[#8e8e93]">
-                  Visão cronológica de eventos, preparações em armazém e devoluções
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-[#f2f2f5] text-[#3a3a3c]">
-                  Calendly Auto-Sync Ativo
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {eventsList.map((evt) => (
-                <div
-                  key={evt.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-[#ececf0] hover:border-[#007aff]/40 transition gap-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-[#f8f8fa] flex flex-col items-center justify-center text-center">
-                      <span className="text-xs font-bold text-[#007aff]">
-                        {new Date(evt.startDate).toLocaleDateString("pt-PT", { month: "short" }).toUpperCase()}
-                      </span>
-                      <span className="text-sm font-black">
-                        {new Date(evt.startDate).getDate()}
-                      </span>
-                    </div>
-
-                    <div>
-                      <h3 className="font-bold text-sm">{evt.name}</h3>
-                      <div className="text-xs text-[#8e8e93] flex items-center gap-2 mt-0.5">
-                        <span>{evt.venue}</span>
-                        <span>·</span>
-                        <span>
-                          {new Date(evt.startDate).toLocaleTimeString("pt-PT", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      </div>
+          <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs space-y-4">
+            <h2 className="text-[20px] font-bold">Calendário de Eventos</h2>
+            <div className="divide-y divide-[#ececf0]">
+              {eventsList.map((e) => (
+                <div key={e.id} className="py-3 flex items-center justify-between">
+                  <div>
+                    <div className="font-bold">{e.name}</div>
+                    <div className="text-xs text-[#8e8e93]">
+                      {new Date(e.startDate).toLocaleString("pt-PT")} · {e.venue}
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-3">
-                    <select
-                      value={evt.status}
-                      onChange={(e) => handleStatusChange(evt.id, e.target.value)}
-                      className="text-xs font-medium bg-[#f8f8fa] border border-[#ececf0] rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#007aff]"
-                    >
-                      <option value="planeamento">Planeamento</option>
-                      <option value="orcamento">Orçamento</option>
-                      <option value="confirmado">Confirmado</option>
-                      <option value="preparacao">Preparação</option>
-                      <option value="em_curso">Em curso</option>
-                      <option value="devolucao">Devolução</option>
-                      <option value="concluido">Concluído</option>
-                      <option value="cancelado">Cancelado</option>
-                    </select>
-                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#eaf8ee] text-[#24793a]">
+                    {e.status}
+                  </span>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* TAB 3: EVENTS PIPELINE */}
+        {/* TAB 3: EVENTS */}
         {activeTab === "events" && (
-          <div className="space-y-4">
+          <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold tracking-tight">Pipeline de Eventos</h2>
-                <p className="text-xs text-[#8e8e93]">
-                  Acompanhamento de estágios operacionais da CFM Eventos
-                </p>
-              </div>
+              <h2 className="text-[20px] font-bold">Eventos & Produção</h2>
               <button
                 onClick={() => setShowEventWizard(true)}
-                className="px-3.5 py-2 rounded-xl bg-[#007aff] hover:bg-[#0062cc] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition"
+                className="px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-semibold"
               >
-                <Plus className="w-4 h-4" />
-                <span>Novo evento</span>
+                ＋ Novo evento
               </button>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {eventsList.map((evt) => {
-                const statusInfo = statusColors[evt.status] || {
-                  bg: "bg-gray-100",
-                  text: "text-gray-700",
-                  label: evt.status,
-                };
-
-                return (
-                  <div
-                    key={evt.id}
-                    className="bg-white border border-[#ececf0] rounded-2xl p-5 shadow-xs flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusInfo.bg} ${statusInfo.text}`}
-                        >
-                          {statusInfo.label}
-                        </span>
-                        <span className="text-xs text-[#8e8e93]">
-                          {new Date(evt.startDate).toLocaleDateString("pt-PT", {
-                            day: "numeric",
-                            month: "short",
-                          })}
-                        </span>
-                      </div>
-
-                      <h3 className="font-bold text-base tracking-tight text-[#111111]">{evt.name}</h3>
-                      <p className="text-xs text-[#8e8e93] mt-1 flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5" />
-                        {evt.venue}
-                      </p>
-
-                      {evt.notes && (
-                        <p className="text-xs text-[#555] mt-3 p-2.5 rounded-xl bg-[#f8f8fa] border border-[#ececf0] line-clamp-2">
-                          {evt.notes}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="mt-5 pt-3 border-t border-[#ececf0] flex items-center justify-between">
-                      <div>
-                        <div className="text-[10px] text-[#8e8e93] uppercase font-bold">Alterar Estado</div>
-                        <select
-                          value={evt.status}
-                          onChange={(e) => handleStatusChange(evt.id, e.target.value)}
-                          className="text-xs font-semibold bg-transparent text-[#007aff] cursor-pointer focus:outline-none"
-                        >
-                          <option value="planeamento">Planeamento</option>
-                          <option value="orcamento">Orçamento</option>
-                          <option value="confirmado">Confirmado</option>
-                          <option value="preparacao">Preparação</option>
-                          <option value="em_curso">Em curso</option>
-                          <option value="devolucao">Devolução</option>
-                          <option value="concluido">Concluído</option>
-                          <option value="cancelado">Cancelado</option>
-                        </select>
-                      </div>
-
-                      <div className="text-right">
-                        <div className="text-[10px] text-[#8e8e93] uppercase font-bold">Orçamento</div>
-                        <div className="text-xs font-bold">
-                          €{evt.totalBudget?.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 4: INVENTORY FULL */}
-        {activeTab === "inventory" && (
-          <div className="bg-white border border-[#ececf0] rounded-2xl p-6 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-bold tracking-tight">Inventário & Material de Aluguer</h2>
-                <p className="text-xs text-[#8e8e93]">
-                  Catálogo com localização de armazém, controlo de stocks e avarias
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 text-xs rounded-full bg-[#f2f2f5] font-semibold">
-                  {initialItems.length} Artigos Registados
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {initialItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-2xl border border-[#ececf0] p-4 bg-[#fafafa] flex flex-col justify-between"
-                >
-                  <div>
-                    {item.imageUrl && (
-                      <div className="h-32 w-full rounded-xl overflow-hidden mb-3 bg-gray-100">
-                        <img
-                          src={item.imageUrl}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-[#8e8e93] tracking-wider uppercase">
-                        {item.sku}
-                      </span>
-                      <span className="text-xs font-bold text-[#007aff]">
-                        €{item.unitPrice.toFixed(2)} / dia
-                      </span>
-                    </div>
-                    <h3 className="font-bold text-sm text-[#111111] mt-0.5">{item.name}</h3>
-                    <div className="text-xs text-[#8e8e93] mt-1">{item.category}</div>
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-[#ececf0] space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-[#8e8e93]">Localização:</span>
-                      <span className="font-medium text-[#111111]">{item.warehouseLocation}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-[#8e8e93]">Stock Total:</span>
-                      <span className="font-bold text-[#111111]">{item.totalQuantity} un.</span>
-                    </div>
-                    <div className="w-full bg-[#ececf0] h-1.5 rounded-full overflow-hidden">
-                      <div className="bg-[#34c759] h-full w-[70%]"></div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 5: QUOTES FULL */}
-        {activeTab === "quotes" && (
-          <div className="bg-white border border-[#ececf0] rounded-2xl p-6 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-bold tracking-tight">Orçamentos & Links de Adjudicação</h2>
-                <p className="text-xs text-[#8e8e93]">
-                  Propostas comerciais com aprovação digital instantânea do cliente
-                </p>
-              </div>
-              <button
-                onClick={() => setShowQuoteWizard(true)}
-                className="px-3.5 py-2 rounded-xl bg-[#007aff] hover:bg-[#0062cc] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Novo orçamento</span>
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {quotesList.map((q) => {
-                const isApproved = q.status === "aprovado";
-                return (
-                  <div
-                    key={q.id}
-                    className="p-5 rounded-2xl border border-[#ececf0] bg-[#fafafa] flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-sm text-[#111111]">{q.quoteNumber}</span>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                            isApproved
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-amber-100 text-amber-800"
-                          }`}
-                        >
-                          {isApproved ? "✓ Aprovado pelo Cliente" : "Aguardando Aprovação"}
-                        </span>
-                      </div>
-                      <div className="text-xs text-[#8e8e93]">
-                        Subtotal: €{q.subtotal.toFixed(2)} · IVA (23%): €{q.vatAmount.toFixed(2)}
-                      </div>
-                      <div className="text-sm font-bold text-[#111111] mt-1">
-                        Total: €{q.total.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => copyQuoteLink(q.accessToken)}
-                        className="px-3.5 py-2 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold text-[#111111] hover:bg-[#f2f2f5] flex items-center gap-1.5 transition shadow-xs"
-                      >
-                        {copiedToken === q.accessToken ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-[#34c759]" />
-                            <span>Copiado!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span>Copiar Link de Aprovação</span>
-                          </>
-                        )}
-                      </button>
-
-                      <a
-                        href={`/proposta/${q.accessToken}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-3.5 py-2 rounded-xl bg-[#007aff] hover:bg-[#0062cc] text-xs font-semibold text-white flex items-center gap-1.5 transition shadow-xs"
-                      >
-                        <span>Abrir Proposta</span>
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 6: FINANCE FULL */}
-        {activeTab === "finance" && (
-          <div className="bg-white border border-[#ececf0] rounded-2xl p-6 shadow-xs space-y-6">
-            <div>
-              <h2 className="text-lg font-bold tracking-tight">Livro de Movimentos Financeiros</h2>
-              <p className="text-xs text-[#8e8e93]">
-                Registo de entradas, despesas de produção e investimento em material
-              </p>
-            </div>
-
             <div className="divide-y divide-[#ececf0]">
-              {initialMovements.map((mov) => {
-                const isEntrada = mov.type === "entrada";
-                const isSaida = mov.type === "saida";
-
-                return (
-                  <div key={mov.id} className="py-3.5 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                          isEntrada
-                            ? "bg-emerald-100 text-emerald-700"
-                            : isSaida
-                            ? "bg-rose-100 text-rose-700"
-                            : "bg-amber-100 text-amber-700"
-                        }`}
-                      >
-                        {isEntrada ? "+" : "-"}
-                      </div>
-                      <div>
-                        <div className="font-semibold text-sm text-[#111111]">
-                          {mov.description}
-                        </div>
-                        <div className="text-[#8e8e93] text-[11px] mt-0.5">
-                          {mov.category} · {new Date(mov.date).toLocaleDateString("pt-PT")}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div
-                      className={`text-sm font-bold ${
-                        isEntrada ? "text-[#24793a]" : "text-[#111111]"
-                      }`}
-                    >
-                      {isEntrada ? "+" : "-"}€
-                      {mov.amount.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 7: CLIENTS FULL */}
-        {activeTab === "clients" && (
-          <div className="bg-white border border-[#ececf0] rounded-2xl p-6 shadow-xs space-y-6">
-            <div>
-              <h2 className="text-lg font-bold tracking-tight">CRM & Diretório de Clientes</h2>
-              <p className="text-xs text-[#8e8e93]">
-                Registo de clientes corporativos, contactos particulares e leads do Calendly
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {initialClients.map((c) => (
-                <div
-                  key={c.id}
-                  className="p-5 rounded-2xl border border-[#ececf0] bg-[#fafafa] flex flex-col justify-between"
-                >
+              {eventsList.map((e) => (
+                <div key={e.id} className="py-3 flex items-center justify-between">
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="w-8 h-8 rounded-xl bg-white border border-[#ececf0] flex items-center justify-center text-xs font-bold text-[#111111]">
-                        <Building2 className="w-4 h-4" />
-                      </span>
-                      {c.source === "calendly" && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">
-                          via Calendly
-                        </span>
-                      )}
+                    <div className="font-bold">{e.name}</div>
+                    <div className="text-xs text-[#8e8e93]">
+                      {new Date(e.startDate).toLocaleDateString("pt-PT")} · {e.venue}
                     </div>
-                    <h3 className="font-bold text-sm text-[#111111]">{c.name}</h3>
-                    {c.contactName && (
-                      <div className="text-xs text-[#8e8e93] mt-0.5">Contacto: {c.contactName}</div>
-                    )}
-                    {c.email && <div className="text-xs text-[#8e8e93] mt-0.5">{c.email}</div>}
-                    {c.phone && <div className="text-xs text-[#8e8e93] mt-0.5">{c.phone}</div>}
                   </div>
-
-                  {c.notes && (
-                    <div className="mt-3 pt-3 border-t border-[#ececf0] text-[11px] text-[#555]">
-                      {c.notes}
-                    </div>
-                  )}
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#f2f2f4] text-[#48484a]">
+                    {e.status}
+                  </span>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
+        )}
+
+        {/* TAB 4: INVENTORY */}
+        {activeTab === "inventory" && (
+          <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs space-y-4">
+            <h2 className="text-[20px] font-bold">Catálogo de Stock</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {initialItems.map((item) => (
+                <div key={item.id} className="p-4 rounded-xl border border-[#ececf0] bg-[#fafafa]">
+                  <div className="font-bold text-sm">{item.name}</div>
+                  <div className="text-xs text-[#8e8e93] mt-1">{item.warehouseLocation}</div>
+                  <div className="text-xs font-semibold mt-2">
+                    Stock: {item.totalQuantity} unidades
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* TAB 5: MORE (Quotes, Clients, Finance) */}
+        {activeTab === "more" && (
+          <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs space-y-4">
+            <h2 className="text-[20px] font-bold">Gestão & Definições</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div
+                onClick={() => setShowQuoteWizard(true)}
+                className="cursor-pointer p-4 rounded-xl border border-[#ececf0] bg-[#f8f8fa] hover:bg-white transition"
+              >
+                <div className="font-bold text-sm">Orçamentos</div>
+                <div className="text-xs text-[#8e8e93]">Criar, exportar e enviar propostas</div>
+              </div>
+              <div className="p-4 rounded-xl border border-[#ececf0] bg-[#f8f8fa]">
+                <div className="font-bold text-sm">Clientes CRM</div>
+                <div className="text-xs text-[#8e8e93]">Histórico e contactos comerciais</div>
+              </div>
+            </div>
+          </section>
         )}
       </main>
 
-      {/* NOVO EVENTO WIZARD MODAL */}
+      {/* Floating Bottom Navigation Bar (Matching prototype) */}
+      <aside className="fixed bottom-0 left-0 right-0 z-40 bg-[rgba(249,249,251,0.96)] backdrop-blur-[24px] border-t border-[#ececf0] py-2 flex items-center justify-center">
+        <div className="w-full max-w-[650px] flex items-center justify-around h-[52px]">
+          {/* 1. Início */}
+          <button
+            onClick={() => setActiveTab("home")}
+            className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition"
+            style={{
+              backgroundColor: activeTab === "home" ? "rgba(0,122,255,0.11)" : "transparent",
+              color: activeTab === "home" ? "#007aff" : "#8e8e93",
+            }}
+            title="Início"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3.25 10.6 12 3.45l8.75 7.15" />
+              <path d="M5.35 9.25V20.2h13.3V9.25" />
+              <path d="M9.25 20.2v-6.35h5.5v6.35" />
+            </svg>
+          </button>
+
+          {/* 2. Calendário */}
+          <button
+            onClick={() => setActiveTab("calendar")}
+            className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition"
+            style={{
+              backgroundColor: activeTab === "calendar" ? "rgba(0,122,255,0.11)" : "transparent",
+              color: activeTab === "calendar" ? "#007aff" : "#8e8e93",
+            }}
+            title="Calendário"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="3.25" y="4.75" width="17.5" height="16" rx="2.6" />
+              <path d="M7.45 3.2v4M16.55 3.2v4M3.25 9.4h17.5" />
+              <path d="M7.2 13.1h2.15M11 13.1h2.15M14.8 13.1h2.15M7.2 16.8h2.15M11 16.8h2.15" />
+            </svg>
+          </button>
+
+          {/* 3. Eventos */}
+          <button
+            onClick={() => setActiveTab("events")}
+            className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition"
+            style={{
+              backgroundColor: activeTab === "events" ? "rgba(0,122,255,0.11)" : "transparent",
+              color: activeTab === "events" ? "#007aff" : "#8e8e93",
+            }}
+            title="Eventos"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3.25 7.15h17.5v3.05a2.35 2.35 0 0 0 0 4.7v3.95H3.25V14.9a2.35 2.35 0 0 0 0-4.7z" />
+              <path d="M9.2 7.15v11.7" />
+              <path d="M13.2 10.45v5.1M15.75 10.45v5.1" strokeDasharray="1.1 2.1" />
+            </svg>
+          </button>
+
+          {/* 4. Stock */}
+          <button
+            onClick={() => setActiveTab("inventory")}
+            className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition"
+            style={{
+              backgroundColor: activeTab === "inventory" ? "rgba(0,122,255,0.11)" : "transparent",
+              color: activeTab === "inventory" ? "#007aff" : "#8e8e93",
+            }}
+            title="Stock"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3.5 7.1 12 2.95l8.5 4.15v9.8L12 21.05 3.5 16.9z" />
+              <path d="M3.85 7.3 12 11.45l8.15-4.15M12 11.45v9.6" />
+              <path d="m8.05 4.9 8.25 4.2" />
+            </svg>
+          </button>
+
+          {/* 5. Mais */}
+          <button
+            onClick={() => setActiveTab("more")}
+            className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition"
+            style={{
+              backgroundColor: activeTab === "more" ? "rgba(0,122,255,0.11)" : "transparent",
+              color: activeTab === "more" ? "#007aff" : "#8e8e93",
+            }}
+            title="Mais"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="3.6" y="3.6" width="6.6" height="6.6" rx="1.85" />
+              <rect x="13.8" y="3.6" width="6.6" height="6.6" rx="1.85" />
+              <rect x="3.6" y="13.8" width="6.6" height="6.6" rx="1.85" />
+              <rect x="13.8" y="13.8" width="6.6" height="6.6" rx="1.85" />
+            </svg>
+          </button>
+        </div>
+      </aside>
+
+      {/* EVENT WIZARD MODAL */}
       {showEventWizard && (
         <EventWizardModal
           clients={initialClients}
@@ -1041,7 +756,7 @@ export default function EventFlowApp({
         />
       )}
 
-      {/* NOVO ORCAMENTO WIZARD MODAL */}
+      {/* QUOTE WIZARD MODAL */}
       {showQuoteWizard && (
         <QuoteWizardModal
           clients={initialClients}
@@ -1054,79 +769,6 @@ export default function EventFlowApp({
           }}
         />
       )}
-
-      {/* Floating Bottom Navigation Bar (Apple Style) */}
-      <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white/95 backdrop-blur-md border border-[#ececf0] shadow-lg rounded-2xl px-3 py-2 flex items-center gap-1 sm:gap-2">
-        <button
-          onClick={() => setActiveTab("home")}
-          className={`flex flex-col items-center px-3 py-1.5 rounded-xl transition ${
-            activeTab === "home" ? "text-[#007aff] font-bold" : "text-[#8e8e93] hover:text-[#111111]"
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Início</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("calendar")}
-          className={`flex flex-col items-center px-3 py-1.5 rounded-xl transition ${
-            activeTab === "calendar" ? "text-[#007aff] font-bold" : "text-[#8e8e93] hover:text-[#111111]"
-          }`}
-        >
-          <CalendarIcon className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Calendário</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("events")}
-          className={`flex flex-col items-center px-3 py-1.5 rounded-xl transition ${
-            activeTab === "events" ? "text-[#007aff] font-bold" : "text-[#8e8e93] hover:text-[#111111]"
-          }`}
-        >
-          <Clock className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Eventos</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("inventory")}
-          className={`flex flex-col items-center px-3 py-1.5 rounded-xl transition ${
-            activeTab === "inventory" ? "text-[#007aff] font-bold" : "text-[#8e8e93] hover:text-[#111111]"
-          }`}
-        >
-          <Package className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Stock</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("quotes")}
-          className={`flex flex-col items-center px-3 py-1.5 rounded-xl transition ${
-            activeTab === "quotes" ? "text-[#007aff] font-bold" : "text-[#8e8e93] hover:text-[#111111]"
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Orçamentos</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("finance")}
-          className={`flex flex-col items-center px-3 py-1.5 rounded-xl transition ${
-            activeTab === "finance" ? "text-[#007aff] font-bold" : "text-[#8e8e93] hover:text-[#111111]"
-          }`}
-        >
-          <DollarSign className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Financeiro</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("clients")}
-          className={`flex flex-col items-center px-3 py-1.5 rounded-xl transition ${
-            activeTab === "clients" ? "text-[#007aff] font-bold" : "text-[#8e8e93] hover:text-[#111111]"
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Clientes</span>
-        </button>
-      </nav>
     </div>
   );
 }
@@ -1202,14 +844,13 @@ function EventWizardModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg border border-[#ececf0] shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Header */}
+      <div className="bg-white rounded-[22px] w-full max-w-lg border border-[#ececf0] shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
         <div className="p-5 border-b border-[#ececf0] flex items-center justify-between">
           <div>
             <div className="text-[11px] font-bold text-[#007aff] uppercase tracking-wider">
               Passo {step} de 3
             </div>
-            <h2 className="text-base font-bold text-[#111111]">Novo Evento</h2>
+            <h2 className="text-[17px] font-bold text-[#111111]">Novo Evento</h2>
           </div>
           <button
             onClick={onClose}
@@ -1219,7 +860,6 @@ function EventWizardModal({
           </button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
           {step === 1 && (
             <div className="space-y-4">
@@ -1231,7 +871,7 @@ function EventWizardModal({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Ex: Gala de Natal Santander"
-                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                 />
               </div>
 
@@ -1240,7 +880,7 @@ function EventWizardModal({
                 <select
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                 >
                   {clients.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -1257,17 +897,7 @@ function EventWizardModal({
                   value={venue}
                   onChange={(e) => setVenue(e.target.value)}
                   placeholder="Ex: Pavilhão Carlos Lopes, Lisboa"
-                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#3a3a3c] mb-1">URL Fotografia de Capa</label>
-                <input
-                  type="url"
-                  value={coverImageUrl}
-                  onChange={(e) => setCoverImageUrl(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                 />
               </div>
             </div>
@@ -1283,7 +913,7 @@ function EventWizardModal({
                     required
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                   />
                 </div>
                 <div>
@@ -1292,12 +922,12 @@ function EventWizardModal({
                     type="datetime-local"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                   />
                 </div>
               </div>
 
-              <div className="p-3 bg-[#f8f8fa] border border-[#ececf0] rounded-xl space-y-3">
+              <div className="p-3 bg-[#f8f8fa] border border-[#ececf0] rounded-[14px] space-y-3">
                 <div className="font-bold text-[11px] text-[#007aff] uppercase tracking-wider">
                   Datas Logísticas de Armazém
                 </div>
@@ -1332,7 +962,7 @@ function EventWizardModal({
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                 >
                   <option value="planeamento">Planeamento</option>
                   <option value="orcamento">Orçamento</option>
@@ -1348,7 +978,7 @@ function EventWizardModal({
                   step="0.01"
                   value={totalBudget}
                   onChange={(e) => setTotalBudget(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                 />
               </div>
 
@@ -1359,19 +989,18 @@ function EventWizardModal({
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Ex: Necessária equipa de 4 montadores e carrinha extra."
-                  className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                  className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                 />
               </div>
             </div>
           )}
 
-          {/* Footer Navigation */}
           <div className="pt-4 border-t border-[#ececf0] flex items-center justify-between">
             {step > 1 ? (
               <button
                 type="button"
                 onClick={() => setStep(step - 1)}
-                className="px-4 py-2 rounded-xl bg-white border border-[#ececf0] text-xs font-bold hover:bg-[#f2f2f5]"
+                className="px-4 py-2 rounded-[12px] bg-white border border-[#ececf0] text-xs font-bold hover:bg-[#f2f2f5]"
               >
                 Voltar
               </button>
@@ -1383,7 +1012,7 @@ function EventWizardModal({
               <button
                 type="button"
                 onClick={() => setStep(step + 1)}
-                className="px-4 py-2 rounded-xl bg-[#007aff] text-white text-xs font-bold hover:bg-[#0062cc]"
+                className="px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold hover:bg-black"
               >
                 Continuar
               </button>
@@ -1391,7 +1020,7 @@ function EventWizardModal({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-5 py-2.5 rounded-xl bg-[#007aff] hover:bg-[#0062cc] text-white text-xs font-bold shadow-xs transition"
+                className="px-5 py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold shadow-xs transition"
               >
                 {isSubmitting ? "A criar evento..." : "Criar Evento"}
               </button>
@@ -1424,7 +1053,6 @@ function QuoteWizardModal({
   const [eventId, setEventId] = useState(events[0]?.id || "");
   const [validityDays, setValidityDays] = useState("15");
 
-  // Selected lines
   const [lines, setLines] = useState<
     Array<{ itemId?: string; description: string; quantity: number; unitPrice: number }>
   >([
@@ -1465,7 +1093,7 @@ function QuoteWizardModal({
     );
   };
 
-  const subtotal = lines.reduce((sum, l) => sum + (l.quantity * l.unitPrice), 0);
+  const subtotal = lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
   const vatAmount = subtotal * 0.23;
   const total = subtotal + vatAmount;
 
@@ -1505,14 +1133,13 @@ function QuoteWizardModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-xl border border-[#ececf0] shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Header */}
+      <div className="bg-white rounded-[22px] w-full max-w-xl border border-[#ececf0] shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
         <div className="p-5 border-b border-[#ececf0] flex items-center justify-between">
           <div>
             <div className="text-[11px] font-bold text-[#007aff] uppercase tracking-wider">
               Passo {step} de 3
             </div>
-            <h2 className="text-base font-bold text-[#111111]">Novo Orçamento</h2>
+            <h2 className="text-[17px] font-bold text-[#111111]">Novo Orçamento</h2>
           </div>
           <button
             onClick={onClose}
@@ -1522,7 +1149,6 @@ function QuoteWizardModal({
           </button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
           {step === 1 && (
             <div className="space-y-4">
@@ -1531,7 +1157,7 @@ function QuoteWizardModal({
                 <select
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                 >
                   {clients.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -1546,7 +1172,7 @@ function QuoteWizardModal({
                 <select
                   value={eventId}
                   onChange={(e) => setEventId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                 >
                   {events.map((evt) => (
                     <option key={evt.id} value={evt.id}>
@@ -1557,12 +1183,14 @@ function QuoteWizardModal({
               </div>
 
               <div>
-                <label className="block font-bold text-[#3a3a3c] mb-1">Validade da Proposta (Dias)</label>
+                <label className="block font-bold text-[#3a3a3c] mb-1">
+                  Validade da Proposta (Dias)
+                </label>
                 <input
                   type="number"
                   value={validityDays}
                   onChange={(e) => setValidityDays(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                 />
               </div>
             </div>
@@ -1571,7 +1199,9 @@ function QuoteWizardModal({
           {step === 2 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-sm text-[#111111]">Linhas de Artigos & Serviços</span>
+                <span className="font-bold text-sm text-[#111111]">
+                  Linhas de Artigos & Serviços
+                </span>
                 <button
                   type="button"
                   onClick={addLine}
@@ -1601,7 +1231,9 @@ function QuoteWizardModal({
                         type="number"
                         min="1"
                         value={line.quantity}
-                        onChange={(e) => updateLine(idx, "quantity", parseInt(e.target.value || "1", 10))}
+                        onChange={(e) =>
+                          updateLine(idx, "quantity", parseInt(e.target.value || "1", 10))
+                        }
                         className="w-full px-2 py-1 bg-white border border-[#ececf0] rounded-lg text-xs text-center"
                       />
                     </div>
@@ -1610,7 +1242,9 @@ function QuoteWizardModal({
                         type="number"
                         step="0.01"
                         value={line.unitPrice}
-                        onChange={(e) => updateLine(idx, "unitPrice", parseFloat(e.target.value || "0"))}
+                        onChange={(e) =>
+                          updateLine(idx, "unitPrice", parseFloat(e.target.value || "0"))
+                        }
                         className="w-full px-2 py-1 bg-white border border-[#ececf0] rounded-lg text-xs text-right"
                       />
                     </div>
@@ -1642,23 +1276,23 @@ function QuoteWizardModal({
                 </div>
                 <div className="flex justify-between text-sm font-bold pt-2 border-t border-[#ececf0] text-[#111111]">
                   <span>Total da Proposta</span>
-                  <span className="text-[#007aff]">€{total.toFixed(2)}</span>
+                  <span className="text-[#111111]">€{total.toFixed(2)}</span>
                 </div>
               </div>
 
               <div className="text-[11px] text-[#8e8e93]">
-                Ao gerar este orçamento, será criado um link de aprovação direta para o cliente com assinatura digital.
+                Ao gerar este orçamento, será criado um link de aprovação direta para o cliente
+                com assinatura digital.
               </div>
             </div>
           )}
 
-          {/* Footer Navigation */}
           <div className="pt-4 border-t border-[#ececf0] flex items-center justify-between">
             {step > 1 ? (
               <button
                 type="button"
                 onClick={() => setStep(step - 1)}
-                className="px-4 py-2 rounded-xl bg-white border border-[#ececf0] text-xs font-bold hover:bg-[#f2f2f5]"
+                className="px-4 py-2 rounded-[12px] bg-white border border-[#ececf0] text-xs font-bold hover:bg-[#f2f2f5]"
               >
                 Voltar
               </button>
@@ -1670,7 +1304,7 @@ function QuoteWizardModal({
               <button
                 type="button"
                 onClick={() => setStep(step + 1)}
-                className="px-4 py-2 rounded-xl bg-[#007aff] text-white text-xs font-bold hover:bg-[#0062cc]"
+                className="px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold hover:bg-black"
               >
                 Continuar
               </button>
@@ -1678,7 +1312,7 @@ function QuoteWizardModal({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-5 py-2.5 rounded-xl bg-[#007aff] hover:bg-[#0062cc] text-white text-xs font-bold shadow-xs transition"
+                className="px-5 py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold shadow-xs transition"
               >
                 {isSubmitting ? "A gerar orçamento..." : "Gerar Orçamento & Link"}
               </button>
