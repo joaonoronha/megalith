@@ -95,3 +95,42 @@ export async function createQuoteAction(formData: FormData) {
   revalidatePath("/");
   return { success: true, id: quoteId, accessToken };
 }
+
+export async function loginAction(formData: FormData) {
+  const { loginUser } = await import("@/lib/auth");
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+
+  if (!email || !password) {
+    return { success: false, error: "Preenche o email e a palavra-passe." };
+  }
+
+  const result = await loginUser(email, password);
+  if (result.success) {
+    revalidatePath("/");
+  }
+  return result;
+}
+
+export async function logoutAction() {
+  const { logoutUser } = await import("@/lib/auth");
+  await logoutUser();
+  revalidatePath("/");
+}
+
+export async function createUserAction(formData: FormData) {
+  const { createTeamUser } = await import("@/lib/auth");
+  const name = formData.get("name") as string;
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+  const role = (formData.get("role") as any) || "admin";
+
+  if (!name || !email || !password) {
+    return { success: false, error: "Nome, email e palavra-passe são obrigatórios." };
+  }
+
+  const result = await createTeamUser({ name, email, password, role });
+  revalidatePath("/");
+  return result;
+}
+

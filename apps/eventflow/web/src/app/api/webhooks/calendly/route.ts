@@ -4,6 +4,18 @@ import { clients, events } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
 
+export async function GET() {
+  return NextResponse.json({
+    status: "ok",
+    message: "CFM EventFlow Calendly Webhook endpoint is active and awaiting events.",
+    endpoint: "/api/webhooks/calendly",
+  });
+}
+
+export async function HEAD() {
+  return new NextResponse(null, { status: 200 });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
