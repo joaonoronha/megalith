@@ -1,0 +1,7 @@
+id: eventflow
+name: EventFlow (CFM Eventos)
+description: Operations management, temporal inventory allocation, digital quote approval, and financial ledger platform for CFM Eventos.
+docs: README.md
+services:
+  - id: web
+    manifest: web/service.yaml
