@@ -457,11 +457,11 @@ export default function EventFlowApp({
   const [calendarFilter, setCalendarFilter] = useState<"all" | "meetings" | "events">("all");
 
   const calendlyMeetingsCount = useMemo(() => {
-    return eventsList.filter(isCalendlyMeeting).length;
-  }, [eventsList]);
+    return meetingsList.length;
+  }, [meetingsList]);
 
   const productionEventsCount = useMemo(() => {
-    return eventsList.filter((e) => !isCalendlyMeeting(e)).length;
+    return eventsList.length;
   }, [eventsList]);
 
   const handleSyncCalendly = async (token?: string) => {
@@ -474,6 +474,9 @@ export default function EventFlowApp({
         }
         if (res.clients) {
           setClientsList(res.clients);
+        }
+        if (res.meetings) {
+          setMeetingsList(res.meetings);
         }
         setCalendlyBanner({
           type: "success",
@@ -811,26 +814,46 @@ export default function EventFlowApp({
     });
   };
 
+  // Unified Calendar Items: merges production events and meetings
+  const allCalendarItems = useMemo(() => {
+    const eventItems = eventsList.map((e) => ({
+      ...e,
+      isMeeting: false,
+      detailUrl: `/eventos/${e.id}`,
+      displayTitle: e.name,
+    }));
+    const meetingItems = meetingsList.map((m) => ({
+      ...m,
+      name: m.title || m.name || "Reunião",
+      isMeeting: true,
+      detailUrl: `/reunioes/${m.id}`,
+      displayTitle: m.title || m.name || "Reunião",
+      category: "Reunião Calendly",
+      venue: m.location || m.venue || "Google Meet",
+    }));
+    return [...eventItems, ...meetingItems];
+  }, [eventsList, meetingsList]);
+
   const getEventsForCalendarDay = (
     day: number,
     month = currentCalendarMonth,
     year = currentCalendarYear,
     filterMode: "all" | "meetings" | "events" = "all"
   ) => {
-    return eventsList.filter((e) => {
+    return allCalendarItems.filter((e) => {
       if (!e.startDate) return false;
       const d = new Date(e.startDate);
       const matchesDate = d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
       if (!matchesDate) return false;
-      if (filterMode === "meetings") return isCalendlyMeeting(e);
-      if (filterMode === "events") return !isCalendlyMeeting(e);
+      if (filterMode === "meetings") return e.isMeeting;
+      if (filterMode === "events") return !e.isMeeting;
       return true;
     });
   };
 
   // Days with events in current calendar month
   const eventDays = new Set(
-    eventsList
+    allCalendarItems
       .filter((e) => {
         if (!e.startDate) return false;
         const d = new Date(e.startDate);
@@ -841,9 +864,9 @@ export default function EventFlowApp({
 
   // Days with Calendly meetings in current calendar month
   const calendlyEventDays = new Set(
-    eventsList
+    allCalendarItems
       .filter((e) => {
-        if (!e.startDate || !isCalendlyMeeting(e)) return false;
+        if (!e.startDate || !e.isMeeting) return false;
         const d = new Date(e.startDate);
         return d.getFullYear() === currentCalendarYear && d.getMonth() === currentCalendarMonth;
       })
@@ -1995,7 +2018,7 @@ export default function EventFlowApp({
                       : "bg-[#f2f2f5] text-[#636366] hover:bg-[#e5e5ea]"
                   }`}
                 >
-                  Todos ({eventsList.length})
+                  Todos ({allCalendarItems.length})
                 </button>
                 <button
                   type="button"
@@ -2130,13 +2153,13 @@ export default function EventFlowApp({
                       {/* Event pills preview on Desktop */}
                       <div className="hidden sm:block space-y-1 my-1.5 flex-1 min-w-0">
                         {dayEvents.slice(0, 2).map((evt) => {
-                          const isMeeting = isCalendlyMeeting(evt);
+                          const isMeeting = Boolean(evt.isMeeting || isCalendlyMeeting(evt));
                           if (isMeeting) {
                             return (
                               <div
                                 key={evt.id}
                                 className="px-1.5 py-0.5 rounded-[6px] text-[10px] font-bold truncate bg-gradient-to-r from-[#6366f1] to-[#4f46e5] text-white shadow-xs flex items-center gap-1 border border-indigo-700/30 ring-1 ring-indigo-400/20"
-                                title={`Reunião Calendly: ${evt.name}`}
+                                title={`Reunião: ${evt.name}`}
                               >
                                 <Video className="w-2.5 h-2.5 flex-shrink-0 text-white/90" />
                                 <span className="truncate">
@@ -2172,7 +2195,7 @@ export default function EventFlowApp({
                             <span
                               key={evt.id}
                               className={`w-1.5 h-1.5 rounded-full ${
-                                isCalendlyMeeting(evt)
+                                (evt.isMeeting || isCalendlyMeeting(evt))
                                   ? "bg-[#6366f1] ring-1 ring-white"
                                   : "bg-[#007aff]"
                               }`}
@@ -2197,9 +2220,9 @@ export default function EventFlowApp({
             <div className="pt-2">
               <div className="flex items-center justify-between mb-3">
                 <div className="text-[16px] font-bold text-[#111111]">
-                  Cronograma da Agenda ({eventsList.filter((e) => {
-                    if (calendarFilter === "meetings") return isCalendlyMeeting(e);
-                    if (calendarFilter === "events") return !isCalendlyMeeting(e);
+                  Cronograma da Agenda ({allCalendarItems.filter((e) => {
+                    if (calendarFilter === "meetings") return e.isMeeting;
+                    if (calendarFilter === "events") return !e.isMeeting;
                     return true;
                   }).length})
                 </div>
@@ -2214,21 +2237,21 @@ export default function EventFlowApp({
               </div>
 
               <div className="divide-y divide-[#ececf0] border border-[#ececf0] rounded-[18px] overflow-hidden bg-white shadow-xs">
-                {eventsList
+                {allCalendarItems
                   .filter((e) => {
-                    if (calendarFilter === "meetings") return isCalendlyMeeting(e);
-                    if (calendarFilter === "events") return !isCalendlyMeeting(e);
+                    if (calendarFilter === "meetings") return e.isMeeting;
+                    if (calendarFilter === "events") return !e.isMeeting;
                     return true;
                   })
                   .map((e) => {
-                    const isMeeting = isCalendlyMeeting(e);
+                    const isMeeting = Boolean(e.isMeeting);
                     const statusObj = getStatusStyle(e.status);
                     const startDate = new Date(e.startDate);
 
                     return (
                       <div
                         key={e.id}
-                        onClick={() => router.push(`/eventos/${e.id}`)}
+                        onClick={() => router.push(e.detailUrl || (isMeeting ? `/reunioes/${e.id}` : `/eventos/${e.id}`))}
                         className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition cursor-pointer group ${
                           isMeeting
                             ? "bg-[#faf9ff] hover:bg-[#f3f0ff]"
@@ -6099,7 +6122,7 @@ function CalendarDayPopupModal({
                         {/* Action buttons */}
                         <div className="pt-1 flex items-center gap-2">
                           <Link
-                            href={`/eventos/${evt.id}`}
+                            href={`/reunioes/${evt.id}`}
                             onClick={onClose}
                             className="flex-1 py-2.5 px-3 rounded-[12px] bg-[#4338ca] hover:bg-[#3730a3] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer"
                           >

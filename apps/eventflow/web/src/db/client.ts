@@ -26,8 +26,12 @@ export async function ensureDbMigrated(): Promise<void> {
       "ALTER TABLE events ADD COLUMN meeting_summary TEXT",
       "ALTER TABLE events ADD COLUMN meeting_participants TEXT",
 
-      // 2. Event Media comments column
+      // 2. Event Media columns
+      "ALTER TABLE event_media ADD COLUMN images TEXT",
       "ALTER TABLE event_media ADD COLUMN comments TEXT",
+      "ALTER TABLE event_media ADD COLUMN tag TEXT",
+      "ALTER TABLE event_media ADD COLUMN order_index INTEGER",
+      "ALTER TABLE event_media ADD COLUMN uploaded_by_name TEXT",
 
       // 3. Moodboard Comments table
       `CREATE TABLE IF NOT EXISTS moodboard_comments (
@@ -66,8 +70,25 @@ export async function ensureDbMigrated(): Promise<void> {
         source TEXT NOT NULL DEFAULT 'manual',
         calendly_uri TEXT,
         linked_event_row_id TEXT,
+        meeting_summary TEXT,
+        meeting_participants TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
+      )`,
+
+      // 5. Columns added to existing tables
+      "ALTER TABLE event_tasks ADD COLUMN meeting_id TEXT",
+      "ALTER TABLE event_meetings ADD COLUMN meeting_summary TEXT",
+      "ALTER TABLE event_meetings ADD COLUMN meeting_participants TEXT",
+
+      // 6. App Uploads Storage (for file uploads across serverless and local dev)
+      `CREATE TABLE IF NOT EXISTS app_uploads (
+        id TEXT PRIMARY KEY,
+        filename TEXT UNIQUE NOT NULL,
+        mime_type TEXT NOT NULL,
+        data_base64 TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
       )`,
     ];
 
@@ -77,6 +98,58 @@ export async function ensureDbMigrated(): Promise<void> {
       } catch (err: any) {
         // Ignore column already exists or table already exists
       }
+    }
+
+    // 6. Migrate any legacy meeting rows in `events` table to `event_meetings` and remove them from `events`
+    try {
+      const legacyRes = await client.execute(
+        "SELECT * FROM events WHERE category = 'Reunião Calendly' OR calendly_event_uri IS NOT NULL"
+      );
+      for (const row of legacyRes.rows as any[]) {
+        const meetingId = `mtg-${String(row.id).replace(/^evt-/, "")}`;
+        const existingMtg = await client.execute({
+          sql: "SELECT id FROM event_meetings WHERE id = ? OR calendly_uri = ?",
+          args: [meetingId, row.calendly_event_uri || ""],
+        });
+
+        if (existingMtg.rows.length === 0) {
+          await client.execute({
+            sql: `INSERT INTO event_meetings (
+              id, event_id, client_id, title, type, status, start_date, end_date, location,
+              notes, source, calendly_uri, meeting_summary, meeting_participants, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 'google_meet', 'agendada', ?, ?, ?, ?, 'calendly', ?, ?, ?, ?, ?)`,
+            args: [
+              meetingId,
+              row.linked_event_id || null,
+              row.client_id || null,
+              row.name || "Reunião Calendly",
+              row.start_date,
+              row.end_date || null,
+              row.venue || "Google Meet",
+              row.notes || null,
+              row.calendly_event_uri || null,
+              row.meeting_summary || null,
+              row.meeting_participants || null,
+              row.created_at || Date.now(),
+              row.updated_at || Date.now(),
+            ],
+          });
+        }
+
+        // Reassign any tasks linked to the legacy event to the meeting
+        await client.execute({
+          sql: "UPDATE event_tasks SET meeting_id = ?, event_id = NULL WHERE event_id = ?",
+          args: [meetingId, row.id],
+        });
+
+        // Delete from events table so events contains ONLY production events
+        await client.execute({
+          sql: "DELETE FROM events WHERE id = ?",
+          args: [row.id],
+        });
+      }
+    } catch (e) {
+      // Ignore if columns missing or already migrated
     }
   })();
 

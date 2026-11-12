@@ -1,5 +1,5 @@
 import { db, ensureDbMigrated } from "@/db/client";
-import { clients, events, integrations, auditLogs } from "@/db/schema";
+import { clients, eventMeetings, integrations, auditLogs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { generateId } from "@/lib/id";
 
@@ -235,9 +235,9 @@ export async function pullCalendlyMeetings(overrideToken?: string): Promise<Cale
         });
       }
 
-      // Check if event already exists
-      const existingEvent = await db.query.events.findFirst({
-        where: eq(events.calendlyEventUri, eventUri),
+      // Check if meeting already exists in eventMeetings
+      const existingMeeting = await db.query.eventMeetings.findFirst({
+        where: eq(eventMeetings.calendlyUri, eventUri),
       });
 
       const startDate = new Date(calEvent.start_time);
@@ -250,42 +250,57 @@ export async function pullCalendlyMeetings(overrideToken?: string): Promise<Cale
           ? "Zoom (Reunião Online)"
           : "Consulta & Briefing CFM");
 
-      const eventTitle = `Reunião: ${inviteeName} (${calEvent.name || "Briefing"})`;
+      const meetUrl =
+        calEvent.location?.join_url ||
+        (typeof calEvent.location?.location === "string" && calEvent.location.location.startsWith("http")
+          ? calEvent.location.location
+          : null) ||
+        (calEvent.location?.type === "google_conference"
+          ? `https://meet.google.com/cfm-${eventUuid?.slice(-6) || "online"}`
+          : null);
+
+      const meetingTitle = `Reunião: ${inviteeName} (${calEvent.name || "Briefing"})`;
       const notesContent = `Reunião marcada via Calendly para discutir evento/decoração.\n\nTipo: ${calEvent.name || "Consulta"}\nLocalização: ${venue}${qaNotes ? `\n\nRespostas do Cliente:\n${qaNotes}` : ""}`;
 
-      let targetEventId: string;
+      let targetMeetingId: string;
 
-      if (existingEvent) {
-        targetEventId = existingEvent.id;
+      if (existingMeeting) {
+        targetMeetingId = existingMeeting.id;
         await db
-          .update(events)
+          .update(eventMeetings)
           .set({
-            name: eventTitle,
+            title: meetingTitle,
             startDate,
             endDate,
-            venue,
+            location: venue,
+            meetUrl: meetUrl || existingMeeting.meetUrl,
             notes: notesContent,
-            category: "Reunião Calendly",
-            status: calEvent.status === "active" ? "planeamento" : "cancelado",
+            status: calEvent.status === "active" ? "agendada" : "cancelada",
+            clientContactName: inviteeName,
+            clientContactEmail: inviteeEmail,
+            clientContactPhone: inviteePhone,
             updatedAt: new Date(),
           })
-          .where(eq(events.id, existingEvent.id));
+          .where(eq(eventMeetings.id, existingMeeting.id));
       } else {
-        targetEventId = generateId("evt");
-        await db.insert(events).values({
-          id: targetEventId,
-          name: eventTitle,
+        targetMeetingId = generateId("mtg");
+        await db.insert(eventMeetings).values({
+          id: targetMeetingId,
+          title: meetingTitle,
           clientId,
+          type: (calEvent.location?.type === "google_conference" || meetUrl) ? "google_meet" : "presencial",
+          status: "agendada",
           startDate,
           endDate,
-          venue,
-          status: "planeamento",
-          category: "Reunião Calendly",
-          theme: "Briefing & Consulta de Evento",
+          location: venue,
+          meetUrl,
           notes: notesContent,
-          coverImageUrl:
-            "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=600&q=80",
-          calendlyEventUri: eventUri,
+          hostName: ownerName || "Equipa CFM",
+          clientContactName: inviteeName,
+          clientContactEmail: inviteeEmail,
+          clientContactPhone: inviteePhone,
+          source: "calendly",
+          calendlyUri: eventUri,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -294,18 +309,18 @@ export async function pullCalendlyMeetings(overrideToken?: string): Promise<Cale
         await db.insert(auditLogs).values({
           id: generateId("log"),
           entityType: "event",
-          entityId: targetEventId,
+          entityId: targetMeetingId,
           action: "criado",
           title: "Reunião Calendly Importada",
-          details: `Reunião com ${inviteeName} importada automaticamente do Calendly.`,
+          details: `Reunião com ${inviteeName} importada automaticamente do Calendly para a secção de Reuniões.`,
           userName: "Sincronizador Calendly",
           createdAt: new Date(),
         });
       }
 
       syncedMeetings.push({
-        id: targetEventId,
-        name: eventTitle,
+        id: targetMeetingId,
+        name: meetingTitle,
         clientName: inviteeName,
         startDate: startDate.toISOString(),
         endDate: endDate ? endDate.toISOString() : null,

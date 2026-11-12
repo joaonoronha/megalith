@@ -107,7 +107,9 @@ export async function getAppInitialData() {
       }),
     ]);
 
-    allEvents = results[0] || [];
+    allEvents = (results[0] || []).filter(
+      (e: any) => e.category !== "Reunião Calendly" && !e.calendlyEventUri
+    );
     allItems = results[1] || [];
     allClients = results[2] || [];
     allQuotes = results[3] || [];

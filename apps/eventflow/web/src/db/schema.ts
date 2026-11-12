@@ -91,10 +91,11 @@ export const events = sqliteTable("events", {
   lastUpdatedByName: text("last_updated_by_name"),
 });
 
-// 4.1 Action Items & Completion Checklist per Event
+// 4.1 Action Items & Completion Checklist per Event or Meeting
 export const eventTasks = sqliteTable("event_tasks", {
   id: text("id").primaryKey(),
-  eventId: text("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  eventId: text("event_id").references(() => events.id, { onDelete: "cascade" }),
+  meetingId: text("meeting_id").references(() => eventMeetings.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   completed: integer("completed", { mode: "boolean" }).default(false).notNull(),
   dueDate: integer("due_date", { mode: "timestamp" }),
@@ -310,7 +311,20 @@ export const eventMeetings = sqliteTable("event_meetings", {
   source: text("source", { enum: ["manual", "calendly", "linked"] }).default("manual").notNull(),
   calendlyUri: text("calendly_uri"),
   linkedEventRowId: text("linked_event_row_id"),
+  meetingSummary: text("meeting_summary"),
+  meetingParticipants: text("meeting_participants"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
 });
+
+// 15. App Uploads Storage (for file uploads across serverless and local dev)
+export const appUploads = sqliteTable("app_uploads", {
+  id: text("id").primaryKey(),
+  filename: text("filename").notNull().unique(),
+  mimeType: text("mime_type").notNull(),
+  dataBase64: text("data_base64").notNull(),
+  size: integer("size").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+});
+
 
