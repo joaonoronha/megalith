@@ -6,6 +6,7 @@ import {
   inventoryItems,
   eventAllocations,
   eventTasks,
+  eventMedia,
   quotes,
 } from "@/db/schema";
 import { eq, desc, asc } from "drizzle-orm";
@@ -80,7 +81,14 @@ export default async function EventPage({ params }: PageProps) {
     orderBy: [desc(quotes.createdAt)],
   });
 
-  // 7. Auth User
+  // 7. Event Media: Idea Boards & Final Outcomes
+  const media = await db
+    .select()
+    .from(eventMedia)
+    .where(eq(eventMedia.eventId, id))
+    .orderBy(asc(eventMedia.orderIndex), asc(eventMedia.createdAt));
+
+  // 8. Auth User
   const currentUser = await getCurrentUser();
 
   return (
@@ -91,6 +99,7 @@ export default async function EventPage({ params }: PageProps) {
       allItems={allItems}
       initialAllocations={rawAllocations}
       initialTasks={tasks}
+      initialMedia={media}
       quotes={eventQuotes}
       currentUser={currentUser}
     />

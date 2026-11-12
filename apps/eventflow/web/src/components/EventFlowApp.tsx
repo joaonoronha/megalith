@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useTransition } from "react";
+import React, { useState, useEffect, useTransition, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -23,6 +23,10 @@ import {
   ChevronLeft,
   Sparkles,
   History,
+  MapPin,
+  SlidersHorizontal,
+  Filter,
+  Tag,
 } from "lucide-react";
 import AuditLogModal from "@/components/AuditLogModal";
 import { formatRelativeTime } from "@/lib/date-format";
@@ -248,6 +252,87 @@ export default function EventFlowApp({
 
   // Copied link feedback
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+
+  // Inventory Filtering & Listing State
+  const [inventorySearch, setInventorySearch] = useState<string>("");
+  const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState<string>("all");
+  const [inventoryLocationFilter, setInventoryLocationFilter] = useState<string>("all");
+  const [inventoryAlertFilter, setInventoryAlertFilter] = useState<"all" | "alerts" | "low" | "damaged" | "available">("all");
+
+  // Distinct categories and warehouse locations
+  const inventoryCategories = useMemo(() => {
+    const cats = new Set<string>();
+    itemsList.forEach((i) => {
+      if (i.category?.trim()) cats.add(i.category.trim());
+    });
+    return Array.from(cats).sort();
+  }, [itemsList]);
+
+  const inventoryLocations = useMemo(() => {
+    const locs = new Set<string>();
+    itemsList.forEach((i) => {
+      const loc = i.warehouseLocation?.trim() || "Armazém Principal";
+      locs.add(loc);
+    });
+    return Array.from(locs).sort();
+  }, [itemsList]);
+
+  // Alert counters
+  const inventoryAlertCounters = useMemo(() => {
+    let lowCount = 0;
+    let damagedCount = 0;
+    let totalAlerts = 0;
+    itemsList.forEach((item) => {
+      const damaged = item.damagedQuantity || 0;
+      const available = item.totalQuantity - damaged;
+      const isLow = available < item.minStock;
+      if (damaged > 0) damagedCount += 1;
+      if (isLow) lowCount += 1;
+      if (damaged > 0 || isLow) totalAlerts += 1;
+    });
+    return { lowCount, damagedCount, totalAlerts };
+  }, [itemsList]);
+
+  // Filtered inventory list
+  const processedInventoryItems = useMemo(() => {
+    return itemsList.filter((item) => {
+      const damaged = item.damagedQuantity || 0;
+      const available = item.totalQuantity - damaged;
+      const isLow = available < item.minStock;
+      const hasAlert = damaged > 0 || isLow;
+
+      // 1. Text search (Name, SKU, ID, Category, Location)
+      if (inventorySearch.trim()) {
+        const query = inventorySearch.toLowerCase().trim();
+        const matches =
+          item.name?.toLowerCase().includes(query) ||
+          item.sku?.toLowerCase().includes(query) ||
+          item.id?.toLowerCase().includes(query) ||
+          item.category?.toLowerCase().includes(query) ||
+          item.warehouseLocation?.toLowerCase().includes(query);
+        if (!matches) return false;
+      }
+
+      // 2. Category filter
+      if (inventoryCategoryFilter !== "all" && item.category !== inventoryCategoryFilter) {
+        return false;
+      }
+
+      // 3. Location filter
+      if (inventoryLocationFilter !== "all") {
+        const loc = item.warehouseLocation || "Armazém Principal";
+        if (loc !== inventoryLocationFilter) return false;
+      }
+
+      // 4. Alert filter
+      if (inventoryAlertFilter === "alerts" && !hasAlert) return false;
+      if (inventoryAlertFilter === "low" && !isLow) return false;
+      if (inventoryAlertFilter === "damaged" && damaged <= 0) return false;
+      if (inventoryAlertFilter === "available" && hasAlert) return false;
+
+      return true;
+    });
+  }, [itemsList, inventorySearch, inventoryCategoryFilter, inventoryLocationFilter, inventoryAlertFilter]);
 
   // Financial aggregates
   const totalEntradas = movementsList
@@ -1452,10 +1537,11 @@ export default function EventFlowApp({
         {/* TAB 4: INVENTORY */}
         {/* ========================================================= */}
         {activeTab === "inventory" && (
-          <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs space-y-5">
+          <section className="bg-white border border-[#ececf0] rounded-[22px] p-4 sm:p-6 shadow-xs space-y-5">
+            {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-[22px] font-bold text-[#111111]">
+                <h2 className="text-[20px] sm:text-[22px] font-bold text-[#111111]">
                   Catálogo de Stock & Armazém
                 </h2>
                 <p className="text-xs text-[#8e8e93]">
@@ -1465,133 +1551,409 @@ export default function EventFlowApp({
 
               <button
                 onClick={() => setShowItemWizard(true)}
-                className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition self-start sm:self-auto cursor-pointer"
+                className="px-4 py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition self-start sm:self-auto cursor-pointer shadow-2xs"
               >
                 <span>＋</span>
                 <span>Novo artigo</span>
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-              {itemsList.map((item) => {
-                const damaged = item.damagedQuantity || 0;
-                const available = item.totalQuantity - damaged;
-                const isLow = available < item.minStock;
+            {/* Filter Toolbar */}
+            <div className="bg-[#fafafa] border border-[#ececf0] rounded-[18px] p-3.5 sm:p-4 space-y-3">
+              {/* Row 1: Search + Category + Storage Location */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                {/* Search */}
+                <div className="sm:col-span-5 relative">
+                  <Search className="w-4 h-4 text-[#8e8e93] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={inventorySearch}
+                    onChange={(e) => setInventorySearch(e.target.value)}
+                    placeholder="Pesquisar por nome, SKU, ID, categoria..."
+                    className="w-full pl-9 pr-8 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff] transition"
+                  />
+                  {inventorySearch && (
+                    <button
+                      type="button"
+                      onClick={() => setInventorySearch("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8e8e93] hover:text-[#111] p-0.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
 
-                return (
-                  <div
-                    key={item.id}
-                    className="p-4 rounded-[16px] border border-[#ececf0] bg-[#fafafa] flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-1.5">
-                          <Link
-                            href={`/inventario/${item.id}`}
-                            className="text-[11px] font-bold text-[#8e8e93] hover:text-[#111] uppercase tracking-wider transition"
-                            title="SKU do Artigo"
-                          >
-                            {item.sku}
-                          </Link>
-                          <Link
-                            href={`/inventario/${item.id}`}
-                            className="font-mono text-[10px] text-[#8e8e93] hover:text-[#007aff] bg-white px-1.5 py-0.5 rounded border border-[#ececf0] transition"
-                            title="Ver ficha do artigo"
-                          >
-                            #{item.id}
-                          </Link>
-                        </div>
-                        {damaged > 0 ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">
-                            {damaged} Danificado(s)
-                          </span>
-                        ) : isLow ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                            Stock Baixo
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                            Disponível
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="font-bold text-sm text-[#111]">
-                        <Link
-                          href={`/inventario/${item.id}`}
-                          className="hover:text-[#007aff] transition"
-                          title="Ver ficha do artigo"
-                        >
-                          {item.name}
-                        </Link>
-                      </div>
-                      <div className="text-xs text-[#8e8e93] mt-0.5">
-                        {item.warehouseLocation || "Armazém Principal"}
-                      </div>
-
-                      <div className="mt-3 pt-3 border-t border-[#ececf0] grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <span className="text-[#8e8e93]">Disponível:</span>{" "}
-                          <strong className="text-[#111]">{available} un.</strong>
-                        </div>
-                        <div>
-                          <span className="text-[#8e8e93]">Total:</span>{" "}
-                          <strong className="text-[#111]">{item.totalQuantity} un.</strong>
-                        </div>
-                      </div>
-
-                      <div className="mt-2.5 pt-2 border-t border-[#ececf0]/70 flex items-center justify-between text-[11px] text-[#8e8e93]">
-                        <span className="truncate">
-                          Last updated by <strong className="text-[#3a3a3c] font-semibold">{item.lastUpdatedByName || "Administrador CFM"}</strong> {formatRelativeTime(item.updatedAt, "en")}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAuditModal({
-                              isOpen: true,
-                              entityType: "inventory",
-                              entityId: item.id,
-                              entityTitle: item.name,
-                            });
-                          }}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-[#ececf0] text-[#007aff] transition cursor-pointer text-[10px] font-semibold flex-shrink-0"
-                          title="Ver histórico de alterações"
-                        >
-                          <History className="w-3 h-3" />
-                          <span>Histórico</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-[#ececf0] flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-[#111]">
-                          €{(item.unitPrice || 0).toFixed(2)}/dia
-                        </span>
-                        <Link
-                          href={`/inventario/${item.id}`}
-                          className="text-[11px] font-semibold text-[#007aff] hover:underline"
-                        >
-                          Ver ficha →
-                        </Link>
-                      </div>
-
-                      {damaged > 0 && (
-                        <button
-                          onClick={() => {
-                            setTriageItem(item);
-                            setShowTriageModal(true);
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-[#111] text-white text-[11px] font-semibold hover:bg-black transition"
-                        >
-                          Fazer triagem
-                        </button>
-                      )}
-                    </div>
+                {/* Category Filter */}
+                <div className="sm:col-span-4 relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#8e8e93]">
+                    <Tag className="w-3.5 h-3.5" />
                   </div>
-                );
-              })}
+                  <select
+                    value={inventoryCategoryFilter}
+                    onChange={(e) => setInventoryCategoryFilter(e.target.value)}
+                    className="w-full pl-8 pr-7 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff] transition appearance-none cursor-pointer"
+                  >
+                    <option value="all">Todas as Categorias ({itemsList.length})</option>
+                    {inventoryCategories.map((cat) => {
+                      const count = itemsList.filter((i) => i.category === cat).length;
+                      return (
+                        <option key={cat} value={cat}>
+                          {cat} ({count})
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <ChevronRight className="w-3.5 h-3.5 text-[#8e8e93] absolute right-2.5 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none" />
+                </div>
+
+                {/* Storage Location Filter */}
+                <div className="sm:col-span-3 relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#8e8e93]">
+                    <MapPin className="w-3.5 h-3.5" />
+                  </div>
+                  <select
+                    value={inventoryLocationFilter}
+                    onChange={(e) => setInventoryLocationFilter(e.target.value)}
+                    className="w-full pl-8 pr-7 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff] transition appearance-none cursor-pointer"
+                  >
+                    <option value="all">Todos os Locais</option>
+                    {inventoryLocations.map((loc) => {
+                      const count = itemsList.filter(
+                        (i) => (i.warehouseLocation || "Armazém Principal") === loc
+                      ).length;
+                      return (
+                        <option key={loc} value={loc}>
+                          {loc} ({count})
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <ChevronRight className="w-3.5 h-3.5 text-[#8e8e93] absolute right-2.5 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Row 2: Alert filter chips & Summary */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-[#ececf0]/70">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-semibold text-[#8e8e93] mr-1 hidden sm:inline">
+                    Alertas:
+                  </span>
+
+                  {/* All */}
+                  <button
+                    type="button"
+                    onClick={() => setInventoryAlertFilter("all")}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
+                      inventoryAlertFilter === "all"
+                        ? "bg-[#111] text-white shadow-2xs"
+                        : "bg-white border border-[#ececf0] text-[#3a3a3c] hover:bg-[#f2f2f5]"
+                    }`}
+                  >
+                    Todos ({itemsList.length})
+                  </button>
+
+                  {/* With Alerts */}
+                  <button
+                    type="button"
+                    onClick={() => setInventoryAlertFilter("alerts")}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition flex items-center gap-1 cursor-pointer ${
+                      inventoryAlertFilter === "alerts"
+                        ? "bg-rose-600 text-white shadow-2xs"
+                        : inventoryAlertCounters.totalAlerts > 0
+                        ? "bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100"
+                        : "bg-white border border-[#ececf0] text-[#8e8e93] hover:bg-[#f2f2f5]"
+                    }`}
+                  >
+                    <AlertTriangle className="w-3 h-3" />
+                    <span>Com Alertas ({inventoryAlertCounters.totalAlerts})</span>
+                  </button>
+
+                  {/* Low Stock */}
+                  <button
+                    type="button"
+                    onClick={() => setInventoryAlertFilter("low")}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
+                      inventoryAlertFilter === "low"
+                        ? "bg-amber-600 text-white shadow-2xs"
+                        : inventoryAlertCounters.lowCount > 0
+                        ? "bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100"
+                        : "bg-white border border-[#ececf0] text-[#8e8e93] hover:bg-[#f2f2f5]"
+                    }`}
+                  >
+                    Stock Baixo ({inventoryAlertCounters.lowCount})
+                  </button>
+
+                  {/* Damaged */}
+                  <button
+                    type="button"
+                    onClick={() => setInventoryAlertFilter("damaged")}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
+                      inventoryAlertFilter === "damaged"
+                        ? "bg-rose-700 text-white shadow-2xs"
+                        : inventoryAlertCounters.damagedCount > 0
+                        ? "bg-rose-50 border border-rose-200 text-rose-800 hover:bg-rose-100"
+                        : "bg-white border border-[#ececf0] text-[#8e8e93] hover:bg-[#f2f2f5]"
+                    }`}
+                  >
+                    Danificados ({inventoryAlertCounters.damagedCount})
+                  </button>
+
+                  {/* Available */}
+                  <button
+                    type="button"
+                    onClick={() => setInventoryAlertFilter("available")}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
+                      inventoryAlertFilter === "available"
+                        ? "bg-emerald-600 text-white shadow-2xs"
+                        : "bg-white border border-[#ececf0] text-[#3a3a3c] hover:bg-[#f2f2f5]"
+                    }`}
+                  >
+                    Disponíveis ({itemsList.length - inventoryAlertCounters.totalAlerts})
+                  </button>
+                </div>
+
+                {/* Reset button if filters active */}
+                {(inventorySearch ||
+                  inventoryCategoryFilter !== "all" ||
+                  inventoryLocationFilter !== "all" ||
+                  inventoryAlertFilter !== "all") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInventorySearch("");
+                      setInventoryCategoryFilter("all");
+                      setInventoryLocationFilter("all");
+                      setInventoryAlertFilter("all");
+                    }}
+                    className="text-xs font-semibold text-[#007aff] hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Limpar filtros</span>
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Inventory Results Count */}
+            <div className="flex items-center justify-between text-xs text-[#8e8e93] px-1">
+              <span>
+                A mostrar <strong className="text-[#111]">{processedInventoryItems.length}</strong> de{" "}
+                <strong className="text-[#111]">{itemsList.length}</strong> artigos
+              </span>
+              <span className="text-[11px]">
+                Vista em lista estruturada
+              </span>
+            </div>
+
+            {/* List Items Container */}
+            {processedInventoryItems.length === 0 ? (
+              <div className="p-12 text-center bg-[#fafafa] border border-dashed border-[#ececf0] rounded-[20px] space-y-3">
+                <div className="w-12 h-12 rounded-[16px] bg-white border border-[#ececf0] flex items-center justify-center mx-auto text-[#8e8e93]">
+                  <Package className="w-6 h-6" />
+                </div>
+                <h3 className="text-sm font-bold text-[#111]">
+                  Nenhum artigo encontrado
+                </h3>
+                <p className="text-xs text-[#8e8e93] max-w-sm mx-auto">
+                  Não foram encontrados artigos que correspondam aos filtros de pesquisa atuais.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInventorySearch("");
+                    setInventoryCategoryFilter("all");
+                    setInventoryLocationFilter("all");
+                    setInventoryAlertFilter("all");
+                  }}
+                  className="px-3.5 py-1.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold transition"
+                >
+                  Limpar todos os filtros
+                </button>
+              </div>
+            ) : (
+              <div className="bg-white rounded-[20px] border border-[#ececf0] overflow-hidden shadow-2xs divide-y divide-[#ececf0]">
+                {/* Desktop Table Header */}
+                <div className="hidden lg:grid grid-cols-12 gap-3 px-5 py-3 bg-[#f8f8fa] text-[11px] font-bold text-[#8e8e93] uppercase tracking-wider">
+                  <div className="col-span-4">Artigo & Identificadores</div>
+                  <div className="col-span-2">Categoria</div>
+                  <div className="col-span-2">Localização no Armazém</div>
+                  <div className="col-span-2">Stock & Estado</div>
+                  <div className="col-span-2 text-right">Preço / dia & Ações</div>
+                </div>
+
+                {/* List Item Rows */}
+                {processedInventoryItems.map((item) => {
+                  const damaged = item.damagedQuantity || 0;
+                  const available = item.totalQuantity - damaged;
+                  const isLow = available < item.minStock;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-4 lg:px-5 lg:py-3.5 hover:bg-[#fafafa] transition flex flex-col lg:grid lg:grid-cols-12 lg:items-center gap-3"
+                    >
+                      {/* Column 1: Item Thumbnail & Name & SKU */}
+                      <div className="lg:col-span-4 flex items-center gap-3">
+                        <Link
+                          href={`/inventario/${item.id}`}
+                          className="shrink-0 relative group"
+                        >
+                          {item.imageUrl ? (
+                            <img
+                              src={item.imageUrl}
+                              alt={item.name}
+                              className="w-12 h-12 rounded-[12px] object-cover border border-[#ececf0] group-hover:scale-105 transition"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-[12px] bg-[#f2f2f5] border border-[#ececf0] flex items-center justify-center text-[#8e8e93] group-hover:scale-105 transition">
+                              <Package className="w-5 h-5" />
+                            </div>
+                          )}
+                        </Link>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Link
+                              href={`/inventario/${item.id}`}
+                              className="text-[10px] font-bold text-[#8e8e93] hover:text-[#111] uppercase tracking-wider transition"
+                              title="SKU do Artigo"
+                            >
+                              {item.sku}
+                            </Link>
+                            <Link
+                              href={`/inventario/${item.id}`}
+                              className="font-mono text-[9px] text-[#8e8e93] hover:text-[#007aff] bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] transition"
+                              title="ID único do artigo"
+                            >
+                              #{item.id}
+                            </Link>
+                          </div>
+
+                          <div className="font-bold text-sm text-[#111] mt-0.5">
+                            <Link
+                              href={`/inventario/${item.id}`}
+                              className="hover:text-[#007aff] transition line-clamp-1"
+                              title={item.name}
+                            >
+                              {item.name}
+                            </Link>
+                          </div>
+
+                          {item.dimensions && (
+                            <div className="text-[11px] text-[#8e8e93] truncate">
+                              {item.dimensions}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Column 2: Category */}
+                      <div className="lg:col-span-2 flex lg:block items-center justify-between text-xs">
+                        <span className="lg:hidden text-[#8e8e93] font-medium">Categoria:</span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#f2f2f5] text-[#3a3a3c]">
+                          {item.category || "Geral"}
+                        </span>
+                      </div>
+
+                      {/* Column 3: Warehouse Location */}
+                      <div className="lg:col-span-2 flex lg:block items-center justify-between text-xs">
+                        <span className="lg:hidden text-[#8e8e93] font-medium">Localização:</span>
+                        <div className="inline-flex items-center gap-1 text-xs text-[#3a3a3c]">
+                          <MapPin className="w-3.5 h-3.5 text-[#8e8e93] shrink-0" />
+                          <span className="truncate max-w-[150px]">
+                            {item.warehouseLocation || "Armazém Principal"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Column 4: Stock & Alert Badges */}
+                      <div className="lg:col-span-2 space-y-1">
+                        <div className="flex items-center justify-between lg:justify-start gap-1.5 flex-wrap">
+                          {damaged > 0 ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" />
+                              <span>{damaged} Danificado(s)</span>
+                            </span>
+                          ) : isLow ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" />
+                              <span>Stock Baixo</span>
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Disponível</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between lg:justify-start gap-2 text-xs">
+                          <div>
+                            <span className="text-[#8e8e93]">Disp:</span>{" "}
+                            <strong className="text-[#111]">{available} un.</strong>
+                          </div>
+                          <span className="text-[#ececf0]">·</span>
+                          <div>
+                            <span className="text-[#8e8e93]">Total:</span>{" "}
+                            <strong className="text-[#111]">{item.totalQuantity} un.</strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Column 5: Price & Actions */}
+                      <div className="lg:col-span-2 flex items-center justify-between lg:justify-end gap-3 pt-2 lg:pt-0 border-t lg:border-t-0 border-[#ececf0]/70">
+                        <div className="text-left lg:text-right">
+                          <div className="text-xs font-bold text-[#111]">
+                            €{(item.unitPrice || 0).toFixed(2)}/dia
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAuditModal({
+                                isOpen: true,
+                                entityType: "inventory",
+                                entityId: item.id,
+                                entityTitle: item.name,
+                              });
+                            }}
+                            className="inline-flex items-center gap-1 text-[10px] text-[#007aff] hover:underline cursor-pointer"
+                            title="Ver histórico de alterações"
+                          >
+                            <History className="w-3 h-3" />
+                            <span>Histórico</span>
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {damaged > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTriageItem(item);
+                                setShowTriageModal(true);
+                              }}
+                              className="px-2.5 py-1.5 rounded-[10px] bg-[#111] hover:bg-black text-white text-[11px] font-semibold transition cursor-pointer"
+                              title="Fazer triagem do material danificado"
+                            >
+                              Triagem
+                            </button>
+                          )}
+
+                          <Link
+                            href={`/inventario/${item.id}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[10px] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[#111] text-[11px] font-semibold transition cursor-pointer"
+                            title="Ver ficha completa do artigo"
+                          >
+                            <span>Ficha</span>
+                            <ChevronRight className="w-3 h-3 text-[#8e8e93]" />
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
         )}
 

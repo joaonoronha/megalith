@@ -12,6 +12,7 @@ import {
   financialMovements,
   quoteTemplates,
   auditLogs,
+  eventMedia,
 } from "./schema";
 
 export async function seed() {
@@ -549,7 +550,140 @@ export async function seed() {
     },
   ]).onConflictDoNothing();
 
-  console.log("✅ Seeding completed successfully with audit logs!");
+  // 10. Event Media: Idea Boards & Final Outcomes
+  await db.insert(eventMedia).values([
+    // Casamento Marta & João - Idea Boards
+    {
+      id: "med-w-idea-1",
+      eventId: eventWedding.id,
+      type: "idea_board",
+      title: "Paleta Terracotta & Flores Silvestres",
+      description: "Inspiração para caminhos de mesa em linho e flores secas com tons terracota e eucalipto.",
+      imageUrl: "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80",
+      tag: "Flores",
+      orderIndex: 1,
+      uploadedByName: "Sofia Ribeiro",
+      createdAt: threeDaysAgo,
+    },
+    {
+      id: "med-w-idea-2",
+      eventId: eventWedding.id,
+      type: "idea_board",
+      title: "Mesa de Honra com Cadeiras Chiavari",
+      description: "Disposição clássica em formato oval com iluminação intimista e velas âmbar.",
+      imageUrl: "https://images.unsplash.com/photo-1549497538-303791108f95?auto=format&fit=crop&w=800&q=80",
+      tag: "Mobiliário",
+      orderIndex: 2,
+      uploadedByName: "Administrador CFM",
+      createdAt: twoDaysAgo,
+    },
+    {
+      id: "med-w-idea-3",
+      eventId: eventWedding.id,
+      type: "idea_board",
+      title: "Iluminação Suspensa & Lanternas",
+      description: "Efeito céu estrelado com cordões micro-LED sob a pérgula exterior.",
+      imageUrl: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=800&q=80",
+      tag: "Iluminação",
+      orderIndex: 3,
+      uploadedByName: "Sofia Ribeiro",
+      createdAt: yesterday,
+    },
+
+    // Casamento Marta & João - Final Outcomes (Actual Photos Taken)
+    {
+      id: "med-w-out-1",
+      eventId: eventWedding.id,
+      type: "final_outcome",
+      title: "Montagem da Cerimónia no Jardim da Quinta",
+      description: "Foto real tirada após montagem do altar botânico e 120 cadeiras alinhadas.",
+      imageUrl: "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=800&q=80",
+      tag: "Cerimónia",
+      orderIndex: 1,
+      uploadedByName: "Administrador CFM",
+      createdAt: twoHoursAgo,
+    },
+    {
+      id: "med-w-out-2",
+      eventId: eventWedding.id,
+      type: "final_outcome",
+      title: "Mesas Postas ao Pôr-do-Sol",
+      description: "Resultado final dos centros de mesa com iluminação de velas LED e louça personalizada.",
+      imageUrl: "https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?auto=format&fit=crop&w=800&q=80",
+      tag: "Copo de Água",
+      orderIndex: 2,
+      uploadedByName: "Sofia Ribeiro",
+      createdAt: twoHoursAgo,
+    },
+
+    // Mastercard Gala - Idea Boards
+    {
+      id: "med-g-idea-1",
+      eventId: eventGala.id,
+      type: "idea_board",
+      title: "Conceito Black & Gold Minimalist",
+      description: "Linhas retas e contraste forte com estruturas metálicas pretas e detalhes em ouro escovado.",
+      imageUrl: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=800&q=80",
+      tag: "Conceito",
+      orderIndex: 1,
+      uploadedByName: "Sofia Ribeiro",
+      createdAt: fourHoursAgo,
+    },
+    {
+      id: "med-g-idea-2",
+      eventId: eventGala.id,
+      type: "idea_board",
+      title: "Lounge VIP Corporate",
+      description: "Zona de networking executivo com sofás aveludados e iluminação pontual.",
+      imageUrl: "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=800&q=80",
+      tag: "Lounge",
+      orderIndex: 2,
+      uploadedByName: "Administrador CFM",
+      createdAt: threeDaysAgo,
+    },
+
+    // Mastercard Gala - Final Outcomes
+    {
+      id: "med-g-out-1",
+      eventId: eventGala.id,
+      type: "final_outcome",
+      title: "Palco Principal & Iluminação Cénica",
+      description: "Resultado real na Estufa Fria com projeção de mapping e mesas redondas prontas.",
+      imageUrl: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80",
+      tag: "Palco",
+      orderIndex: 1,
+      uploadedByName: "Sofia Ribeiro",
+      createdAt: fourHoursAgo,
+    },
+
+    // Winnie the Pooh - Idea Boards & Final Outcomes
+    {
+      id: "med-p-idea-1",
+      eventId: eventPooh.id,
+      type: "idea_board",
+      title: "Bosque dos Cem Acres - Tons Mel & Madeira",
+      description: "Referências rústicas infantis com potes de mel cerâmicos e toalhas xadrez suaves.",
+      imageUrl: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=800&q=80",
+      tag: "Mesa de Bolo",
+      orderIndex: 1,
+      uploadedByName: "Sofia Ribeiro",
+      createdAt: yesterday,
+    },
+    {
+      id: "med-p-out-1",
+      eventId: eventPooh.id,
+      type: "final_outcome",
+      title: "Candy Bar e Painel Decorativo Real",
+      description: "Foto tirada na montagem do Jardim das Amoreiras com balões mostarda e doces temáticos.",
+      imageUrl: "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?auto=format&fit=crop&w=800&q=80",
+      tag: "Mesa Principal",
+      orderIndex: 1,
+      uploadedByName: "Sofia Ribeiro",
+      createdAt: yesterday,
+    },
+  ]).onConflictDoNothing();
+
+  console.log("✅ Seeding completed successfully with audit logs and event media!");
 }
 
 if (import.meta.url.endsWith(process.argv[1])) {
