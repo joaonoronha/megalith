@@ -7,11 +7,16 @@ import {
   eventAllocations,
   eventTasks,
   eventMedia,
+  moodboardComments,
+  eventMeetings,
   quotes,
+  users,
 } from "@/db/schema";
 import { eq, desc, asc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import EventDetailView from "@/components/EventDetailView";
+import MeetingDetailView from "@/components/MeetingDetailView";
+import { isMeetingEvent } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +41,55 @@ export default async function EventPage({ params }: PageProps) {
         where: eq(clients.id, event.clientId),
       })
     : null;
+
+  // Team users
+  const teamUsers = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+    })
+    .from(users);
+
+  // Auth User
+  const currentUser = await getCurrentUser();
+
+  // If this entity is a Meeting (Calendly briefing, consulta, etc.), render the dedicated MeetingDetailView
+  // which focuses on conversation summary (ata), action items checklist, participants, schedule/Meet, and linking to an event.
+  // Meetings NEVER receive commercial quotes/quotas.
+  if (isMeetingEvent(event)) {
+    const linkedEvent = event.linkedEventId
+      ? await db.query.events.findFirst({
+          where: eq(events.id, event.linkedEventId),
+        })
+      : null;
+
+    const allEvents = await db.query.events.findMany({
+      orderBy: [desc(events.startDate)],
+    });
+
+    const allProductionEvents = allEvents.filter(
+      (e) => e.id !== event.id && !isMeetingEvent(e)
+    );
+
+    const actionItems = await db.query.eventTasks.findMany({
+      where: eq(eventTasks.eventId, id),
+      orderBy: [asc(eventTasks.orderIndex), asc(eventTasks.createdAt)],
+    });
+
+    return (
+      <MeetingDetailView
+        meeting={event}
+        client={client || null}
+        linkedEvent={linkedEvent || null}
+        allProductionEvents={allProductionEvents}
+        actionItems={actionItems}
+        teamUsers={teamUsers}
+        currentUser={currentUser}
+      />
+    );
+  }
 
   // 2. All Clients
   const allClients = await db.query.clients.findMany({
@@ -81,15 +135,118 @@ export default async function EventPage({ params }: PageProps) {
     orderBy: [desc(quotes.createdAt)],
   });
 
-  // 7. Event Media: Idea Boards & Final Outcomes
-  const media = await db
+  // 7. Event Media: Idea Boards & Final Outcomes (with collaborative comments)
+  const rawMedia = await db
     .select()
     .from(eventMedia)
     .where(eq(eventMedia.eventId, id))
     .orderBy(asc(eventMedia.orderIndex), asc(eventMedia.createdAt));
 
-  // 8. Auth User
-  const currentUser = await getCurrentUser();
+  let mediaComments: any[] = [];
+  try {
+    mediaComments = await db
+      .select()
+      .from(moodboardComments)
+      .where(eq(moodboardComments.eventId, id))
+      .orderBy(asc(moodboardComments.createdAt));
+  } catch (err) {
+    console.error("Error loading moodboard comments:", err);
+  }
+
+  const media = rawMedia.map((m) => {
+    const tableComments = mediaComments.filter((c) => c.mediaId === m.id);
+    let inlineComments: any[] = [];
+    if (m.comments) {
+      try {
+        const parsed = JSON.parse(m.comments);
+        if (Array.isArray(parsed)) inlineComments = parsed;
+      } catch {}
+    }
+
+    const commentMap = new Map();
+    inlineComments.forEach((c) => commentMap.set(c.id, c));
+    tableComments.forEach((c) =>
+      commentMap.set(c.id, {
+        ...c,
+        createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : c.createdAt,
+      })
+    );
+
+    return {
+      ...m,
+      comments: Array.from(commentMap.values()),
+    };
+  });
+
+  // 8. Event Meetings (Google Meet & In Person)
+  const meetings = await db.query.eventMeetings.findMany({
+    where: eq(eventMeetings.eventId, id),
+    orderBy: [asc(eventMeetings.startDate)],
+  });
+
+  // 9. Available meetings to link to this event (e.g. from the same client or unlinked Calendly events)
+  let availableMeetingsToLink: any[] = [];
+  try {
+    const otherMeetings = await db.query.eventMeetings.findMany({
+      where: event.clientId ? eq(eventMeetings.clientId, event.clientId) : undefined,
+      orderBy: [desc(eventMeetings.startDate)],
+    });
+
+    const calMeetings = await db.query.events.findMany({
+      where: event.clientId ? eq(events.clientId, event.clientId) : undefined,
+      orderBy: [desc(events.startDate)],
+    });
+
+    const alreadyLinkedIds = new Set(meetings.map((m) => m.id));
+    const alreadyLinkedEventIds = new Set(
+      meetings.map((m) => m.linkedEventRowId).filter(Boolean)
+    );
+
+    const linkableOther = otherMeetings.filter(
+      (m) => m.eventId !== id && !alreadyLinkedIds.has(m.id)
+    );
+
+    const linkableCal = calMeetings
+      .filter(
+        (e) =>
+          e.id !== id &&
+          (e.category === "Reunião Calendly" || Boolean(e.calendlyEventUri) || e.name.toLowerCase().startsWith("reunião")) &&
+          !alreadyLinkedEventIds.has(e.id) &&
+          e.linkedEventId !== id
+      )
+      .map((e) => ({
+        id: `cal-evt-${e.id}`,
+        existingEventId: e.id,
+        title: e.name,
+        type: (e.venue?.toLowerCase().includes("meet") ? "google_meet" : "presencial") as "google_meet" | "presencial",
+        startDate: e.startDate,
+        endDate: e.endDate,
+        location: e.venue,
+        meetUrl: e.venue?.includes("meet.google.com") ? e.venue : null,
+        notes: e.notes,
+        source: "calendly",
+        clientName: client?.name || "Cliente",
+      }));
+
+    availableMeetingsToLink = [
+      ...linkableOther.map((m) => ({
+        id: m.id,
+        meetingId: m.id,
+        title: m.title,
+        type: m.type,
+        startDate: m.startDate,
+        endDate: m.endDate,
+        location: m.location,
+        meetUrl: m.meetUrl,
+        notes: m.notes,
+        source: m.source,
+        clientName: client?.name || "Cliente",
+      })),
+      ...linkableCal,
+    ];
+  } catch (err) {
+    console.error("Error fetching linkable meetings:", err);
+  }
 
   return (
     <EventDetailView
@@ -100,6 +257,9 @@ export default async function EventPage({ params }: PageProps) {
       initialAllocations={rawAllocations}
       initialTasks={tasks}
       initialMedia={media}
+      initialMeetings={meetings}
+      availableMeetingsToLink={availableMeetingsToLink}
+      teamUsers={teamUsers}
       quotes={eventQuotes}
       currentUser={currentUser}
     />

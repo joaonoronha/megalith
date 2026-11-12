@@ -6,6 +6,8 @@ import {
   eventAllocations,
   eventTasks,
   eventMedia,
+  moodboardComments,
+  eventMeetings,
   quotes,
   quoteLines,
   clients,
@@ -16,7 +18,7 @@ import {
   users,
   alerts,
 } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import crypto from "crypto";
@@ -24,6 +26,7 @@ import { generateId, generateReferenceCode, formatCustomId } from "@/lib/id";
 import { recordAuditLog, getAuditLogsForEntity, getRecentAuditLogs } from "@/lib/audit";
 import fs from "fs/promises";
 import path from "path";
+import { isMeetingEvent } from "@/lib/events";
 
 function invalidateAllCaches() {
   try {
@@ -126,8 +129,26 @@ export async function updateEventStatusAction(eventId: string, newStatus: string
 // 3. Create Commercial Quote
 export async function createQuoteAction(formData: FormData) {
   const quoteNumber = (formData.get("quoteNumber") as string) || generateReferenceCode("ORC");
-  const eventId = (formData.get("eventId") as string) || null;
-  const clientId = (formData.get("clientId") as string) || null;
+  const eventId = (formData.get("eventId") as string)?.trim() || null;
+  const clientId = (formData.get("clientId") as string)?.trim() || null;
+
+  if (!eventId) {
+    throw new Error("Um orçamento deve ser gerado dentro da configuração de um evento (eventId obrigatório).");
+  }
+
+  const targetEvent = await db.query.events.findFirst({
+    where: eq(events.id, eventId),
+  });
+
+  if (!targetEvent) {
+    throw new Error("O evento associado à configuração do orçamento não foi encontrado.");
+  }
+
+  if (isMeetingEvent(targetEvent)) {
+    throw new Error("Reuniões não têm orçamentos associados. Apenas eventos de produção podem ter orçamentos.");
+  }
+
+  const resolvedClientId = clientId || targetEvent.clientId || null;
   const validityDays = parseInt((formData.get("validityDays") as string) || "15", 10);
   const vatRate = 23.0;
   const linesJson = formData.get("lines") as string;
@@ -150,7 +171,7 @@ export async function createQuoteAction(formData: FormData) {
     id: quoteId,
     quoteNumber,
     eventId,
-    clientId,
+    clientId: resolvedClientId,
     accessToken,
     status: "enviado",
     validityDays,
@@ -487,7 +508,7 @@ export async function createItemAction(formData: FormData) {
     entityId: id,
     action: "criado",
     title: "Artigo criado",
-    details: `${name} (${sku}) adicionado ao inventário (${totalQuantity} un., €${unitPrice}/dia, local: ${warehouseLocation || "Armazém Principal"})${totalCost > 0 ? ` · Despesa automática de €${totalCost.toFixed(2)} registada em Finanças.` : ""}`,
+    details: `${name} (${sku}) adicionado ao inventário (${totalQuantity} un., €${unitPrice}/evento, local: ${warehouseLocation || "Armazém Principal"})${totalCost > 0 ? ` · Despesa automática de €${totalCost.toFixed(2)} registada em Finanças.` : ""}`,
   });
 
   invalidateAllCaches();
@@ -570,7 +591,7 @@ export async function updateItemAction(formData: FormData) {
     entityId: itemId,
     action: "atualizado",
     title: "Artigo atualizado",
-    details: `Dados atualizados: ${name} (${totalQuantity} un., €${unitPrice}/dia, local: ${warehouseLocation || "Armazém Principal"})`,
+    details: `Dados atualizados: ${name} (${totalQuantity} un., €${unitPrice}/evento, local: ${warehouseLocation || "Armazém Principal"})`,
   });
 
   invalidateAllCaches();
@@ -750,7 +771,7 @@ export async function updateUserAction(formData: FormData) {
   }
 
   const userId = formData.get("userId") as string;
-  const name = formData.get("name") as string;
+  const name = (formData.get("name") as string)?.trim();
   const email = (formData.get("email") as string)?.toLowerCase().trim();
   const password = formData.get("password") as string;
   const role = formData.get("role") as "admin" | "producer" | "warehouse";
@@ -758,6 +779,15 @@ export async function updateUserAction(formData: FormData) {
   if (!userId || !name) {
     return { success: false, error: "ID e Nome são obrigatórios." };
   }
+
+  const oldUser = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  });
+  if (!oldUser) {
+    return { success: false, error: "Utilizador não encontrado." };
+  }
+
+  const oldName = oldUser.name;
 
   const updatePayload: Record<string, any> = {
     name,
@@ -784,6 +814,42 @@ export async function updateUserAction(formData: FormData) {
     .set(updatePayload)
     .where(eq(users.id, userId));
 
+  // If the user's name was changed, synchronize related records where the name is stored
+  if (name !== oldName) {
+    await db
+      .update(storageLocations)
+      .set({ managerName: name })
+      .where(or(eq(storageLocations.managerUserId, userId), eq(storageLocations.managerName, oldName)));
+
+    await db
+      .update(eventTasks)
+      .set({ assignedTo: name })
+      .where(eq(eventTasks.assignedTo, oldName));
+  }
+
+  // If the updated user is the currently logged in user, refresh the session cookie with the new name
+  const isCurrentUser = currentUser.id === userId;
+  if (isCurrentUser) {
+    const { signSessionToken, SESSION_COOKIE_NAME } = await import("@/lib/session");
+    const { cookies } = await import("next/headers");
+    const expiresAt = Date.now() + 14 * 24 * 60 * 60 * 1000;
+    const token = await signSessionToken({
+      userId,
+      email: updatePayload.email || oldUser.email,
+      name,
+      role: (updatePayload.role || oldUser.role) as "admin" | "producer" | "warehouse",
+      expiresAt,
+    });
+    const cookieStore = await cookies();
+    cookieStore.set(SESSION_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      expires: new Date(expiresAt),
+    });
+  }
+
   await recordAuditLog({
     entityType: "user",
     entityId: userId,
@@ -793,11 +859,32 @@ export async function updateUserAction(formData: FormData) {
   });
 
   invalidateAllCaches();
-  revalidatePath(`/utilizadores/${userId}`);
-  revalidatePath(`/users/${userId}`);
-  revalidatePath("/mais");
-  revalidatePath("/more");
-  return { success: true };
+  try {
+    revalidatePath("/", "layout");
+    revalidatePath(`/utilizadores/${userId}`);
+    revalidatePath(`/users/${userId}`);
+    revalidatePath("/mais");
+    revalidatePath("/more");
+    revalidatePath("/eventos");
+    revalidatePath("/events");
+    revalidatePath("/inventario");
+    revalidatePath("/inventory");
+    revalidatePath("/financas");
+    revalidatePath("/finance");
+    revalidatePath("/calendario");
+    revalidatePath("/calendar");
+  } catch {}
+
+  return {
+    success: true,
+    user: {
+      id: userId,
+      name,
+      email: updatePayload.email || oldUser.email,
+      role: (updatePayload.role || oldUser.role) as "admin" | "producer" | "warehouse",
+    },
+    isCurrentUser,
+  };
 }
 
 // 9. Update Event Details (Category, Dates, Theme, Vibe, Customer Price, Notes, Special Needs)
@@ -1077,7 +1164,13 @@ export async function deleteAllocationAction(allocationId: string, eventId: stri
 }
 
 // 15. Add Event Action Item (Task)
-export async function addEventTaskAction(eventId: string, title: string, priority: "baixa" | "media" | "alta" | "urgente" = "media", dueDateStr?: string) {
+export async function addEventTaskAction(
+  eventId: string,
+  title: string,
+  priority: "baixa" | "media" | "alta" | "urgente" = "media",
+  dueDateStr?: string,
+  assignedTo?: string
+) {
   if (!eventId || !title.trim()) {
     return { success: false, error: "Título da tarefa é obrigatório." };
   }
@@ -1090,6 +1183,7 @@ export async function addEventTaskAction(eventId: string, title: string, priorit
     completed: false,
     priority,
     dueDate: dueDateStr ? new Date(dueDateStr) : null,
+    assignedTo: assignedTo?.trim() || null,
     orderIndex: Date.now(),
     createdAt: new Date(),
   });
@@ -1456,6 +1550,156 @@ export async function deleteEventMediaAction(mediaId: string, eventId: string) {
   return { success: true };
 }
 
+// 20.1 Add Moodboard Comment & Collaborative Feedback
+export async function addMoodboardCommentAction(formData: FormData) {
+  const mediaId = (formData.get("mediaId") as string)?.trim();
+  const eventId = (formData.get("eventId") as string)?.trim();
+  const content = (formData.get("content") as string)?.trim();
+  const photoId = (formData.get("photoId") as string)?.trim() || null;
+  const photoIndexStr = formData.get("photoIndex") as string;
+  const photoIndex =
+    photoIndexStr !== null && photoIndexStr !== undefined && photoIndexStr !== ""
+      ? parseInt(photoIndexStr, 10)
+      : null;
+  const photoLabel = (formData.get("photoLabel") as string)?.trim() || null;
+  const photoUrl = (formData.get("photoUrl") as string)?.trim() || null;
+  let imageUrl = (formData.get("imageUrl") as string)?.trim() || null;
+
+  if (!mediaId || !eventId) {
+    return { success: false, error: "ID do moodboard e ID do evento são obrigatórios." };
+  }
+
+  if (!content) {
+    return { success: false, error: "O comentário não pode estar vazio." };
+  }
+
+  const { getCurrentUser } = await import("@/lib/auth");
+  const user = await getCurrentUser();
+  const authorName = user?.name || "Administrador CFM";
+  const userId = user?.id || null;
+
+  // Handle uploaded comment attachment file if present
+  const imageFile = formData.get("imageFile") as File | null;
+  if (imageFile && typeof imageFile.arrayBuffer === "function" && imageFile.size > 0) {
+    try {
+      const uploadsDir = path.join(process.cwd(), "public", "uploads");
+      await fs.mkdir(uploadsDir, { recursive: true });
+
+      const buffer = Buffer.from(await imageFile.arrayBuffer());
+      const rawExt = path.extname(imageFile.name || "").toLowerCase() || ".jpg";
+      const sanitizedBase = path
+        .basename(imageFile.name || "comentario", rawExt)
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .slice(0, 30);
+      const uniqueName = `cmt-${Date.now()}-${generateId("f")}-${sanitizedBase}${rawExt}`;
+      const filePath = path.join(uploadsDir, uniqueName);
+
+      await fs.writeFile(filePath, buffer);
+      imageUrl = `/api/uploads/${uniqueName}`;
+    } catch (uploadErr) {
+      console.error("Erro ao gravar anexo de comentário:", uploadErr);
+    }
+  }
+
+  const commentId = generateId("cmt");
+  const now = new Date();
+
+  const newCommentRecord = {
+    id: commentId,
+    mediaId,
+    eventId,
+    userId,
+    authorName,
+    content,
+    photoId,
+    photoIndex,
+    photoLabel,
+    photoUrl,
+    imageUrl,
+    createdAt: now,
+  };
+
+  // 1. Insert into moodboard_comments table
+  await db.insert(moodboardComments).values(newCommentRecord);
+
+  // 2. Also keep eventMedia.comments JSON array updated for instant access
+  const [board] = await db.select().from(eventMedia).where(eq(eventMedia.id, mediaId));
+  if (board) {
+    let existingComments: any[] = [];
+    if (board.comments) {
+      try {
+        const parsed = JSON.parse(board.comments);
+        if (Array.isArray(parsed)) existingComments = parsed;
+      } catch {}
+    }
+
+    const updatedComments = [
+      ...existingComments,
+      {
+        ...newCommentRecord,
+        createdAt: now.toISOString(),
+      },
+    ];
+
+    await db
+      .update(eventMedia)
+      .set({
+        comments: JSON.stringify(updatedComments),
+      })
+      .where(eq(eventMedia.id, mediaId));
+  }
+
+  // 3. Record Audit Log
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "comentario_moodboard",
+    title: `Novo comentário no Moodboard "${board?.title || "Moodboard"}"`,
+    details: `${authorName}: "${content.slice(0, 50)}${content.length > 50 ? "..." : ""}" ${photoLabel ? `(${photoLabel})` : ""}`,
+  });
+
+  invalidateAllCaches();
+  safeRevalidate(`/eventos/${eventId}`);
+  safeRevalidate(`/events/${eventId}`);
+
+  return {
+    success: true,
+    comment: {
+      ...newCommentRecord,
+      createdAt: now.toISOString(),
+    },
+  };
+}
+
+// 20.2 Delete Moodboard Comment
+export async function deleteMoodboardCommentAction(commentId: string, mediaId: string, eventId: string) {
+  // Delete from relational table
+  await db.delete(moodboardComments).where(eq(moodboardComments.id, commentId));
+
+  // Sync eventMedia.comments JSON
+  const [board] = await db.select().from(eventMedia).where(eq(eventMedia.id, mediaId));
+  if (board && board.comments) {
+    try {
+      const parsed = JSON.parse(board.comments);
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter((c: any) => c.id !== commentId);
+        await db
+          .update(eventMedia)
+          .set({
+            comments: JSON.stringify(filtered),
+          })
+          .where(eq(eventMedia.id, mediaId));
+      }
+    } catch {}
+  }
+
+  invalidateAllCaches();
+  safeRevalidate(`/eventos/${eventId}`);
+  safeRevalidate(`/events/${eventId}`);
+
+  return { success: true, commentId };
+}
+
 // 21. Alert Actions (Snooze, Acknowledge, Dismiss, Sync)
 export async function snoozeAlertAction(alertId: string, hours: number) {
   const snoozedUntil = new Date(Date.now() + hours * 60 * 60 * 1000);
@@ -1511,12 +1755,29 @@ export async function syncCalendlyMeetingsAction(providedToken?: string) {
   const result = await pullCalendlyMeetings(providedToken);
   invalidateAllCaches();
   try {
+    revalidatePath("/");
     revalidatePath("/calendario");
     revalidatePath("/calendar");
     revalidatePath("/eventos");
     revalidatePath("/events");
   } catch {}
-  return result;
+
+  const { db } = await import("@/db/client");
+  const { events, clients } = await import("@/db/schema");
+  const { desc } = await import("drizzle-orm");
+
+  const [allEvents, allClients] = await Promise.all([
+    db.query.events.findMany({
+      orderBy: [desc(events.startDate)],
+    }).catch(() => []),
+    db.query.clients.findMany().catch(() => []),
+  ]);
+
+  return {
+    ...result,
+    events: allEvents,
+    clients: allClients,
+  };
 }
 
 export async function getCalendlyIntegrationStatusAction() {
@@ -1536,6 +1797,523 @@ export async function getCalendlyIntegrationStatusAction() {
     syncStatus: integration?.syncStatus || "idle",
     syncError: integration?.syncError || null,
   };
+}
+
+// ============================================================================
+// 14. Event Meetings Management (Google Meet & In Person)
+// ============================================================================
+
+export async function createEventMeetingAction(data: {
+  eventId: string;
+  title: string;
+  type?: "google_meet" | "presencial" | "outro";
+  startDate: string;
+  endDate?: string;
+  location?: string;
+  meetUrl?: string;
+  notes?: string;
+  hostName?: string;
+  hostUserId?: string;
+  clientContactName?: string;
+  clientContactEmail?: string;
+  clientContactPhone?: string;
+}) {
+  const event = await db.query.events.findFirst({
+    where: eq(events.id, data.eventId),
+  });
+  if (!event) {
+    throw new Error("Evento não encontrado");
+  }
+
+  const meetingType = data.type || "google_meet";
+  let meetUrl = data.meetUrl?.trim() || null;
+  let location = data.location?.trim() || null;
+
+  if (meetingType === "google_meet" && !meetUrl) {
+    const codeA = crypto.randomBytes(2).toString("hex").slice(0, 3);
+    const codeB = crypto.randomBytes(2).toString("hex").slice(0, 4);
+    meetUrl = `https://meet.google.com/cfm-${codeA}-${codeB}`;
+  }
+
+  if (meetingType === "presencial" && !location) {
+    location = event.venue || "Atelier CFM Loures";
+  }
+
+  const meetingId = generateId("mtg");
+  const start = new Date(data.startDate);
+  const end = data.endDate ? new Date(data.endDate) : new Date(start.getTime() + 45 * 60 * 1000);
+
+  let clientContactName = data.clientContactName?.trim();
+  let clientContactEmail = data.clientContactEmail?.trim();
+  let clientContactPhone = data.clientContactPhone?.trim();
+
+  if (event.clientId && (!clientContactName || !clientContactEmail || !clientContactPhone)) {
+    const client = await db.query.clients.findFirst({
+      where: eq(clients.id, event.clientId),
+    });
+    if (client) {
+      clientContactName = clientContactName || client.contactName || client.name;
+      clientContactEmail = clientContactEmail || client.email || undefined;
+      clientContactPhone = clientContactPhone || client.phone || undefined;
+    }
+  }
+
+  const newMeeting = {
+    id: meetingId,
+    eventId: data.eventId,
+    clientId: event.clientId,
+    title: data.title.trim(),
+    type: meetingType,
+    status: "agendada" as const,
+    startDate: start,
+    endDate: end,
+    location,
+    meetUrl,
+    notes: data.notes?.trim() || null,
+    hostUserId: data.hostUserId || null,
+    hostName: data.hostName?.trim() || "Equipa CFM",
+    clientContactName: clientContactName || null,
+    clientContactEmail: clientContactEmail || null,
+    clientContactPhone: clientContactPhone || null,
+    source: "manual" as const,
+    calendlyUri: null,
+    linkedEventRowId: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  await db.insert(eventMeetings).values(newMeeting);
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: data.eventId,
+    action: "criado",
+    title: "Reunião Agendada",
+    details: `Reunião "${data.title.trim()}" (${meetingType === "google_meet" ? "Google Meet" : "Presencial"}) agendada para ${start.toLocaleDateString("pt-PT")} às ${start.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}.`,
+  });
+
+  safeRevalidate(`/eventos/${data.eventId}`);
+  safeRevalidate(`/events/${data.eventId}`);
+  safeRevalidate("/calendario");
+  safeRevalidate("/calendar");
+  safeRevalidate("/");
+
+  return { success: true, meeting: newMeeting };
+}
+
+export async function linkMeetingToEventAction(data: {
+  eventId: string;
+  meetingId?: string;
+  existingEventId?: string;
+  externalMeetUrl?: string;
+  title?: string;
+  startDate?: string;
+  notes?: string;
+  type?: "google_meet" | "presencial" | "outro";
+}) {
+  const event = await db.query.events.findFirst({
+    where: eq(events.id, data.eventId),
+  });
+  if (!event) throw new Error("Evento não encontrado");
+
+  // Case 1: Linking an existing meeting row
+  if (data.meetingId) {
+    await db
+      .update(eventMeetings)
+      .set({
+        eventId: data.eventId,
+        updatedAt: new Date(),
+      })
+      .where(eq(eventMeetings.id, data.meetingId));
+
+    const linkedMeeting = await db.query.eventMeetings.findFirst({
+      where: eq(eventMeetings.id, data.meetingId),
+    });
+
+    await recordAuditLog({
+      entityType: "event",
+      entityId: data.eventId,
+      action: "atualizado",
+      title: "Reunião Vinculada",
+      details: `Reunião "${linkedMeeting?.title || data.meetingId}" vinculada a este evento.`,
+    });
+
+    safeRevalidate(`/eventos/${data.eventId}`);
+    safeRevalidate(`/events/${data.eventId}`);
+    safeRevalidate("/calendario");
+    safeRevalidate("/calendar");
+    return { success: true, meeting: linkedMeeting };
+  }
+
+  // Case 2: Linking an existing event row from events table (e.g. imported from Calendly)
+  if (data.existingEventId) {
+    const existingEvt = await db.query.events.findFirst({
+      where: eq(events.id, data.existingEventId),
+    });
+    if (!existingEvt) throw new Error("Reunião existente não encontrada");
+
+    await db
+      .update(events)
+      .set({
+        linkedEventId: data.eventId,
+        updatedAt: new Date(),
+      })
+      .where(eq(events.id, data.existingEventId));
+
+    const isMeet = Boolean(
+      existingEvt.venue?.toLowerCase().includes("meet") ||
+      existingEvt.notes?.toLowerCase().includes("meet") ||
+      existingEvt.calendlyEventUri
+    );
+
+    const meetUrl = isMeet
+      ? existingEvt.venue?.includes("meet.google.com")
+        ? existingEvt.venue
+        : `https://meet.google.com/cfm-${crypto.randomBytes(2).toString("hex").slice(0, 3)}-${crypto.randomBytes(2).toString("hex").slice(0, 4)}`
+      : null;
+
+    const meetingId = generateId("mtg");
+    const newMeeting = {
+      id: meetingId,
+      eventId: data.eventId,
+      clientId: event.clientId || existingEvt.clientId,
+      title: existingEvt.name,
+      type: (isMeet ? "google_meet" : "presencial") as "google_meet" | "presencial",
+      status: "agendada" as const,
+      startDate: existingEvt.startDate,
+      endDate: existingEvt.endDate || new Date(existingEvt.startDate.getTime() + 45 * 60 * 1000),
+      location: existingEvt.venue,
+      meetUrl,
+      notes: existingEvt.notes,
+      hostName: "Equipa CFM",
+      source: "calendly" as const,
+      calendlyUri: existingEvt.calendlyEventUri,
+      linkedEventRowId: existingEvt.id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await db.insert(eventMeetings).values(newMeeting);
+
+    await recordAuditLog({
+      entityType: "event",
+      entityId: data.eventId,
+      action: "atualizado",
+      title: "Reunião Calendly Vinculada",
+      details: `Reunião importada "${existingEvt.name}" vinculada a este evento.`,
+    });
+
+    safeRevalidate(`/eventos/${data.eventId}`);
+    safeRevalidate(`/events/${data.eventId}`);
+    safeRevalidate("/calendario");
+    safeRevalidate("/calendar");
+    return { success: true, meeting: newMeeting };
+  }
+
+  // Case 3: Link an external meeting URL / custom meeting
+  if (data.externalMeetUrl || data.title) {
+    const isMeet = Boolean(data.externalMeetUrl) || data.type === "google_meet";
+    const meetingId = generateId("mtg");
+    const start = data.startDate ? new Date(data.startDate) : new Date(Date.now() + 24 * 3600 * 1000);
+    const newMeeting = {
+      id: meetingId,
+      eventId: data.eventId,
+      clientId: event.clientId,
+      title: data.title || "Reunião Vinculada",
+      type: (isMeet ? "google_meet" : "presencial") as "google_meet" | "presencial",
+      status: "agendada" as const,
+      startDate: start,
+      endDate: new Date(start.getTime() + 45 * 60 * 1000),
+      location: isMeet ? "Google Meet (Online)" : (event.venue || "Atelier CFM"),
+      meetUrl: data.externalMeetUrl || (isMeet ? `https://meet.google.com/cfm-${crypto.randomBytes(3).toString("hex")}` : null),
+      notes: data.notes || null,
+      hostName: "Equipa CFM",
+      source: "linked" as const,
+      calendlyUri: null,
+      linkedEventRowId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await db.insert(eventMeetings).values(newMeeting);
+
+    await recordAuditLog({
+      entityType: "event",
+      entityId: data.eventId,
+      action: "criado",
+      title: "Reunião Externa Vinculada",
+      details: `Reunião "${newMeeting.title}" vinculada ao evento.`,
+    });
+
+    safeRevalidate(`/eventos/${data.eventId}`);
+    safeRevalidate(`/events/${data.eventId}`);
+    safeRevalidate("/calendario");
+    safeRevalidate("/calendar");
+    return { success: true, meeting: newMeeting };
+  }
+
+  throw new Error("Parâmetros insuficientes para vincular reunião");
+}
+
+export async function updateEventMeetingAction(data: {
+  meetingId: string;
+  eventId: string;
+  title?: string;
+  type?: "google_meet" | "presencial" | "outro";
+  status?: "agendada" | "realizada" | "cancelada";
+  startDate?: string;
+  endDate?: string;
+  location?: string;
+  meetUrl?: string;
+  notes?: string;
+  hostName?: string;
+}) {
+  const updateData: any = { updatedAt: new Date() };
+  if (data.title !== undefined) updateData.title = data.title.trim();
+  if (data.type !== undefined) updateData.type = data.type;
+  if (data.status !== undefined) updateData.status = data.status;
+  if (data.startDate !== undefined) updateData.startDate = new Date(data.startDate);
+  if (data.endDate !== undefined) updateData.endDate = data.endDate ? new Date(data.endDate) : null;
+  if (data.location !== undefined) updateData.location = data.location.trim();
+  if (data.meetUrl !== undefined) updateData.meetUrl = data.meetUrl.trim();
+  if (data.notes !== undefined) updateData.notes = data.notes.trim();
+  if (data.hostName !== undefined) updateData.hostName = data.hostName.trim();
+
+  await db
+    .update(eventMeetings)
+    .set(updateData)
+    .where(eq(eventMeetings.id, data.meetingId));
+
+  if (data.status) {
+    await recordAuditLog({
+      entityType: "event",
+      entityId: data.eventId,
+      action: "atualizado",
+      title: `Reunião ${data.status === "realizada" ? "Concluída" : data.status === "cancelada" ? "Cancelada" : "Atualizada"}`,
+      details: `Estado da reunião atualizado para "${data.status}".`,
+    });
+  }
+
+  safeRevalidate(`/eventos/${data.eventId}`);
+  safeRevalidate(`/events/${data.eventId}`);
+  safeRevalidate("/calendario");
+  safeRevalidate("/calendar");
+  return { success: true };
+}
+
+export async function unlinkEventMeetingAction(meetingId: string, eventId: string) {
+  const meeting = await db.query.eventMeetings.findFirst({
+    where: eq(eventMeetings.id, meetingId),
+  });
+  if (meeting?.linkedEventRowId) {
+    await db
+      .update(events)
+      .set({ linkedEventId: null })
+      .where(eq(events.id, meeting.linkedEventRowId));
+  }
+
+  await db.delete(eventMeetings).where(eq(eventMeetings.id, meetingId));
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "atualizado",
+    title: "Reunião Desvinculada",
+    details: `Reunião "${meeting?.title || meetingId}" desvinculada deste evento.`,
+  });
+
+  safeRevalidate(`/eventos/${eventId}`);
+  safeRevalidate(`/events/${eventId}`);
+  safeRevalidate("/calendario");
+  safeRevalidate("/calendar");
+  return { success: true };
+}
+
+export async function deleteEventMeetingAction(meetingId: string, eventId: string) {
+  return unlinkEventMeetingAction(meetingId, eventId);
+}
+
+// -------------------------------------------------------------
+// MEETING CONCEPT ACTIONS (Conversation summary, action items, participants & event linking)
+// -------------------------------------------------------------
+
+export async function updateMeetingConversationAction(data: {
+  meetingId: string;
+  summary: string;
+}) {
+  const meeting = await db.query.events.findFirst({
+    where: eq(events.id, data.meetingId),
+  });
+  if (!meeting) throw new Error("Reunião não encontrada.");
+
+  await db
+    .update(events)
+    .set({
+      meetingSummary: data.summary,
+      notes: data.summary,
+      updatedAt: new Date(),
+    })
+    .where(eq(events.id, data.meetingId));
+
+  // If this meeting has a linked eventMeetings record, update it too
+  await db
+    .update(eventMeetings)
+    .set({
+      notes: data.summary,
+      updatedAt: new Date(),
+    })
+    .where(eq(eventMeetings.linkedEventRowId, data.meetingId));
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: data.meetingId,
+    action: "atualizado",
+    title: "Resumo da Conversa Atualizado",
+    details: `Resumo e ata da conversa atualizados para a reunião "${meeting.name}".`,
+  });
+
+  safeRevalidate(`/eventos/${data.meetingId}`);
+  if (meeting.linkedEventId) {
+    safeRevalidate(`/eventos/${meeting.linkedEventId}`);
+  }
+  return { success: true };
+}
+
+export async function updateMeetingParticipantsAction(data: {
+  meetingId: string;
+  participantsJson: string;
+}) {
+  const meeting = await db.query.events.findFirst({
+    where: eq(events.id, data.meetingId),
+  });
+  if (!meeting) throw new Error("Reunião não encontrada.");
+
+  await db
+    .update(events)
+    .set({
+      meetingParticipants: data.participantsJson,
+      updatedAt: new Date(),
+    })
+    .where(eq(events.id, data.meetingId));
+
+  safeRevalidate(`/eventos/${data.meetingId}`);
+  return { success: true };
+}
+
+export async function linkMeetingDirectAction(meetingId: string, targetEventId: string) {
+  const meeting = await db.query.events.findFirst({
+    where: eq(events.id, meetingId),
+  });
+  if (!meeting) throw new Error("Reunião não encontrada.");
+
+  const targetEvent = await db.query.events.findFirst({
+    where: eq(events.id, targetEventId),
+  });
+  if (!targetEvent) throw new Error("Evento não encontrado.");
+
+  await db
+    .update(events)
+    .set({
+      linkedEventId: targetEventId,
+      clientId: meeting.clientId || targetEvent.clientId,
+      updatedAt: new Date(),
+    })
+    .where(eq(events.id, meetingId));
+
+  const isMeet = Boolean(
+    meeting.venue?.toLowerCase().includes("meet") ||
+    meeting.notes?.toLowerCase().includes("meet") ||
+    meeting.calendlyEventUri
+  );
+
+  const meetUrl = isMeet
+    ? meeting.venue?.includes("meet.google.com")
+      ? meeting.venue
+      : `https://meet.google.com/cfm-${meetingId.slice(-6)}`
+    : null;
+
+  const existingLink = await db.query.eventMeetings.findFirst({
+    where: eq(eventMeetings.linkedEventRowId, meetingId),
+  });
+
+  if (existingLink) {
+    await db
+      .update(eventMeetings)
+      .set({
+        eventId: targetEventId,
+        updatedAt: new Date(),
+      })
+      .where(eq(eventMeetings.id, existingLink.id));
+  } else {
+    await db.insert(eventMeetings).values({
+      id: generateId("mtg"),
+      eventId: targetEventId,
+      clientId: targetEvent.clientId || meeting.clientId,
+      title: meeting.name,
+      type: (isMeet ? "google_meet" : "presencial") as any,
+      status: "agendada",
+      startDate: meeting.startDate,
+      endDate: meeting.endDate || new Date(meeting.startDate.getTime() + 45 * 60 * 1000),
+      location: meeting.venue,
+      meetUrl,
+      notes: meeting.meetingSummary || meeting.notes,
+      hostName: "Equipa CFM",
+      source: "calendly",
+      calendlyUri: meeting.calendlyEventUri,
+      linkedEventRowId: meeting.id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: targetEventId,
+    action: "atualizado",
+    title: "Reunião Vinculada",
+    details: `Reunião "${meeting.name}" vinculada ao evento "${targetEvent.name}".`,
+  });
+
+  safeRevalidate(`/eventos/${meetingId}`);
+  safeRevalidate(`/eventos/${targetEventId}`);
+  safeRevalidate("/calendario");
+  return { success: true };
+}
+
+export async function unlinkMeetingFromEventAction(meetingId: string) {
+  const meeting = await db.query.events.findFirst({
+    where: eq(events.id, meetingId),
+  });
+  if (!meeting) throw new Error("Reunião não encontrada.");
+
+  const previousEventId = meeting.linkedEventId;
+
+  await db
+    .update(events)
+    .set({
+      linkedEventId: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(events.id, meetingId));
+
+  await db
+    .delete(eventMeetings)
+    .where(eq(eventMeetings.linkedEventRowId, meetingId));
+
+  if (previousEventId) {
+    await recordAuditLog({
+      entityType: "event",
+      entityId: previousEventId,
+      action: "atualizado",
+      title: "Reunião Desvinculada",
+      details: `Reunião "${meeting.name}" desvinculada do evento.`,
+    });
+    safeRevalidate(`/eventos/${previousEventId}`);
+  }
+
+  safeRevalidate(`/eventos/${meetingId}`);
+  safeRevalidate("/calendario");
+  return { success: true };
 }
 
 

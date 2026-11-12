@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   User,
@@ -52,6 +53,7 @@ interface ManagedLocation {
 
 interface UserDetailViewProps {
   user: TeamUser;
+  currentUser?: { id: string; name: string; email: string; role: string } | null;
   assignedTasks: AssignedTask[];
   managedLocations?: ManagedLocation[];
   canEdit?: boolean;
@@ -59,13 +61,41 @@ interface UserDetailViewProps {
 
 export default function UserDetailView({
   user: initialUser,
+  currentUser,
   assignedTasks,
   managedLocations = [],
   canEdit = false,
 }: UserDetailViewProps) {
+  const router = useRouter();
   const [user, setUser] = useState<TeamUser>(initialUser);
+  const [currentUserState, setCurrentUserState] = useState(currentUser);
   const [copiedId, setCopiedId] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+
+  useEffect(() => {
+    setUser(initialUser);
+  }, [initialUser]);
+
+  useEffect(() => {
+    setCurrentUserState(currentUser);
+  }, [currentUser]);
+
+  useEffect(() => {
+    const handleUserUpdated = (e: CustomEvent<any>) => {
+      const updated = e.detail;
+      if (!updated || !updated.id) return;
+      if (user.id === updated.id) {
+        setUser((prev) => ({ ...prev, ...updated }));
+      }
+      if (currentUserState && currentUserState.id === updated.id) {
+        setCurrentUserState((prev: any) => ({ ...prev, ...updated }));
+      }
+    };
+    window.addEventListener("eventflow:user-updated", handleUserUpdated as EventListener);
+    return () => {
+      window.removeEventListener("eventflow:user-updated", handleUserUpdated as EventListener);
+    };
+  }, [user.id, currentUserState]);
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(user.id);
@@ -123,15 +153,29 @@ export default function UserDetailView({
             <span>Voltar<span className="hidden sm:inline"> à Gestão de Equipa</span></span>
           </Link>
 
-          {canEdit && (
-            <button
-              onClick={() => setShowEditModal(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#111] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] px-3 sm:px-3.5 py-1.5 rounded-[12px] shadow-2xs transition cursor-pointer flex-shrink-0"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              <span>Editar<span className="hidden sm:inline"> Conta</span></span>
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {currentUserState && (
+              <div
+                className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold shadow-2xs"
+                title={`${currentUserState.name} (${currentUserState.email}) · Acesso ${currentUserState.role}`}
+              >
+                <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold">
+                  {currentUserState.name.charAt(0)}
+                </div>
+                <span className="text-[#111] hidden sm:inline">{currentUserState.name.split(" ")[0]}</span>
+              </div>
+            )}
+
+            {canEdit && (
+              <button
+                onClick={() => setShowEditModal(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#111] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] px-3 sm:px-3.5 py-1.5 rounded-[12px] shadow-2xs transition cursor-pointer flex-shrink-0"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Editar<span className="hidden sm:inline"> Conta</span></span>
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -152,6 +196,13 @@ export default function UserDetailView({
                   <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-[#111]">
                     {user.name}
                   </h1>
+
+                  {currentUserState?.id === user.id && (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#007aff]/10 text-[#007aff] border border-[#007aff]/20 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#007aff]"></span>
+                      <span>Sua Conta (Sessão Atual)</span>
+                    </span>
+                  )}
 
                   {/* Copyable ID Badge */}
                   <button
@@ -401,6 +452,17 @@ export default function UserDetailView({
           onClose={() => setShowEditModal(false)}
           onSuccess={(updated) => {
             setUser((prev) => ({ ...prev, ...updated }));
+            if (currentUserState && currentUserState.id === user.id) {
+              setCurrentUserState((prev: any) => ({ ...prev, ...updated }));
+            }
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("eventflow:user-updated", {
+                  detail: { id: user.id, ...updated },
+                })
+              );
+            }
+            router.refresh();
             setShowEditModal(false);
           }}
         />
@@ -440,7 +502,7 @@ function EditUserModal({
 
       const res = await updateUserAction(formData);
       if (res.success) {
-        onSuccess({ name, email, role });
+        onSuccess((res as any).user || { name, email, role });
       } else {
         setError(res.error || "Erro ao atualizar utilizador.");
       }

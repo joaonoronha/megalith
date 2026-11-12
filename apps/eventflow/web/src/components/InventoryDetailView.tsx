@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition, useRef, useMemo } from "react";
+import React, { useState, useEffect, useTransition, useRef, useMemo } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -69,6 +69,7 @@ interface InventoryDetailViewProps {
   allocations: ItemAllocation[];
   locations?: StorageLocation[];
   users?: TeamUser[];
+  currentUser?: { id: string; name: string; email: string; role: string } | null;
 }
 
 const PRESET_CATEGORIES = [
@@ -107,9 +108,36 @@ export default function InventoryDetailView({
   allocations,
   locations: initialLocations = [],
   users: teamUsers = [],
+  currentUser,
 }: InventoryDetailViewProps) {
   const [item, setItem] = useState<InventoryItem>(initialItem);
+  const [currentUserState, setCurrentUserState] = useState(currentUser);
   const [locationsList, setLocationsList] = useState<StorageLocation[]>(initialLocations);
+
+  useEffect(() => {
+    setCurrentUserState(currentUser);
+  }, [currentUser]);
+
+  useEffect(() => {
+    const handleUserUpdated = (e: CustomEvent<any>) => {
+      const updated = e.detail;
+      if (!updated || !updated.id) return;
+      if (currentUserState && currentUserState.id === updated.id) {
+        setCurrentUserState((prev: any) => ({ ...prev, ...updated }));
+      }
+      setLocationsList((prev) =>
+        prev.map((loc) =>
+          loc.managerUserId === updated.id
+            ? { ...loc, managerName: updated.name }
+            : loc
+        )
+      );
+    };
+    window.addEventListener("eventflow:user-updated", handleUserUpdated as EventListener);
+    return () => {
+      window.removeEventListener("eventflow:user-updated", handleUserUpdated as EventListener);
+    };
+  }, [currentUserState]);
   const [showLocationsModal, setShowLocationsModal] = useState(false);
   const [locationsModalMode, setLocationsModalMode] = useState<"list" | "create">("list");
   const [copiedId, setCopiedId] = useState(false);
@@ -274,6 +302,18 @@ export default function InventoryDetailView({
               <History className="w-3.5 h-3.5" />
               <span>Histórico</span>
             </button>
+
+            {currentUserState && (
+              <div
+                className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold shadow-2xs flex-shrink-0"
+                title={`${currentUserState.name} (${currentUserState.email}) · Acesso ${currentUserState.role}`}
+              >
+                <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold">
+                  {currentUserState.name.charAt(0)}
+                </div>
+                <span className="text-[#111] hidden sm:inline">{currentUserState.name.split(" ")[0]}</span>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -491,9 +531,9 @@ export default function InventoryDetailView({
                       handleFieldChange("unitPrice", parseFloat(e.target.value) || 0)
                     }
                     className="text-2xl font-extrabold text-[#111] bg-transparent border-b border-transparent hover:border-[#ececf0] focus:border-[#007aff] focus:bg-[#fafafa] px-1 rounded-[6px] focus:outline-none w-24 text-right"
-                    title="Preço unitário por dia (guarda automaticamente)"
+                    title="Preço unitário por evento (guarda automaticamente)"
                   />
-                  <span className="text-xs font-normal text-[#8e8e93]">/dia</span>
+                  <span className="text-xs font-normal text-[#8e8e93]">/evento</span>
                 </div>
 
                 <div className="flex items-center md:justify-end gap-1 text-[11px] text-[#8e8e93] mt-0.5">

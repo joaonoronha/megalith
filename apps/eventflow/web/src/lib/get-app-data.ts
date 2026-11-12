@@ -9,6 +9,7 @@ import {
   storageLocations,
   users,
   eventAllocations,
+  eventMeetings,
   alerts,
 } from "@/db/schema";
 import { desc, asc } from "drizzle-orm";
@@ -30,7 +31,16 @@ export async function getAppInitialData() {
   let allUsers: any[] = [];
   let allLocations: any[] = [];
   let allAllocations: any[] = [];
+  let allMeetings: any[] = [];
   let templateRow: any = null;
+
+  // Synchronize Calendly meetings on an hourly basis if due
+  try {
+    const { syncCalendlyIfDue } = await import("@/lib/calendly-sync");
+    await syncCalendlyIfDue();
+  } catch (e) {
+    console.error("getAppInitialData: error during automatic Calendly sync", e);
+  }
 
   try {
     const results = await Promise.all([
@@ -87,6 +97,12 @@ export async function getAppInitialData() {
         console.error("getAppInitialData: error loading template", e);
         return null;
       }),
+      db.query.eventMeetings.findMany({
+        orderBy: [asc(eventMeetings.startDate)],
+      }).catch((e) => {
+        console.error("getAppInitialData: error loading meetings", e);
+        return [];
+      }),
     ]);
 
     allEvents = results[0] || [];
@@ -98,6 +114,7 @@ export async function getAppInitialData() {
     allLocations = results[6] || [];
     allAllocations = results[7] || [];
     templateRow = results[8] || null;
+    allMeetings = results[9] || [];
   } catch (err) {
     console.error("getAppInitialData: bulk query error", err);
   }
@@ -136,6 +153,7 @@ export async function getAppInitialData() {
     allUsers: allUsers || [],
     allLocations: allLocations || [],
     allAllocations: allAllocations || [],
+    allMeetings: allMeetings || [],
     template,
     allAlerts: allAlerts || [],
   };

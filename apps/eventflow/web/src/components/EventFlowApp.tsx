@@ -43,6 +43,7 @@ import AlertsDrawerModal from "@/components/AlertsDrawerModal";
 import StorageLocationsModal, { StorageLocation } from "@/components/StorageLocationsModal";
 import FinanceView from "@/components/FinanceView";
 import { formatRelativeTime } from "@/lib/date-format";
+import { isMeetingEvent, canEventReceiveQuote } from "@/lib/events";
 import {
   createEventAction,
   updateEventStatusAction,
@@ -74,6 +75,7 @@ interface Props {
   initialAlerts?: any[];
   initialLocations?: any[];
   initialAllocations?: any[];
+  initialMeetings?: any[];
   initialTab?: "home" | "calendar" | "events" | "inventory" | "finance" | "more";
 }
 
@@ -150,14 +152,7 @@ function getStatusStyle(status: string) {
 }
 
 function isCalendlyMeeting(evt: any): boolean {
-  if (!evt) return false;
-  return Boolean(
-    evt.calendlyEventUri ||
-    evt.category === "Reunião Calendly" ||
-    evt.category === "Consulta / Briefing" ||
-    (typeof evt.name === "string" && evt.name.toLowerCase().startsWith("reunião")) ||
-    (typeof evt.theme === "string" && evt.theme.toLowerCase().includes("briefing"))
-  );
+  return isMeetingEvent(evt);
 }
 
 function formatMeetingTimeRange(start: any, end?: any) {
@@ -185,6 +180,7 @@ export default function EventFlowApp({
   initialAlerts = [],
   initialLocations = [],
   initialAllocations = [],
+  initialMeetings = [],
   initialTab = "home",
 }: Props) {
   const [isPending, startTransition] = useTransition();
@@ -205,6 +201,7 @@ export default function EventFlowApp({
   const [user, setUser] = useState(currentUser);
   const [teamUsers, setTeamUsers] = useState(initialUsers);
   const [eventsList, setEventsList] = useState(initialEvents);
+  const [meetingsList, setMeetingsList] = useState(initialMeetings);
   const [itemsList, setItemsList] = useState(initialItems);
   const [clientsList, setClientsList] = useState(initialClients);
   const [quotesList, setQuotesList] = useState(initialQuotes);
@@ -217,6 +214,77 @@ export default function EventFlowApp({
   const [showAlertsDrawer, setShowAlertsDrawer] = useState(false);
   const [homeAlertFilter, setHomeAlertFilter] = useState<"all" | "new" | "snoozed">("all");
   const [openHomeSnoozeMenuId, setOpenHomeSnoozeMenuId] = useState<string | null>(null);
+
+  // Synchronize state when initial props update (e.g. on router.refresh() or server sync)
+  useEffect(() => {
+    setMeetingsList(initialMeetings);
+  }, [initialMeetings]);
+
+  // Synchronize state when initial props update (e.g. on router.refresh() or server sync)
+  useEffect(() => {
+    setEventsList(initialEvents);
+  }, [initialEvents]);
+
+  useEffect(() => {
+    setClientsList(initialClients);
+  }, [initialClients]);
+
+  useEffect(() => {
+    setItemsList(initialItems);
+  }, [initialItems]);
+
+  useEffect(() => {
+    setQuotesList(initialQuotes);
+  }, [initialQuotes]);
+
+  useEffect(() => {
+    setMovementsList(initialMovements);
+  }, [initialMovements]);
+
+  useEffect(() => {
+    setAllocationsList(initialAllocations);
+  }, [initialAllocations]);
+
+  useEffect(() => {
+    setLocationsList(initialLocations);
+  }, [initialLocations]);
+
+  useEffect(() => {
+    setAlertsList(initialAlerts || []);
+  }, [initialAlerts]);
+
+  useEffect(() => {
+    setUser(currentUser);
+  }, [currentUser]);
+
+  useEffect(() => {
+    setTeamUsers(initialUsers);
+  }, [initialUsers]);
+
+  useEffect(() => {
+    const handleUserUpdated = (e: CustomEvent<any>) => {
+      const updated = e.detail;
+      if (!updated || !updated.id) return;
+      setTeamUsers((prev: any[]) =>
+        prev.map((u: any) => (u.id === updated.id ? { ...u, ...updated } : u))
+      );
+      if (user && user.id === updated.id) {
+        setUser((prev: any) => ({ ...prev, ...updated }));
+      }
+      setLocationsList((prev: any[]) =>
+        prev.map((loc: any) =>
+          loc.managerUserId === updated.id
+            ? { ...loc, managerName: updated.name }
+            : loc
+        )
+      );
+    };
+
+    window.addEventListener("eventflow:user-updated", handleUserUpdated as EventListener);
+    return () => {
+      window.removeEventListener("eventflow:user-updated", handleUserUpdated as EventListener);
+    };
+  }, [user]);
 
   // Dynamic Alerts Computation (New vs Active vs Snoozed)
   const nowMs = Date.now();
@@ -401,6 +469,12 @@ export default function EventFlowApp({
     try {
       const res = await syncCalendlyMeetingsAction(token);
       if (res.success) {
+        if (res.events) {
+          setEventsList(res.events);
+        }
+        if (res.clients) {
+          setClientsList(res.clients);
+        }
         setCalendlyBanner({
           type: "success",
           message: `${res.count} reuniões do Calendly sincronizadas com sucesso! Destacadas a roxo na agenda.`,
@@ -425,6 +499,26 @@ export default function EventFlowApp({
       setIsSyncingCalendly(false);
     }
   };
+
+  // Automatic Hourly Calendly Synchronization for active sessions
+  useEffect(() => {
+    const hourlySync = async () => {
+      try {
+        const res = await syncCalendlyMeetingsAction();
+        if (res.success) {
+          if (res.events) setEventsList(res.events);
+          if (res.clients) setClientsList(res.clients);
+          router.refresh();
+        }
+      } catch (err) {
+        console.warn("Background hourly Calendly sync:", err);
+      }
+    };
+
+    // Every 60 minutes (1 hour)
+    const interval = setInterval(hourlySync, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Calendar State & Interactive Day Details Modal
   const [today] = useState(() => new Date());
@@ -904,17 +998,6 @@ export default function EventFlowApp({
                 >
                   <span className="text-base font-normal leading-none">＋</span>
                   <span>Novo evento</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setSelectedEventForQuote("");
-                    setShowQuoteWizard(true);
-                  }}
-                  className="flex-1 sm:flex-initial min-h-[44px] px-4 py-2.5 rounded-[12px] bg-white border border-black/10 hover:bg-[#f8f8fa] text-[#111111] text-[13px] font-semibold flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer"
-                >
-                  <span className="text-base font-normal leading-none">＋</span>
-                  <span>Novo orçamento</span>
                 </button>
               </div>
             </div>
@@ -1996,7 +2079,7 @@ export default function EventFlowApp({
                     <div
                       key={`cal-day-${day}`}
                       onClick={() => handleCalendarDayClick(day)}
-                      className={`min-h-[58px] sm:min-h-[96px] p-1 sm:p-2 transition cursor-pointer flex flex-col justify-between group ${
+                      className={`min-h-[58px] sm:min-h-[96px] p-1 sm:p-2 transition cursor-pointer flex flex-col justify-between group overflow-hidden ${
                         isSelected
                           ? "bg-[#111]/[0.035] ring-2 ring-inset ring-[#111]"
                           : hasCalendlyInDay
@@ -2006,9 +2089,9 @@ export default function EventFlowApp({
                           : "bg-white/80 hover:bg-white"
                       }`}
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-1 min-w-0">
                         <span
-                          className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold transition ${
+                          className={`w-5 h-5 sm:w-6 sm:h-6 shrink-0 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold transition ${
                             isSelected
                               ? "bg-[#111] text-white shadow-xs"
                               : isToday
@@ -2024,24 +2107,21 @@ export default function EventFlowApp({
                         </span>
 
                         {hasEvents && (
-                          <div className="flex items-center gap-1">
-                            {hasCalendlyInDay && (
-                              <span className="hidden sm:inline-flex items-center gap-0.5 text-[9px] font-bold text-[#4338ca] bg-[#eeeffe] px-1 py-0.5 rounded border border-indigo-200">
-                                <Video className="w-2.5 h-2.5 text-[#6366f1]" />
-                                <span>Reunião</span>
-                              </span>
-                            )}
+                          <div className="flex items-center gap-1 shrink-0">
                             <span
-                              className={`text-[9px] sm:text-[10px] font-bold px-1 sm:px-1.5 py-0.5 rounded-full ${
+                              className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-1 ${
                                 hasCalendlyInDay
-                                  ? "text-[#4338ca] bg-[#eeeffe]"
+                                  ? "text-[#4338ca] bg-[#eeeffe] border border-indigo-200/60"
                                   : "text-[#24793a] bg-[#eaf8ee]"
                               }`}
                             >
-                              <span className="hidden sm:inline">
+                              {hasCalendlyInDay && (
+                                <Video className="w-2.5 h-2.5 text-[#6366f1] shrink-0" />
+                              )}
+                              <span className="hidden lg:inline">
                                 {dayEvents.length} {dayEvents.length === 1 ? "agendado" : "agendados"}
                               </span>
-                              <span className="sm:hidden">{dayEvents.length}</span>
+                              <span className="lg:hidden">{dayEvents.length}</span>
                             </span>
                           </div>
                         )}
@@ -2408,15 +2488,16 @@ export default function EventFlowApp({
                         <option value="cancelado">Cancelado</option>
                       </select>
 
-                      <button
-                        onClick={() => {
-                          setSelectedEventForQuote(e.id);
-                          setShowQuoteWizard(true);
-                        }}
-                        className="px-3 py-1.5 rounded-lg bg-white border border-[#ececf0] text-xs font-semibold text-[#111] hover:bg-[#f2f2f5] transition"
-                      >
-                        + Gerar Orçamento
-                      </button>
+                      {!isCalendlyMeeting(e) && (
+                        <Link
+                          href={`/eventos/${e.id}?action=novo-orcamento`}
+                          onClick={(ev) => ev.stopPropagation()}
+                          className="px-3 py-1.5 rounded-lg bg-white border border-[#ececf0] text-xs font-semibold text-[#111] hover:bg-[#f2f2f5] transition flex items-center gap-1 shadow-2xs"
+                          title="Abrir configuração do evento para gerar orçamento"
+                        >
+                          <span>+ Gerar Orçamento</span>
+                        </Link>
+                      )}
                     </div>
                   </div>
                 );
@@ -2714,7 +2795,7 @@ export default function EventFlowApp({
                   <div className="col-span-2">Categoria</div>
                   <div className="col-span-2">Localização no Armazém</div>
                   <div className="col-span-2">Stock & Estado</div>
-                  <div className="col-span-2 text-right">Preço / dia & Ações</div>
+                  <div className="col-span-2 text-right">Preço / evento & Ações</div>
                 </div>
 
                 {/* List Item Rows */}
@@ -2855,7 +2936,7 @@ export default function EventFlowApp({
                       <div className="lg:col-span-2 flex items-center justify-between lg:justify-end gap-3 pt-2 lg:pt-0 border-t lg:border-t-0 border-[#ececf0]/70">
                         <div className="text-left lg:text-right">
                           <div className="text-xs font-bold text-[#111]">
-                            €{(item.unitPrice || 0).toFixed(2)}/dia
+                            €{(item.unitPrice || 0).toFixed(2)}/evento
                           </div>
                           <button
                             type="button"
@@ -3137,16 +3218,18 @@ export default function EventFlowApp({
                     Orçamentos & Links de Proposta
                   </h3>
                   <p className="text-xs text-[#8e8e93]">
-                    Propostas emitidas com acesso digital para o cliente
+                    Propostas emitidas. Os orçamentos são gerados dentro da configuração de cada evento.
                   </p>
                 </div>
 
                 <button
-                  onClick={() => setShowQuoteWizard(true)}
-                  className="px-3.5 py-1.5 rounded-[10px] bg-[#111111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  type="button"
+                  onClick={() => setActiveTab("events")}
+                  className="px-3.5 py-1.5 rounded-[10px] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[#111111] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  title="Abrir lista de eventos para aceder à configuração de evento"
                 >
-                  <span>＋</span>
-                  <span>Novo orçamento</span>
+                  <Package className="w-3.5 h-3.5 text-[#007aff]" />
+                  <span>Gerir Eventos para Orçamentos →</span>
                 </button>
               </div>
 
@@ -3722,12 +3805,26 @@ export default function EventFlowApp({
           user={editingTeamUser}
           onClose={() => setEditingTeamUser(null)}
           onUpdated={(updated) => {
+            const oldName = editingTeamUser.name;
             setTeamUsers((prev: any[]) =>
               prev.map((u: any) => (u.id === updated.id ? { ...u, ...updated } : u))
             );
             if (user && user.id === updated.id) {
               setUser((prev: any) => ({ ...prev, ...updated }));
             }
+            setLocationsList((prev: any[]) =>
+              prev.map((loc: any) =>
+                loc.managerUserId === updated.id || loc.managerName === oldName
+                  ? { ...loc, managerName: updated.name }
+                  : loc
+              )
+            );
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("eventflow:user-updated", { detail: updated })
+              );
+            }
+            router.refresh();
             setEditingTeamUser(null);
           }}
         />
@@ -4369,7 +4466,7 @@ function ItemWizardModal({
               />
             </div>
             <div>
-              <label className="block font-bold text-[#3a3a3c] mb-1">Preço/dia (€)</label>
+              <label className="block font-bold text-[#3a3a3c] mb-1">Preço/evento (€)</label>
               <input
                 type="number"
                 step="0.01"
@@ -5015,7 +5112,7 @@ function EditUserModal({
 
       const res = await updateUserAction(formData);
       if (res.success) {
-        onUpdated({
+        onUpdated((res as any).user || {
           id: user.id,
           name,
           email,
@@ -5545,9 +5642,14 @@ function QuoteWizardModal({
   onClose: () => void;
   onCreated: (quote: any) => void;
 }) {
+  const eligibleEvents = events.filter((e) => canEventReceiveQuote(e));
   const [step, setStep] = useState(1);
   const [clientId, setClientId] = useState(clients[0]?.id || "");
-  const [eventId, setEventId] = useState(initialEventId || events[0]?.id || "");
+  const [eventId, setEventId] = useState(
+    initialEventId && eligibleEvents.some((e) => e.id === initialEventId)
+      ? initialEventId
+      : eligibleEvents[0]?.id || ""
+  );
   const [validityDays, setValidityDays] = useState("15");
 
   const [lines, setLines] = useState<
@@ -5665,18 +5767,25 @@ function QuoteWizardModal({
               </div>
 
               <div>
-                <label className="block font-bold text-[#3a3a3c] mb-1">Evento Associado</label>
+                <label className="block font-bold text-[#3a3a3c] mb-1">
+                  Evento Associado (Apenas Eventos de Produção)
+                </label>
                 <select
                   value={eventId}
                   onChange={(e) => setEventId(e.target.value)}
                   className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                 >
-                  {events.map((evt) => (
+                  {eligibleEvents.map((evt) => (
                     <option key={evt.id} value={evt.id}>
                       {evt.name} ({new Date(evt.startDate).toLocaleDateString("pt-PT")})
                     </option>
                   ))}
                 </select>
+                {eligibleEvents.length === 0 && (
+                  <p className="text-[11px] text-rose-600 mt-1 font-medium">
+                    Não existem eventos de produção disponíveis. Reuniões Calendly não recebem orçamentos.
+                  </p>
+                )}
               </div>
 
               <div>

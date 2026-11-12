@@ -347,3 +347,32 @@ export async function pullCalendlyMeetings(overrideToken?: string): Promise<Cale
     };
   }
 }
+
+/**
+ * Synchronizes Calendly meetings if more than `maxAgeMs` (default 1 hour)
+ * has passed since the last successful sync, or if it has never been synced yet.
+ */
+export async function syncCalendlyIfDue(maxAgeMs = 60 * 60 * 1000): Promise<CalendlySyncResult | null> {
+  try {
+    const token = await getCalendlyAccessToken();
+    if (!token) return null;
+
+    const integration = await db.query.integrations.findFirst({
+      where: eq(integrations.id, "calendly"),
+    });
+
+    if (integration?.lastSyncedAt) {
+      const lastSyncTime = new Date(integration.lastSyncedAt).getTime();
+      const elapsed = Date.now() - lastSyncTime;
+      if (elapsed < maxAgeMs) {
+        // Still fresh (within 1 hour)
+        return null;
+      }
+    }
+
+    return await pullCalendlyMeetings(token);
+  } catch (err) {
+    console.warn("syncCalendlyIfDue error:", err);
+    return null;
+  }
+}

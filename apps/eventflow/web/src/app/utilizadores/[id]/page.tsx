@@ -58,6 +58,7 @@ export default async function UserPage({ params }: PageProps) {
         role: user.role,
         createdAt: user.createdAt,
       }}
+      currentUser={currentUser}
       assignedTasks={tasks}
       managedLocations={managedLocs}
       canEdit={currentUser?.role === "admin"}

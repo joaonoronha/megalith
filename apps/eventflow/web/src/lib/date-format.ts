@@ -78,3 +78,68 @@ export function formatAuditDate(dateInput: Date | number | string): string {
 
   return `${hours}:${minutes} · ${day} ${month} ${year}`;
 }
+
+export function formatUpcomingTime(dateInput: Date | number | string | null | undefined): string {
+  if (!dateInput) return "";
+  const date = typeof dateInput === "object" ? dateInput : new Date(dateInput);
+  const now = new Date();
+  const diffMs = date.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMs < 0) {
+    const pastDays = Math.abs(diffDays);
+    if (pastDays === 0) return "Hoje (anterior)";
+    if (pastDays === 1) return "Ontem";
+    return `Há ${pastDays} dias`;
+  }
+
+  if (diffDays === 0) return "Hoje";
+  if (diffDays === 1) return "Amanhã";
+  if (diffDays < 7) return `Em ${diffDays} dias`;
+  if (diffDays < 30) {
+    const weeks = Math.round(diffDays / 7);
+    return `Em ${weeks} ${weeks === 1 ? "semana" : "semanas"}`;
+  }
+  return `Em ${Math.round(diffDays / 30)} meses`;
+}
+
+export function formatMeetingRange(
+  startInput: Date | string | number | null | undefined,
+  endInput?: Date | string | number | null
+): string {
+  if (!startInput) return "";
+  const start = typeof startInput === "object" ? startInput : new Date(startInput);
+  const startHours = String(start.getHours()).padStart(2, "0");
+  const startMinutes = String(start.getMinutes()).padStart(2, "0");
+
+  const months = [
+    "Jan",
+    "Fev",
+    "Mar",
+    "Abr",
+    "Mai",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Set",
+    "Out",
+    "Nov",
+    "Dez",
+  ];
+  const day = start.getDate();
+  const month = months[start.getMonth()];
+  const year = start.getFullYear();
+
+  if (!endInput) {
+    return `${day} ${month} ${year} · ${startHours}:${startMinutes}`;
+  }
+
+  const end = typeof endInput === "object" ? endInput : new Date(endInput);
+  const endHours = String(end.getHours()).padStart(2, "0");
+  const endMinutes = String(end.getMinutes()).padStart(2, "0");
+
+  const durationMin = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+  const durationText = durationMin > 0 ? ` (${durationMin} min)` : "";
+
+  return `${day} ${month} ${year} · ${startHours}:${startMinutes} - ${endHours}:${endMinutes}${durationText}`;
+}
