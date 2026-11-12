@@ -6,9 +6,10 @@ import {
   quotes,
   financialMovements,
   quoteTemplates,
+  storageLocations,
   users,
 } from "@/db/schema";
-import { desc } from "drizzle-orm";
+import { desc, asc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 
 export async function getAppInitialData() {
@@ -21,6 +22,7 @@ export async function getAppInitialData() {
     allQuotes,
     allMovements,
     allUsers,
+    allLocations,
     templateRow,
   ] = await Promise.all([
     db.query.events.findMany({
@@ -43,6 +45,9 @@ export async function getAppInitialData() {
         createdAt: users.createdAt,
       })
       .from(users),
+    db.query.storageLocations.findMany({
+      orderBy: [asc(storageLocations.name)],
+    }),
     db.query.quoteTemplates.findFirst(),
   ]);
 
@@ -66,6 +71,7 @@ export async function getAppInitialData() {
     allQuotes,
     allMovements,
     allUsers,
+    allLocations,
     template,
     allAlerts,
   };

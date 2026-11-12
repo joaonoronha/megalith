@@ -3,6 +3,7 @@ import { sql, eq } from "drizzle-orm";
 import {
   users,
   clients,
+  storageLocations,
   inventoryItems,
   events,
   eventAllocations,
@@ -83,6 +84,46 @@ export async function seed() {
   };
 
   await db.insert(clients).values([clientMastercard, clientMarta, clientLoreal]).onConflictDoNothing();
+
+  // 3.1 Storage Locations & Managers
+  await db.insert(storageLocations).values([
+    {
+      id: "loc-principal",
+      name: "Armazém Principal",
+      code: "ARM-PRIN",
+      address: "Sede CFM · Lisboa",
+      managerUserId: "usr-admin-1",
+      managerName: "Administrador CFM",
+      managerContact: "admin@cfmeventos.pt · +351 912 345 678",
+      notes: "Armazém central de receção e expedição de artigos.",
+      createdAt: new Date("2026-01-01"),
+      updatedAt: new Date("2026-01-01"),
+    },
+    {
+      id: "loc-armazem-a",
+      name: "Armazém A",
+      code: "ARM-A",
+      address: "Pólo Logístico Loures - Pavilhão A",
+      managerUserId: null,
+      managerName: "Madalena Rosa",
+      managerContact: "madalenasrosa99@gmail.com · +351 960 123 456",
+      notes: "Mobiliário pesado, cadeiras Chiavari e estruturas de grande porte.",
+      createdAt: new Date("2026-01-01"),
+      updatedAt: new Date("2026-01-01"),
+    },
+    {
+      id: "loc-armazem-b",
+      name: "Armazém B",
+      code: "ARM-B",
+      address: "Pólo Logístico Loures - Pavilhão B",
+      managerUserId: "usr-admin-1",
+      managerName: "Administrador CFM",
+      managerContact: "admin@cfmeventos.pt",
+      notes: "Área climatizada para têxteis, toalhas de linho, iluminação decorativa e copos.",
+      createdAt: new Date("2026-01-01"),
+      updatedAt: new Date("2026-01-01"),
+    },
+  ]).onConflictDoNothing();
 
   // 4. Inventory
   const chairItem = {

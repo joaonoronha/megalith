@@ -24,7 +24,21 @@ export const clients = sqliteTable("clients", {
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
 });
 
-// 3. Inventory & Rental Stock
+// 3. Storage Locations & Facility Managers
+export const storageLocations = sqliteTable("storage_locations", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(), // e.g. "Armazém Principal", "Armazém A", "Armazém B"
+  code: text("code"), // e.g. "ARM-PRIN", "ARM-A"
+  address: text("address"), // e.g. "Rua da Indústria 12, Loures"
+  managerUserId: text("manager_user_id").references(() => users.id),
+  managerName: text("manager_name").notNull(), // e.g. "Administrador CFM", "Madalena Rosa"
+  managerContact: text("manager_contact"), // e.g. "+351 912 345 678 · admin@cfmeventos.pt"
+  notes: text("notes"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+});
+
+// 3.1 Inventory & Rental Stock
 export const inventoryItems = sqliteTable("inventory_items", {
   id: text("id").primaryKey(),
   sku: text("sku").unique().notNull(), // e.g. "MOB-CHA-001"
@@ -33,6 +47,7 @@ export const inventoryItems = sqliteTable("inventory_items", {
   totalQuantity: integer("total_quantity").notNull().default(1),
   minStock: integer("min_stock").default(0),
   warehouseLocation: text("warehouse_location"), // e.g. "Armazém A · B3 · P2"
+  locationId: text("location_id").references(() => storageLocations.id),
   dimensions: text("dimensions"), // e.g. "40 × 45 × 92 cm"
   unitPrice: real("unit_price").default(0).notNull(), // rental price per unit
   replacementCost: real("replacement_cost").default(0),

@@ -9,6 +9,7 @@ import {
   quotes,
   quoteLines,
   clients,
+  storageLocations,
   inventoryItems,
   financialMovements,
   quoteTemplates,
@@ -24,6 +25,8 @@ import { recordAuditLog, getAuditLogsForEntity, getRecentAuditLogs } from "@/lib
 
 function invalidateAllCaches() {
   revalidatePath("/");
+  revalidatePath("/inventario");
+  revalidatePath("/inventory");
 }
 
 // 1. Create Event
@@ -211,6 +214,129 @@ export async function createMovementAction(formData: FormData) {
   return { success: true, id, movement };
 }
 
+// 4.9 Storage Locations Management
+export async function createStorageLocationAction(formData: FormData) {
+  const name = (formData.get("name") as string)?.trim();
+  const code = (formData.get("code") as string)?.trim() || null;
+  const address = (formData.get("address") as string)?.trim() || null;
+  const managerUserId = (formData.get("managerUserId") as string)?.trim() || null;
+  const managerName = (formData.get("managerName") as string)?.trim();
+  const managerContact = (formData.get("managerContact") as string)?.trim() || null;
+  const notes = (formData.get("notes") as string)?.trim() || null;
+  const rawCustomId = (formData.get("customId") as string)?.trim() || "";
+
+  if (!name) {
+    return { success: false, error: "O nome do local de armazenamento é obrigatório." };
+  }
+  if (!managerName) {
+    return { success: false, error: "A pessoa responsável pelo local é obrigatória." };
+  }
+
+  const id = rawCustomId ? formatCustomId("loc", rawCustomId) : generateId("loc");
+
+  const location = {
+    id,
+    name,
+    code,
+    address,
+    managerUserId,
+    managerName,
+    managerContact,
+    notes,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  await db.insert(storageLocations).values(location);
+
+  await recordAuditLog({
+    entityType: "inventory",
+    entityId: id,
+    action: "criado",
+    title: "Local de armazenamento criado",
+    details: `Novo local "${name}" criado. Responsável: ${managerName}${managerContact ? ` (${managerContact})` : ""}`,
+  });
+
+  invalidateAllCaches();
+  return { success: true, id, location };
+}
+
+export async function updateStorageLocationAction(formData: FormData) {
+  const locationId = (formData.get("locationId") as string)?.trim();
+  if (!locationId) return { success: false, error: "ID do local é obrigatório." };
+
+  const name = (formData.get("name") as string)?.trim();
+  const code = (formData.get("code") as string)?.trim() || null;
+  const address = (formData.get("address") as string)?.trim() || null;
+  const managerUserId = (formData.get("managerUserId") as string)?.trim() || null;
+  const managerName = (formData.get("managerName") as string)?.trim();
+  const managerContact = (formData.get("managerContact") as string)?.trim() || null;
+  const notes = (formData.get("notes") as string)?.trim() || null;
+
+  if (!name || !managerName) {
+    return { success: false, error: "Nome do local e responsável são obrigatórios." };
+  }
+
+  await db
+    .update(storageLocations)
+    .set({
+      name,
+      code,
+      address,
+      managerUserId,
+      managerName,
+      managerContact,
+      notes,
+      updatedAt: new Date(),
+    })
+    .where(eq(storageLocations.id, locationId));
+
+  await recordAuditLog({
+    entityType: "inventory",
+    entityId: locationId,
+    action: "atualizado",
+    title: "Local de armazenamento atualizado",
+    details: `Local "${name}" atualizado. Responsável: ${managerName}`,
+  });
+
+  invalidateAllCaches();
+  return { success: true };
+}
+
+export async function deleteStorageLocationAction(locationId: string) {
+  if (!locationId) return { success: false, error: "ID do local é obrigatório." };
+
+  // Reassign items from this location to Armazém Principal if exists
+  const fallback = await db.query.storageLocations.findFirst({
+    where: eq(storageLocations.name, "Armazém Principal"),
+  });
+
+  if (fallback && fallback.id !== locationId) {
+    await db
+      .update(inventoryItems)
+      .set({ locationId: fallback.id, warehouseLocation: fallback.name })
+      .where(eq(inventoryItems.locationId, locationId));
+  } else {
+    await db
+      .update(inventoryItems)
+      .set({ locationId: null })
+      .where(eq(inventoryItems.locationId, locationId));
+  }
+
+  await db.delete(storageLocations).where(eq(storageLocations.id, locationId));
+
+  await recordAuditLog({
+    entityType: "inventory",
+    entityId: locationId,
+    action: "atualizado",
+    title: "Local de armazenamento removido",
+    details: `Local de armazenamento ID ${locationId} removido`,
+  });
+
+  invalidateAllCaches();
+  return { success: true };
+}
+
 // 5. Create Inventory Item
 export async function createItemAction(formData: FormData) {
   const sku = formData.get("sku") as string;
@@ -218,11 +344,43 @@ export async function createItemAction(formData: FormData) {
   const category = formData.get("category") as string;
   const totalQuantity = parseInt((formData.get("totalQuantity") as string) || "1", 10);
   const minStock = parseInt((formData.get("minStock") as string) || "0", 10);
-  const warehouseLocation = formData.get("warehouseLocation") as string;
+  let warehouseLocation = formData.get("warehouseLocation") as string;
+  let locationId = (formData.get("locationId") as string)?.trim() || null;
   const dimensions = formData.get("dimensions") as string;
   const unitPrice = parseFloat((formData.get("unitPrice") as string) || "0");
   const replacementCost = parseFloat((formData.get("replacementCost") as string) || "0");
   const imageUrl = formData.get("imageUrl") as string;
+
+  // Check if a new location was specified directly on item creation
+  const newLocationName = (formData.get("newLocationName") as string)?.trim();
+  const newLocationManagerName = (formData.get("newLocationManagerName") as string)?.trim();
+  const newLocationManagerContact = (formData.get("newLocationManagerContact") as string)?.trim();
+  const newLocationManagerUserId = (formData.get("newLocationManagerUserId") as string)?.trim() || null;
+
+  if (newLocationName && newLocationManagerName) {
+    const newLocId = generateId("loc");
+    await db.insert(storageLocations).values({
+      id: newLocId,
+      name: newLocationName,
+      code: newLocationName.slice(0, 8).toUpperCase().replace(/\s+/g, "-"),
+      managerUserId: newLocationManagerUserId,
+      managerName: newLocationManagerName,
+      managerContact: newLocationManagerContact || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    locationId = newLocId;
+    if (!warehouseLocation || warehouseLocation === "Armazém Principal") {
+      warehouseLocation = newLocationName;
+    }
+    await recordAuditLog({
+      entityType: "inventory",
+      entityId: newLocId,
+      action: "criado",
+      title: "Local de armazenamento criado",
+      details: `Novo local "${newLocationName}" criado. Responsável: ${newLocationManagerName}`,
+    });
+  }
 
   if (!sku || !name || !category) {
     return { success: false, error: "SKU, nome e categoria são obrigatórios." };
@@ -238,6 +396,7 @@ export async function createItemAction(formData: FormData) {
     totalQuantity,
     minStock,
     warehouseLocation: warehouseLocation || "Armazém Principal",
+    locationId,
     dimensions,
     unitPrice,
     replacementCost,
@@ -252,7 +411,7 @@ export async function createItemAction(formData: FormData) {
     entityId: id,
     action: "criado",
     title: "Artigo criado",
-    details: `${name} (${sku}) adicionado ao inventário (${totalQuantity} un., €${unitPrice}/dia)`,
+    details: `${name} (${sku}) adicionado ao inventário (${totalQuantity} un., €${unitPrice}/dia, local: ${warehouseLocation || "Armazém Principal"})`,
   });
 
   invalidateAllCaches();
@@ -304,6 +463,7 @@ export async function updateItemAction(formData: FormData) {
   const totalQuantity = parseInt((formData.get("totalQuantity") as string) || "1", 10);
   const minStock = parseInt((formData.get("minStock") as string) || "0", 10);
   const warehouseLocation = formData.get("warehouseLocation") as string;
+  const locationId = (formData.get("locationId") as string)?.trim() || null;
   const dimensions = formData.get("dimensions") as string;
   const unitPrice = parseFloat((formData.get("unitPrice") as string) || "0");
   const replacementCost = parseFloat((formData.get("replacementCost") as string) || "0");
@@ -321,6 +481,7 @@ export async function updateItemAction(formData: FormData) {
       totalQuantity,
       minStock,
       warehouseLocation: warehouseLocation || "Armazém Principal",
+      locationId: locationId || null,
       dimensions: dimensions || null,
       unitPrice,
       replacementCost,
@@ -352,6 +513,7 @@ export async function updateItemPatchAction(
     totalQuantity?: number;
     minStock?: number | null;
     warehouseLocation?: string | null;
+    locationId?: string | null;
     dimensions?: string | null;
     unitPrice?: number;
     replacementCost?: number | null;
@@ -372,6 +534,7 @@ export async function updateItemPatchAction(
   if (patch.totalQuantity !== undefined) updateData.totalQuantity = Math.max(0, patch.totalQuantity);
   if (patch.minStock !== undefined) updateData.minStock = patch.minStock === null ? null : Math.max(0, patch.minStock);
   if (patch.warehouseLocation !== undefined) updateData.warehouseLocation = patch.warehouseLocation || "Armazém Principal";
+  if (patch.locationId !== undefined) updateData.locationId = patch.locationId || null;
   if (patch.dimensions !== undefined) updateData.dimensions = patch.dimensions || null;
   if (patch.unitPrice !== undefined) updateData.unitPrice = Math.max(0, patch.unitPrice);
   if (patch.replacementCost !== undefined) updateData.replacementCost = patch.replacementCost === null ? null : Math.max(0, patch.replacementCost);

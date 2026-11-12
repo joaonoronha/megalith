@@ -1193,89 +1193,248 @@ export default function EventFlowApp({
 
               {/* 1/3 COLUMN: Alertas Importantes */}
               <div className="lg:col-span-4 pt-1">
-                <div className="flex items-center gap-2.5 mb-2.5 px-1">
-                  <div className="w-[34px] h-[34px] rounded-[11px] bg-white text-[#ff3b30] border border-[#ff3b30]/15 flex items-center justify-center font-bold text-[16px] shadow-xs">
-                    !
-                  </div>
-                  <div>
-                    <div className="text-[14px] font-bold text-[#111111]">
-                      Alertas importantes
+                <div className="flex items-center justify-between mb-2.5 px-1">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-[34px] h-[34px] rounded-[11px] bg-white text-[#ff3b30] border border-[#ff3b30]/15 flex items-center justify-center font-bold text-[16px] shadow-xs">
+                      !
                     </div>
-                    <div className="text-[12px] text-[#8e8e93]">
-                      3 itens requerem atenção
+                    <div>
+                      <div className="text-[14px] font-bold text-[#111111]">
+                        Alertas importantes
+                      </div>
+                      <div className="text-[12px] text-[#8e8e93]">
+                        {activeAlerts.length}{" "}
+                        {activeAlerts.length === 1
+                          ? "item requer atenção"
+                          : "itens requerem atenção"}
+                        {newAlertsCount > 0 && ` · ${newAlertsCount} novo${newAlertsCount > 1 ? "s" : ""}`}
+                      </div>
                     </div>
                   </div>
+
+                  <button
+                    onClick={() => setShowAlertsDrawer(true)}
+                    className="text-[12px] font-semibold text-[#007aff] hover:underline cursor-pointer"
+                  >
+                    Gerir →
+                  </button>
+                </div>
+
+                {/* Filter Pills */}
+                <div className="flex items-center gap-1.5 mb-2.5 px-0.5">
+                  <button
+                    onClick={() => setHomeAlertFilter("all")}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
+                      homeAlertFilter === "all"
+                        ? "bg-[#111] text-white"
+                        : "bg-white text-[#636366] hover:bg-[#ececf0] border border-[#ececf0]"
+                    }`}
+                  >
+                    Todos ({activeAlerts.length})
+                  </button>
+                  <button
+                    onClick={() => setHomeAlertFilter("new")}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer flex items-center gap-1 ${
+                      homeAlertFilter === "new"
+                        ? "bg-[#007aff] text-white"
+                        : "bg-white text-[#636366] hover:bg-[#ececf0] border border-[#ececf0]"
+                    }`}
+                  >
+                    <span>Novos</span>
+                    {newAlertsCount > 0 && (
+                      <span
+                        className={`text-[10px] px-1 rounded-full font-bold ${
+                          homeAlertFilter === "new"
+                            ? "bg-white text-[#007aff]"
+                            : "bg-[#007aff] text-white"
+                        }`}
+                      >
+                        {newAlertsCount}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setHomeAlertFilter("snoozed")}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
+                      homeAlertFilter === "snoozed"
+                        ? "bg-[#111] text-white"
+                        : "bg-white text-[#636366] hover:bg-[#ececf0] border border-[#ececf0]"
+                    }`}
+                  >
+                    Adiados ({snoozedAlerts.length})
+                  </button>
                 </div>
 
                 <div className="space-y-2">
-                  {/* Alert 1: Low stock */}
-                  <Link
-                    href="/inventario"
-                    onClick={(e) => handleTabSwitch("inventory", "/inventario", e)}
-                    className="cursor-pointer bg-[#ff9f0a]/[0.115] border border-[#ff9f0a]/[0.17] text-[#845000] rounded-[15px] p-3.5 flex items-center gap-3 transition hover:opacity-90 block"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-[9px] h-[9px] rounded-full bg-[#ff9f0a] flex-shrink-0"></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-bold text-[#845000]">
-                          Velas LED abaixo do mínimo
-                        </div>
-                        <div className="text-[11px] text-[#845000]/70 mt-0.5">
-                          8 disponíveis · mínimo 20
-                        </div>
-                      </div>
-                      <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full bg-white/70 text-[#845000]">
-                        Stock
-                      </span>
-                    </div>
-                  </Link>
+                  {(() => {
+                    const list =
+                      homeAlertFilter === "new"
+                        ? newAlerts
+                        : homeAlertFilter === "snoozed"
+                        ? snoozedAlerts
+                        : activeAlerts;
 
-                  {/* Alert 2: Damaged item with instant triage */}
-                  <div
-                    onClick={() => {
-                      const chair = itemsList.find((i) =>
-                        i.name.includes("Cadeira")
-                      ) || itemsList[0];
-                      setTriageItem(chair);
-                      setShowTriageModal(true);
-                    }}
-                    className="cursor-pointer bg-[#ff3b30]/[0.09] border border-[#ff3b30]/[0.16] text-[#a62a24] rounded-[15px] p-3.5 flex items-center gap-3 transition hover:opacity-90"
-                  >
-                    <div className="w-[9px] h-[9px] rounded-full bg-[#ff3b30] flex-shrink-0"></div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-bold text-[#a62a24]">
-                        3 cadeiras danificadas
-                      </div>
-                      <div className="text-[11px] text-[#a62a24]/70 mt-0.5">
-                        Cadeira Chiavari Dourada · Fazer triagem →
-                      </div>
-                    </div>
-                    <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full bg-white/70 text-[#a62a24]">
-                      Dano
-                    </span>
-                  </div>
+                    if (list.length === 0) {
+                      return (
+                        <div className="bg-white border border-[#ececf0] rounded-[15px] p-4 text-center">
+                          <div className="text-[12px] font-bold text-[#111]">
+                            {homeAlertFilter === "snoozed"
+                              ? "Sem alertas adiados"
+                              : homeAlertFilter === "new"
+                              ? "Sem alertas novos por ler"
+                              : "Sem pendências"}
+                          </div>
+                          <div className="text-[11px] text-[#8e8e93] mt-0.5">
+                            Tudo operacional e em dia
+                          </div>
+                        </div>
+                      );
+                    }
 
-                  {/* Alert 3: Event in prep */}
-                  <Link
-                    href="/eventos"
-                    onClick={(e) => handleTabSwitch("events", "/eventos", e)}
-                    className="cursor-pointer bg-[#ff9f0a]/[0.115] border border-[#ff9f0a]/[0.17] text-[#845000] rounded-[15px] p-3.5 flex items-center gap-3 transition hover:opacity-90 block"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-[9px] h-[9px] rounded-full bg-[#ff9f0a] flex-shrink-0"></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-bold text-[#845000]">
-                          Mastercard Gala em preparação
+                    return list.slice(0, 4).map((alert) => {
+                      const isNew = !alert.acknowledgedAt;
+                      const isSnoozeOpen = openHomeSnoozeMenuId === alert.id;
+
+                      const isRed =
+                        alert.type === "damaged_stock" ||
+                        alert.type === "payment_due" ||
+                        alert.type === "missing_completed_payment";
+
+                      const categoryTag =
+                        alert.type === "damaged_stock"
+                          ? "Dano"
+                          : alert.type === "low_stock"
+                          ? "Stock"
+                          : alert.type === "event_unprepared"
+                          ? "Prep"
+                          : alert.type === "payment_due"
+                          ? "Sinal"
+                          : "Cobrança";
+
+                      return (
+                        <div
+                          key={alert.id}
+                          className={`relative rounded-[15px] p-3 border transition ${
+                            isRed
+                              ? "bg-[#ff3b30]/[0.08] border-[#ff3b30]/[0.17] text-[#a62a24]"
+                              : "bg-[#ff9f0a]/[0.11] border-[#ff9f0a]/[0.18] text-[#845000]"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div
+                              onClick={() => handleAlertActionClick(alert)}
+                              className="flex-1 min-w-0 cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2 mb-1">
+                                <span
+                                  className={`w-[8px] h-[8px] rounded-full flex-shrink-0 ${
+                                    isRed ? "bg-[#ff3b30]" : "bg-[#ff9f0a]"
+                                  }`}
+                                />
+                                <span className="text-[13px] font-bold truncate">
+                                  {alert.title}
+                                </span>
+                                {isNew && (
+                                  <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded-md bg-[#007aff] text-white">
+                                    Novo
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] opacity-80 line-clamp-2">
+                                {alert.message}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/70">
+                                {categoryTag}
+                              </span>
+
+                              <div className="relative">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenHomeSnoozeMenuId(
+                                      isSnoozeOpen ? null : alert.id
+                                    );
+                                  }}
+                                  className="p-1 rounded-md hover:bg-black/5 text-inherit opacity-75 hover:opacity-100 transition cursor-pointer"
+                                  title="Adiar..."
+                                >
+                                  <Clock className="w-3.5 h-3.5" />
+                                </button>
+
+                                {isSnoozeOpen && (
+                                  <div className="absolute right-0 top-6 w-44 bg-white border border-[#ececf0] rounded-xl shadow-lg p-1.5 z-30 text-[#111] animate-in fade-in zoom-in-95 duration-150">
+                                    <div className="text-[9px] font-bold text-[#8e8e93] uppercase px-2 py-1">
+                                      Adiar alerta
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSnoozeAlert(alert.id, 4)}
+                                      className="w-full text-left px-2 py-1.5 text-xs hover:bg-[#f2f2f5] rounded-md transition"
+                                    >
+                                      🕒 4 horas
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSnoozeAlert(alert.id, 24)}
+                                      className="w-full text-left px-2 py-1.5 text-xs hover:bg-[#f2f2f5] rounded-md transition"
+                                    >
+                                      🕒 1 dia
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSnoozeAlert(alert.id, 72)}
+                                      className="w-full text-left px-2 py-1.5 text-xs hover:bg-[#f2f2f5] rounded-md transition"
+                                    >
+                                      🕒 3 dias
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSnoozeAlert(alert.id, 168)}
+                                      className="w-full text-left px-2 py-1.5 text-xs hover:bg-[#f2f2f5] rounded-md transition"
+                                    >
+                                      🕒 1 semana
+                                    </button>
+                                    <div className="border-t border-[#ececf0] my-1" />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDismissAlert(alert.id)}
+                                      className="w-full text-left px-2 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-md transition"
+                                    >
+                                      Dispensar
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-2.5 pt-2 border-t border-black/5 flex items-center justify-between">
+                            <button
+                              type="button"
+                              onClick={() => handleAlertActionClick(alert)}
+                              className="text-[11px] font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>Resolver agora</span>
+                              <ChevronRight className="w-3 h-3" />
+                            </button>
+                            {isNew && (
+                              <button
+                                type="button"
+                                onClick={() => handleAcknowledgeAlert(alert.id)}
+                                className="text-[10px] opacity-75 hover:opacity-100 hover:underline cursor-pointer"
+                              >
+                                Marcar lido
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-[11px] text-[#845000]/70 mt-0.5">
-                          Material ainda não está 100% preparado
-                        </div>
-                      </div>
-                      <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full bg-white/70 text-[#845000]">
-                        Evento
-                      </span>
-                    </div>
-                  </Link>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             </div>
@@ -2588,6 +2747,18 @@ export default function EventFlowApp({
         entityType={auditModal.entityType}
         entityId={auditModal.entityId}
         entityTitle={auditModal.entityTitle}
+      />
+
+      {/* ALERTS DRAWER MODAL */}
+      <AlertsDrawerModal
+        isOpen={showAlertsDrawer}
+        onClose={() => setShowAlertsDrawer(false)}
+        alerts={alertsList}
+        onSnooze={handleSnoozeAlert}
+        onAcknowledge={handleAcknowledgeAlert}
+        onDismiss={handleDismissAlert}
+        onMarkAllAsRead={handleMarkAllAlertsRead}
+        onActionClick={handleAlertActionClick}
       />
 
       {/* 0. CALENDAR DAY POPUP MODAL */}
