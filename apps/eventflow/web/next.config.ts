@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  allowedDevOrigins: ["macbook-pro-de-joao-1.tailf17159.ts.net", "100.79.40.97"],
   images: {
     remotePatterns: [
       {
@@ -9,9 +10,6 @@ const nextConfig: NextConfig = {
         hostname: "**",
       },
     ],
-  },
-  experimental: {
-    allowedDevOrigins: ["macbook-pro-de-joao-1.tailf17159.ts.net", "100.79.40.97"],
   },
 };
 
