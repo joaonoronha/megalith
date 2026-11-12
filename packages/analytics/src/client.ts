@@ -1,4 +1,4 @@
-import posthog, { type PostHog } from 'posthog-js';
+import posthog, { type PostHog, type PostHogInterface } from 'posthog-js';
 import type { AnalyticsConfig, EventProperties, AnalyticsEventName } from './types';
 
 let initialized = false;
@@ -98,7 +98,7 @@ export function initAnalytics(config: AnalyticsConfig): PostHog | null {
         maskAllInputs: true,
         maskTextSelector: config.maskAllText !== false ? '*' : undefined,
       },
-      loaded: (ph) => {
+      loaded: (ph: PostHogInterface) => {
         // Register global monorepo super properties on every event
         ph.register({
           app: config.app,
