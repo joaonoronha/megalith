@@ -260,6 +260,7 @@ export default function InventoryDetailView({
         <div className="max-w-[1100px] mx-auto flex items-center justify-between gap-2">
           <Link
             href="/inventario"
+            prefetch={true}
             className="inline-flex items-center gap-1.5 sm:gap-2 text-xs font-semibold text-[#636366] hover:text-[#111111] transition bg-[#f2f2f5] hover:bg-[#e5e5ea] px-2.5 sm:px-3 py-1.5 rounded-full flex-shrink-0"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -719,6 +720,7 @@ export default function InventoryDetailView({
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
                           href={`/eventos/${a.eventId}`}
+                          prefetch={false}
                           className="font-bold text-sm text-[#111] hover:text-[#007aff] transition flex items-center gap-1"
                         >
                           <span>{a.eventName}</span>
@@ -728,6 +730,7 @@ export default function InventoryDetailView({
                         {/* Event Unique ID Badge */}
                         <Link
                           href={`/eventos/${a.eventId}`}
+                          prefetch={false}
                           className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] transition"
                         >
                           #{a.eventId}

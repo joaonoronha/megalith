@@ -48,90 +48,101 @@ export default async function EventPage({ params }: PageProps) {
     redirect(`/reunioes/${event.id}`);
   }
 
-  // 1. Client
-  const client = event.clientId
-    ? await db.query.clients.findFirst({
-        where: eq(clients.id, event.clientId),
+  const clientId = event.clientId;
+
+  // Run all auxiliary queries concurrently in a single batch
+  const [
+    client,
+    teamUsers,
+    currentUser,
+    allClients,
+    allItems,
+    rawAllocations,
+    tasks,
+    eventQuotes,
+    rawMedia,
+    mediaComments,
+    meetings,
+    otherMeetings,
+    calMeetings,
+    customItems,
+  ] = await Promise.all([
+    clientId
+      ? db.query.clients.findFirst({ where: eq(clients.id, clientId) }).catch(() => null)
+      : Promise.resolve(null),
+    db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
       })
-    : null;
-
-  // Team users
-  const teamUsers = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      role: users.role,
-    })
-    .from(users);
-
-  // Auth User
-  const currentUser = await getCurrentUser();
-
-  // 2. All Clients
-  const allClients = await db.query.clients.findMany({
-    orderBy: [clients.name],
-  });
-
-  // 3. All Inventory Items
-  const allItems = await db.query.inventoryItems.findMany({
-    orderBy: [inventoryItems.name],
-  });
-
-  // 4. Allocations for this event joined with inventory items
-  const rawAllocations = await db
-    .select({
-      id: eventAllocations.id,
-      eventId: eventAllocations.eventId,
-      itemId: eventAllocations.itemId,
-      quantity: eventAllocations.quantity,
-      status: eventAllocations.status,
-      notes: eventAllocations.notes,
-      itemName: inventoryItems.name,
-      itemSku: inventoryItems.sku,
-      itemCategory: inventoryItems.category,
-      itemUnitPrice: inventoryItems.unitPrice,
-      itemReplacementCost: inventoryItems.replacementCost,
-      itemWarehouseLocation: inventoryItems.warehouseLocation,
-      itemImageUrl: inventoryItems.imageUrl,
-      itemTotalQuantity: inventoryItems.totalQuantity,
-    })
-    .from(eventAllocations)
-    .innerJoin(inventoryItems, eq(eventAllocations.itemId, inventoryItems.id))
-    .where(eq(eventAllocations.eventId, id));
-
-  // 5. Tasks / Action items checklist
-  const tasks = await db.query.eventTasks.findMany({
-    where: eq(eventTasks.eventId, id),
-    orderBy: [asc(eventTasks.orderIndex), asc(eventTasks.createdAt)],
-  });
-
-  // 6. Commercial quotes for this event
-  const eventQuotes = await db.query.quotes.findMany({
-    where: eq(quotes.eventId, id),
-    orderBy: [desc(quotes.createdAt)],
-  });
-
-  // 7. Event Media: Idea Boards & Final Outcomes (with collaborative comments)
-  const rawMedia = await db
-    .select()
-    .from(eventMedia)
-    .where(eq(eventMedia.eventId, id))
-    .orderBy(asc(eventMedia.orderIndex), asc(eventMedia.createdAt));
-
-  let mediaComments: any[] = [];
-  try {
-    mediaComments = await db
+      .from(users)
+      .catch(() => []),
+    getCurrentUser().catch(() => null),
+    db.query.clients.findMany({ orderBy: [clients.name] }).catch(() => []),
+    db.query.inventoryItems.findMany({ orderBy: [inventoryItems.name] }).catch(() => []),
+    db
+      .select({
+        id: eventAllocations.id,
+        eventId: eventAllocations.eventId,
+        itemId: eventAllocations.itemId,
+        quantity: eventAllocations.quantity,
+        status: eventAllocations.status,
+        notes: eventAllocations.notes,
+        itemName: inventoryItems.name,
+        itemSku: inventoryItems.sku,
+        itemCategory: inventoryItems.category,
+        itemUnitPrice: inventoryItems.unitPrice,
+        itemReplacementCost: inventoryItems.replacementCost,
+        itemWarehouseLocation: inventoryItems.warehouseLocation,
+        itemImageUrl: inventoryItems.imageUrl,
+        itemTotalQuantity: inventoryItems.totalQuantity,
+      })
+      .from(eventAllocations)
+      .innerJoin(inventoryItems, eq(eventAllocations.itemId, inventoryItems.id))
+      .where(eq(eventAllocations.eventId, id))
+      .catch(() => []),
+    db.query.eventTasks.findMany({
+      where: eq(eventTasks.eventId, id),
+      orderBy: [asc(eventTasks.orderIndex), asc(eventTasks.createdAt)],
+    }).catch(() => []),
+    db.query.quotes.findMany({
+      where: eq(quotes.eventId, id),
+      orderBy: [desc(quotes.createdAt)],
+    }).catch(() => []),
+    db
+      .select()
+      .from(eventMedia)
+      .where(eq(eventMedia.eventId, id))
+      .orderBy(asc(eventMedia.orderIndex), asc(eventMedia.createdAt))
+      .catch(() => []),
+    db
       .select()
       .from(moodboardComments)
       .where(eq(moodboardComments.eventId, id))
-      .orderBy(asc(moodboardComments.createdAt));
-  } catch (err) {
-    console.error("Error loading moodboard comments:", err);
-  }
+      .orderBy(asc(moodboardComments.createdAt))
+      .catch(() => []),
+    db.query.eventMeetings.findMany({
+      where: eq(eventMeetings.eventId, id),
+      orderBy: [asc(eventMeetings.startDate)],
+    }).catch(() => []),
+    db.query.eventMeetings.findMany({
+      where: clientId ? eq(eventMeetings.clientId, clientId) : undefined,
+      orderBy: [desc(eventMeetings.startDate)],
+    }).catch(() => []),
+    db.query.events.findMany({
+      where: clientId ? eq(events.clientId, clientId) : undefined,
+      orderBy: [desc(events.startDate)],
+    }).catch(() => []),
+    db.query.eventCustomItems.findMany({
+      where: eq(eventCustomItems.eventId, id),
+      orderBy: [asc(eventCustomItems.createdAt)],
+    }).catch(() => []),
+  ]);
 
-  const media = rawMedia.map((m) => {
-    const tableComments = mediaComments.filter((c) => c.mediaId === m.id);
+  const media = (rawMedia || []).map((m: any) => {
+    const tableComments = (mediaComments || []).filter((c: any) => c.mediaId === m.id);
     let inlineComments: any[] = [];
     if (m.comments) {
       try {
@@ -155,101 +166,68 @@ export default async function EventPage({ params }: PageProps) {
     };
   });
 
-  // 8. Event Meetings (Google Meet & In Person)
-  const meetings = await db.query.eventMeetings.findMany({
-    where: eq(eventMeetings.eventId, id),
-    orderBy: [asc(eventMeetings.startDate)],
-  });
+  const alreadyLinkedIds = new Set((meetings || []).map((m: any) => m.id));
+  const alreadyLinkedEventIds = new Set(
+    (meetings || []).map((m: any) => m.linkedEventRowId).filter(Boolean)
+  );
 
-  // 9. Available meetings to link to this event (e.g. from the same client or unlinked Calendly events)
-  let availableMeetingsToLink: any[] = [];
-  try {
-    const otherMeetings = await db.query.eventMeetings.findMany({
-      where: event.clientId ? eq(eventMeetings.clientId, event.clientId) : undefined,
-      orderBy: [desc(eventMeetings.startDate)],
-    });
+  const linkableOther = (otherMeetings || []).filter(
+    (m: any) => m.eventId !== id && !alreadyLinkedIds.has(m.id)
+  );
 
-    const calMeetings = await db.query.events.findMany({
-      where: event.clientId ? eq(events.clientId, event.clientId) : undefined,
-      orderBy: [desc(events.startDate)],
-    });
+  const linkableCal = (calMeetings || [])
+    .filter(
+      (e: any) =>
+        e.id !== id &&
+        (e.category === "Reunião Calendly" || Boolean(e.calendlyEventUri) || e.name.toLowerCase().startsWith("reunião")) &&
+        !alreadyLinkedEventIds.has(e.id) &&
+        e.linkedEventId !== id
+    )
+    .map((e: any) => ({
+      id: `cal-evt-${e.id}`,
+      existingEventId: e.id,
+      title: e.name,
+      type: (e.venue?.toLowerCase().includes("meet") ? "google_meet" : "presencial") as "google_meet" | "presencial",
+      startDate: e.startDate,
+      endDate: e.endDate,
+      location: e.venue,
+      meetUrl: e.venue?.includes("meet.google.com") ? e.venue : null,
+      notes: e.notes,
+      source: "calendly",
+      clientName: client?.name || "Cliente",
+    }));
 
-    const alreadyLinkedIds = new Set(meetings.map((m) => m.id));
-    const alreadyLinkedEventIds = new Set(
-      meetings.map((m) => m.linkedEventRowId).filter(Boolean)
-    );
-
-    const linkableOther = otherMeetings.filter(
-      (m) => m.eventId !== id && !alreadyLinkedIds.has(m.id)
-    );
-
-    const linkableCal = calMeetings
-      .filter(
-        (e) =>
-          e.id !== id &&
-          (e.category === "Reunião Calendly" || Boolean(e.calendlyEventUri) || e.name.toLowerCase().startsWith("reunião")) &&
-          !alreadyLinkedEventIds.has(e.id) &&
-          e.linkedEventId !== id
-      )
-      .map((e) => ({
-        id: `cal-evt-${e.id}`,
-        existingEventId: e.id,
-        title: e.name,
-        type: (e.venue?.toLowerCase().includes("meet") ? "google_meet" : "presencial") as "google_meet" | "presencial",
-        startDate: e.startDate,
-        endDate: e.endDate,
-        location: e.venue,
-        meetUrl: e.venue?.includes("meet.google.com") ? e.venue : null,
-        notes: e.notes,
-        source: "calendly",
-        clientName: client?.name || "Cliente",
-      }));
-
-    availableMeetingsToLink = [
-      ...linkableOther.map((m) => ({
-        id: m.id,
-        meetingId: m.id,
-        title: m.title,
-        type: m.type,
-        startDate: m.startDate,
-        endDate: m.endDate,
-        location: m.location,
-        meetUrl: m.meetUrl,
-        notes: m.notes,
-        source: m.source,
-        clientName: client?.name || "Cliente",
-      })),
-      ...linkableCal,
-    ];
-  } catch (err) {
-    console.error("Error fetching linkable meetings:", err);
-  }
-
-  // 10. Event Custom Items (Bespoke items specific only to this event, added directly to quota)
-  let customItems: any[] = [];
-  try {
-    customItems = await db.query.eventCustomItems.findMany({
-      where: eq(eventCustomItems.eventId, id),
-      orderBy: [asc(eventCustomItems.createdAt)],
-    });
-  } catch (err) {
-    console.error("Error fetching custom items:", err);
-  }
+  const availableMeetingsToLink = [
+    ...linkableOther.map((m: any) => ({
+      id: m.id,
+      meetingId: m.id,
+      title: m.title,
+      type: m.type,
+      startDate: m.startDate,
+      endDate: m.endDate,
+      location: m.location,
+      meetUrl: m.meetUrl,
+      notes: m.notes,
+      source: m.source,
+      clientName: client?.name || "Cliente",
+    })),
+    ...linkableCal,
+  ];
 
   return (
     <EventDetailView
       event={event}
       client={client || null}
-      allClients={allClients}
-      allItems={allItems}
-      initialAllocations={rawAllocations}
-      initialCustomItems={customItems}
-      initialTasks={tasks}
-      initialMedia={media}
-      initialMeetings={meetings}
+      allClients={allClients || []}
+      allItems={allItems || []}
+      initialAllocations={rawAllocations || []}
+      initialCustomItems={customItems || []}
+      initialTasks={tasks || []}
+      initialMedia={media || []}
+      initialMeetings={meetings || []}
       availableMeetingsToLink={availableMeetingsToLink}
-      teamUsers={teamUsers}
-      quotes={eventQuotes}
+      teamUsers={teamUsers || []}
+      quotes={eventQuotes || []}
       currentUser={currentUser}
     />
   );

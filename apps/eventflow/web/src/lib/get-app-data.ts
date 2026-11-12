@@ -19,13 +19,16 @@ import { getCurrentUser } from "@/lib/auth";
 export async function getAppInitialData() {
   await ensureDbMigrated().catch(() => {});
 
-  let currentUser = null;
-  try {
-    currentUser = await getCurrentUser();
-  } catch (err) {
-    console.error("getAppInitialData: error resolving currentUser", err);
-  }
+  // Trigger non-blocking background tasks so SSR is completely instantaneous
+  import("@/lib/calendly-sync")
+    .then(({ syncCalendlyIfDue }) => syncCalendlyIfDue())
+    .catch((e) => console.error("getAppInitialData: background Calendly sync error", e));
 
+  import("@/lib/alerts")
+    .then(({ evaluateAndSyncAlerts }) => evaluateAndSyncAlerts())
+    .catch((e) => console.error("getAppInitialData: background alerts sync error", e));
+
+  let currentUser = null;
   let allEvents: any[] = [];
   let allItems: any[] = [];
   let allClients: any[] = [];
@@ -37,14 +40,7 @@ export async function getAppInitialData() {
   let allCustomItems: any[] = [];
   let allMeetings: any[] = [];
   let templateRow: any = null;
-
-  // Synchronize Calendly meetings on an hourly basis if due
-  try {
-    const { syncCalendlyIfDue } = await import("@/lib/calendly-sync");
-    await syncCalendlyIfDue();
-  } catch (e) {
-    console.error("getAppInitialData: error during automatic Calendly sync", e);
-  }
+  let allAlerts: any[] = [];
 
   try {
     const results = await Promise.all([
@@ -111,6 +107,17 @@ export async function getAppInitialData() {
         console.error("getAppInitialData: error loading custom items", e);
         return [];
       }),
+      db.query.alerts.findMany({
+        orderBy: [desc(alerts.lastTriggeredAt)],
+        limit: 50,
+      }).catch((e) => {
+        console.error("getAppInitialData: error loading alerts", e);
+        return [];
+      }),
+      getCurrentUser().catch((e) => {
+        console.error("getAppInitialData: error loading currentUser", e);
+        return null;
+      }),
     ]);
 
     allEvents = (results[0] || []).filter(
@@ -126,6 +133,8 @@ export async function getAppInitialData() {
     templateRow = results[8] || null;
     allMeetings = results[9] || [];
     allCustomItems = results[10] || [];
+    allAlerts = results[11] || [];
+    currentUser = results[12] || null;
   } catch (err) {
     console.error("getAppInitialData: bulk query error", err);
   }
@@ -138,21 +147,6 @@ export async function getAppInitialData() {
     footerNotes: "Obrigado pela preferência.",
     brandColor: "#111111",
   };
-
-  let allAlerts: any[] = [];
-  try {
-    const { evaluateAndSyncAlerts } = await import("@/lib/alerts");
-    allAlerts = await evaluateAndSyncAlerts();
-  } catch (err) {
-    console.error("getAppInitialData: alerts sync error, reading alerts table directly", err);
-    try {
-      allAlerts = await db.query.alerts.findMany({
-        orderBy: [desc(alerts.lastTriggeredAt)],
-      });
-    } catch {
-      allAlerts = [];
-    }
-  }
 
   return {
     currentUser,

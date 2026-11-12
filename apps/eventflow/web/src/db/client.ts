@@ -12,9 +12,13 @@ export const client = createClient({
 
 export const db = drizzle(client, { schema });
 
+let isMigrated = false;
 let migrationPromise: Promise<void> | null = null;
 
 export async function ensureDbMigrated(): Promise<void> {
+  if (isMigrated) {
+    return;
+  }
   if (migrationPromise) {
     return migrationPromise;
   }
@@ -166,6 +170,7 @@ export async function ensureDbMigrated(): Promise<void> {
     } catch (e) {
       // Ignore if columns missing or already migrated
     }
+    isMigrated = true;
   })();
 
   return migrationPromise;

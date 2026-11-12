@@ -2852,6 +2852,7 @@ export default function EventDetailView({
         <div className="max-w-[1100px] mx-auto flex items-center justify-between gap-2">
           <Link
             href="/eventos"
+            prefetch={true}
             className="inline-flex items-center gap-1.5 sm:gap-2 text-xs font-semibold text-[#636366] hover:text-[#111111] transition bg-[#f2f2f5] hover:bg-[#e5e5ea] px-2.5 sm:px-3 py-1.5 rounded-full flex-shrink-0"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -3439,7 +3440,7 @@ export default function EventDetailView({
                         >
                           <div className="flex items-center gap-3.5 min-w-0">
                             {a.itemImageUrl ? (
-                              <Link href={`/inventario/${a.itemId}`} className="flex-shrink-0" title="Ver ficha do artigo">
+                              <Link href={`/inventario/${a.itemId}`} prefetch={false} className="flex-shrink-0" title="Ver ficha do artigo">
                                 <img
                                   src={a.itemImageUrl}
                                   alt={a.itemName}
@@ -3449,6 +3450,7 @@ export default function EventDetailView({
                             ) : (
                               <Link
                                 href={`/inventario/${a.itemId}`}
+                                prefetch={false}
                                 className="w-12 h-12 rounded-[10px] bg-[#ececf0] hover:bg-[#e5e5ea] flex items-center justify-center text-[#8e8e93] font-bold text-xs flex-shrink-0 transition"
                                 title="Ver ficha do artigo"
                               >
@@ -3460,6 +3462,7 @@ export default function EventDetailView({
                               <div className="font-bold text-sm text-[#111] truncate">
                                 <Link
                                   href={`/inventario/${a.itemId}`}
+                                  prefetch={false}
                                   className="hover:text-[#007aff] transition"
                                   title="Ver ficha do artigo no inventário"
                                 >
@@ -3469,6 +3472,7 @@ export default function EventDetailView({
                               <div className="text-xs text-[#8e8e93] flex flex-wrap items-center gap-2 mt-0.5">
                                 <Link
                                   href={`/inventario/${a.itemId}`}
+                                  prefetch={false}
                                   className="font-mono bg-white hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] text-[10px] transition"
                                   title="SKU do Artigo"
                                 >
@@ -3476,6 +3480,7 @@ export default function EventDetailView({
                                 </Link>
                                 <Link
                                   href={`/inventario/${a.itemId}`}
+                                  prefetch={false}
                                   className="font-mono text-[#8e8e93] hover:text-[#007aff] text-[10px] transition"
                                   title="ID do Artigo"
                                 >
