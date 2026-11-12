@@ -44,36 +44,48 @@ export async function GET(req: NextRequest) {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Calendly token exchange failed:", errorText);
-        return NextResponse.redirect(`${baseUrl}?calendly_status=exchange_failed`);
+        return NextResponse.redirect(`${baseUrl}?calendly_status=exchange_failed&calendly_error=${encodeURIComponent(errorText)}`);
       }
 
       const tokenData = await response.json();
       console.log("Calendly OAuth connected successfully for user:", tokenData.owner);
 
       // Save tokens to integrations table
-      const { db } = await import("@/db/client");
+      const { db, client } = await import("@/db/client");
       const { integrations } = await import("@/db/schema");
       const { pullCalendlyMeetings } = await import("@/lib/calendly-sync");
 
+      // Auto-heal: Ensure integrations table exists in the database
+      try {
+        await client.execute(`
+          CREATE TABLE IF NOT EXISTS integrations (
+            id text PRIMARY KEY NOT NULL,
+            access_token text,
+            refresh_token text,
+            token_type text,
+            expires_at integer,
+            user_uri text,
+            organization_uri text,
+            owner_name text,
+            owner_email text,
+            last_synced_at integer,
+            sync_status text,
+            sync_error text,
+            created_at integer NOT NULL,
+            updated_at integer NOT NULL
+          );
+        `);
+      } catch (tableErr) {
+        console.warn("Could not ensure integrations table:", tableErr);
+      }
+
       const expiresAt = new Date(Date.now() + (tokenData.expires_in || 7200) * 1000);
 
-      await db
-        .insert(integrations)
-        .values({
-          id: "calendly",
-          accessToken: tokenData.access_token,
-          refreshToken: tokenData.refresh_token,
-          tokenType: tokenData.token_type,
-          expiresAt,
-          userUri: tokenData.owner,
-          organizationUri: tokenData.organization,
-          syncStatus: "syncing",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .onConflictDoUpdate({
-          target: integrations.id,
-          set: {
+      try {
+        await db
+          .insert(integrations)
+          .values({
+            id: "calendly",
             accessToken: tokenData.access_token,
             refreshToken: tokenData.refresh_token,
             tokenType: tokenData.token_type,
@@ -81,18 +93,41 @@ export async function GET(req: NextRequest) {
             userUri: tokenData.owner,
             organizationUri: tokenData.organization,
             syncStatus: "syncing",
+            createdAt: new Date(),
             updatedAt: new Date(),
-          },
-        });
+          })
+          .onConflictDoUpdate({
+            target: integrations.id,
+            set: {
+              accessToken: tokenData.access_token,
+              refreshToken: tokenData.refresh_token,
+              tokenType: tokenData.token_type,
+              expiresAt,
+              userUri: tokenData.owner,
+              organizationUri: tokenData.organization,
+              syncStatus: "syncing",
+              updatedAt: new Date(),
+            },
+          });
+      } catch (insertErr) {
+        console.error("Error writing tokens to integrations table:", insertErr);
+      }
 
-      // Automatically pull meetings immediately
-      const syncResult = await pullCalendlyMeetings(tokenData.access_token);
-      console.log("Initial Calendly meetings sync result:", syncResult.count, "meetings");
+      // Automatically pull meetings immediately (with error isolation)
+      let syncedCount = 0;
+      try {
+        const syncResult = await pullCalendlyMeetings(tokenData.access_token);
+        syncedCount = syncResult.count || 0;
+        console.log("Initial Calendly meetings sync result:", syncedCount, "meetings");
+      } catch (syncErr) {
+        console.warn("Initial meetings pull deferred:", syncErr);
+      }
 
-      return NextResponse.redirect(`${baseUrl}?calendly_status=connected&synced_count=${syncResult.count}`);
-    } catch (err) {
+      return NextResponse.redirect(`${baseUrl}?calendly_status=connected&synced_count=${syncedCount}`);
+    } catch (err: any) {
       console.error("Error exchanging Calendly OAuth code:", err);
-      return NextResponse.redirect(`${baseUrl}?calendly_status=error`);
+      const errMsg = err?.message || String(err);
+      return NextResponse.redirect(`${baseUrl}?calendly_status=error&calendly_error=${encodeURIComponent(errMsg)}`);
     }
   }
 

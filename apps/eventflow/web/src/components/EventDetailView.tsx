@@ -43,6 +43,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Video,
+  UserPlus,
 } from "lucide-react";
 import AuditLogModal from "@/components/AuditLogModal";
 import { formatRelativeTime } from "@/lib/date-format";
@@ -60,6 +61,7 @@ import {
   addBatchEventMediaAction,
   deleteMediaImageAction,
   deleteEventMediaAction,
+  createClientAction,
 } from "@/app/actions";
 
 interface Client {
@@ -571,7 +573,9 @@ export default function EventDetailView({
   const [isPending, startTransition] = useTransition();
 
   const [event, setEvent] = useState(initialEvent);
+  const [clientsList, setClientsList] = useState<Client[]>(allClients);
   const [client, setClient] = useState(initialClient);
+  const [showCreateClientModal, setShowCreateClientModal] = useState(false);
   const [allocations, setAllocations] = useState(initialAllocations);
   const [tasks, setTasks] = useState(initialTasks);
 
@@ -680,7 +684,7 @@ export default function EventDetailView({
 
   // Client switcher
   const handleClientChange = (newClientId: string) => {
-    const foundClient = allClients.find((c) => c.id === newClientId) || null;
+    const foundClient = clientsList.find((c) => c.id === newClientId) || null;
     setClient(foundClient);
     setEvent((prev) => ({ ...prev, clientId: newClientId || null }));
     savePatch({ clientId: newClientId || null });
@@ -1569,21 +1573,43 @@ export default function EventDetailView({
 
             {/* 4. Client Selector & Contact Info */}
             <div className="p-3 space-y-1">
-              <div className="text-[#8e8e93] text-xs font-medium">Cliente Associado</div>
+              <div className="flex items-center justify-between">
+                <div className="text-[#8e8e93] text-xs font-medium">Cliente Associado</div>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateClientModal(true)}
+                  className="text-[11px] font-bold text-[#007aff] hover:text-[#0051a8] flex items-center gap-1 cursor-pointer transition"
+                  title="Criar novo cliente CRM"
+                >
+                  <UserPlus className="w-3 h-3" />
+                  <span>Novo</span>
+                </button>
+              </div>
               <select
                 value={event.clientId || ""}
-                onChange={(e) => handleClientChange(e.target.value)}
+                onChange={(e) => {
+                  if (e.target.value === "__create_new__") {
+                    setShowCreateClientModal(true);
+                  } else {
+                    handleClientChange(e.target.value);
+                  }
+                }}
                 className="w-full font-bold text-sm text-[#111] bg-[#fafafc] hover:bg-[#f2f2f5] border border-[#ececf0] rounded-lg px-2.5 py-1 outline-none cursor-pointer truncate transition"
               >
                 <option value="">(Sem cliente associado)</option>
-                {allClients.map((c) => (
+                {clientsList.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} {c.contactName ? `(${c.contactName})` : ""}
                   </option>
                 ))}
+                <option value="__create_new__">+ Criar novo cliente...</option>
               </select>
               <div className="text-[11px] text-[#8e8e93] truncate pt-0.5">
-                {client?.phone || client?.email || "Sem dados de contacto adicionais"}
+                {client ? (
+                  client.phone || client.email || "Sem dados de contacto adicionais"
+                ) : (
+                  <span className="italic text-[#8e8e93]">Nenhum cliente atribuído</span>
+                )}
               </div>
             </div>
           </div>
@@ -2136,22 +2162,54 @@ export default function EventDetailView({
                   <User className="w-4 h-4 text-[#111]" />
                   <h3 className="text-sm font-bold text-[#111]">Ficha do Cliente</h3>
                 </div>
-                {client?.id && (
-                  <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0]">
-                    #{client.id}
-                  </span>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {client?.id && (
+                    <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0]">
+                      #{client.id}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateClientModal(true)}
+                    className="p-1 rounded-md text-[#007aff] hover:bg-[#f2f2f5] transition cursor-pointer flex items-center gap-1 text-[11px] font-bold"
+                    title="Criar novo cliente"
+                    aria-label="Criar novo cliente"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Novo</span>
+                  </button>
+                </div>
               </div>
 
               {client ? (
                 <div className="space-y-3 text-xs">
-                  <div>
-                    <div className="font-bold text-sm text-[#111]">{client.name}</div>
-                    {client.contactName && (
-                      <div className="text-[#8e8e93] text-[11px] mt-0.5">
-                        Contacto direto: {client.contactName}
-                      </div>
-                    )}
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-bold text-sm text-[#111]">{client.name}</div>
+                      {client.contactName && (
+                        <div className="text-[#8e8e93] text-[11px] mt-0.5">
+                          Contacto direto: {client.contactName}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateClientModal(true)}
+                        className="text-[11px] text-[#007aff] hover:text-[#0051a8] font-semibold transition cursor-pointer"
+                        title="Criar novo cliente"
+                      >
+                        + Novo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleClientChange("")}
+                        className="text-[11px] text-[#8e8e93] hover:text-rose-600 font-medium transition cursor-pointer"
+                        title="Desassociar cliente deste evento"
+                      >
+                        Desassociar
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-2 pt-1 border-t border-[#ececf0]">
@@ -2204,11 +2262,55 @@ export default function EventDetailView({
                         <span className="font-mono text-[#111]">{client.nif}</span>
                       </div>
                     )}
+
+                    {client.address && (
+                      <div className="flex items-center justify-between text-[#8e8e93]">
+                        <span>Morada:</span>
+                        <span className="text-[#111] truncate">{client.address}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
-                <div className="text-xs text-[#8e8e93] py-2 italic">
-                  Selecione um cliente no topo para ver os contactos diretos aqui.
+                <div className="p-4 rounded-[16px] bg-[#fafafc] border border-dashed border-[#ececf0] text-center space-y-3">
+                  <div className="w-9 h-9 rounded-full bg-white border border-[#ececf0] flex items-center justify-center mx-auto text-[#8e8e93]">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-[#111]">Nenhum cliente associado</div>
+                    <p className="text-[11px] text-[#8e8e93] mt-0.5">
+                      Pode associar um cliente existente ou registar um novo cliente agora.
+                    </p>
+                  </div>
+                  <div className="space-y-2 pt-1">
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value === "__create_new__") {
+                          setShowCreateClientModal(true);
+                        } else if (e.target.value) {
+                          handleClientChange(e.target.value);
+                        }
+                      }}
+                      className="w-full text-xs font-semibold bg-white border border-[#ececf0] rounded-xl px-2.5 py-2 outline-none cursor-pointer"
+                    >
+                      <option value="">Atribuir cliente existente...</option>
+                      {clientsList.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.contactName ? `(${c.contactName})` : ""}
+                        </option>
+                      ))}
+                      <option value="__create_new__">+ Criar novo cliente...</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateClientModal(true)}
+                      className="w-full py-2 px-3 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-2xs"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>Criar Novo Cliente</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </section>
@@ -3038,6 +3140,240 @@ export default function EventDetailView({
         entityId={event.id}
         entityTitle={event.name}
       />
+
+      {/* Create Client Modal */}
+      {showCreateClientModal && (
+        <CreateClientModal
+          onClose={() => setShowCreateClientModal(false)}
+          onCreated={(newClient) => {
+            setClientsList((prev) => {
+              const exists = prev.some((c) => c.id === newClient.id);
+              return exists ? prev : [newClient, ...prev];
+            });
+            setClient(newClient);
+            setEvent((prev) => ({ ...prev, clientId: newClient.id }));
+            savePatch({ clientId: newClient.id });
+            setShowCreateClientModal(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------
+// MODAL: CREATE NEW CLIENT INLINE IN EVENT VIEW
+// -----------------------------------------------------------------
+function CreateClientModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (client: Client) => void;
+}) {
+  const [name, setName] = useState("");
+  const [customId, setCustomId] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [nif, setNif] = useState("");
+  const [address, setAddress] = useState("");
+  const [notes, setNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.set("name", name);
+      if (customId.trim()) formData.set("customId", customId.trim());
+      formData.set("contactName", contactName);
+      formData.set("email", email);
+      formData.set("phone", phone);
+      formData.set("nif", nif);
+      formData.set("address", address);
+      formData.set("notes", notes);
+
+      const res = await createClientAction(formData);
+      if (res.success && res.client) {
+        onCreated({
+          id: res.client.id,
+          name: res.client.name,
+          contactName: res.client.contactName ?? null,
+          email: res.client.email ?? null,
+          phone: res.client.phone ?? null,
+          nif: res.client.nif ?? null,
+          address: res.client.address ?? null,
+          notes: res.client.notes ?? null,
+          source: res.client.source ?? "manual",
+        });
+      } else {
+        setError(res.error || "Erro ao criar cliente.");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Erro inesperado ao criar cliente.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-[24px] w-full max-w-md border border-[#ececf0] shadow-2xl overflow-y-auto max-h-[calc(100dvh-2rem)] p-6 text-xs animate-in fade-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#ececf0]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-[#f2f2f5] flex items-center justify-center text-[#111]">
+              <UserPlus className="w-4 h-4 text-[#007aff]" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-[#111]">Criar Novo Cliente</h3>
+              <p className="text-[11px] text-[#8e8e93] mt-0.5">Criar e associar diretamente a este evento</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[#8e8e93] hover:text-[#111] p-1 rounded-full cursor-pointer transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-[12px] bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          <div>
+            <label className="block font-bold text-[#111] mb-1">
+              Nome da Empresa / Cliente *
+            </label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex: Mastercard Portugal ou Marta Silva"
+              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#111] mb-1">
+              ID Personalizado (Opcional)
+            </label>
+            <input
+              type="text"
+              value={customId}
+              onChange={(e) => setCustomId(e.target.value)}
+              placeholder="Ex: cli-mastercard (vazio = automático cli_...)"
+              className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#111] mb-1">Pessoa de Contacto</label>
+            <input
+              type="text"
+              value={contactName}
+              onChange={(e) => setContactName(e.target.value)}
+              placeholder="Ex: Sofia Antunes"
+              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block font-bold text-[#111] mb-1">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="contacto@empresa.pt"
+                className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-[#111] mb-1">Telefone</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+351 912 345 678"
+                className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block font-bold text-[#111] mb-1">NIF / Número Fiscal</label>
+              <input
+                type="text"
+                value={nif}
+                onChange={(e) => setNif(e.target.value)}
+                placeholder="501234567"
+                className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-[#111] mb-1">Morada</label>
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Lisboa, Portugal"
+                className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#111] mb-1">Notas / Observações</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder="Preferências, canal de comunicação preferido..."
+              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
+          <div className="pt-3 flex items-center justify-end gap-2 border-t border-[#ececf0]">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-[12px] text-xs font-semibold text-[#636366] hover:bg-[#f2f2f5] transition cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || !name.trim()}
+              className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>A criar...</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Criar e Associar ao Evento</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
