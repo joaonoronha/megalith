@@ -467,6 +467,7 @@ export default function EventFlowApp({
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showNewUserModal, setShowNewUserModal] = useState(false);
   const [editingTeamUser, setEditingTeamUser] = useState<any | null>(null);
+  const [dashboardFinanceMode, setDashboardFinanceMode] = useState<"comparative" | "realized" | "projected">("comparative");
   const [selectedEventForQuote, setSelectedEventForQuote] = useState<string>("");
   const [auditModal, setAuditModal] = useState<{
     isOpen: boolean;
@@ -588,7 +589,7 @@ export default function EventFlowApp({
     });
   }, [itemsList, locationsList, inventorySearch, inventoryCategoryFilter, inventoryLocationFilter, inventoryAlertFilter]);
 
-  // Financial aggregates
+  // Financial aggregates (Realized Cash Flow)
   const totalEntradas = movementsList
     .filter((m) => m.type === "entrada")
     .reduce((sum, m) => sum + m.amount, 0);
@@ -603,13 +604,27 @@ export default function EventFlowApp({
 
   const resultadoLiquido = totalEntradas - totalSaidas - totalInvestido;
 
-  const totalFaturado = useMemo(() => {
-    const eventsTotal = eventsList.reduce((sum, e) => sum + (e.customerPrice || 0), 0);
-    if (eventsTotal > 0) return eventsTotal;
-    return quotesList.reduce((sum, q) => sum + (q.total || 0), 0);
-  }, [eventsList, quotesList]);
+  // Projected aggregates from pipeline events
+  const projectedMetrics = useMemo(() => {
+    const faturacao = eventsList.reduce((sum, e) => sum + (Number(e.customerPrice) || 0), 0);
+    const orcamentoCustos = eventsList.reduce((sum, e) => sum + (Number(e.totalBudget) || 0), 0);
+    const lucroProjetado = faturacao - orcamentoCustos;
+    const margemProjetada = faturacao > 0 ? ((lucroProjetado / faturacao) * 100).toFixed(1) : "0.0";
+    const aReceber = Math.max(0, faturacao - totalEntradas);
+    return {
+      faturacao,
+      orcamentoCustos,
+      lucroProjetado,
+      margemProjetada,
+      aReceber,
+    };
+  }, [eventsList, totalEntradas]);
 
-  const totalAReceber = Math.max(0, totalFaturado - totalEntradas);
+  const totalFaturado = projectedMetrics.faturacao > 0
+    ? projectedMetrics.faturacao
+    : quotesList.reduce((sum, q) => sum + (q.total || 0), 0);
+
+  const totalAReceber = projectedMetrics.aReceber;
 
   const margemOperacional = totalEntradas > 0
     ? (((totalEntradas - totalSaidas) / totalEntradas) * 100).toFixed(1)
@@ -904,29 +919,75 @@ export default function EventFlowApp({
               </div>
             </div>
 
-            {/* Resumo Financeiro Card */}
-            <div className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+            {/* Resumo Financeiro Card (Realizado vs Projetado) */}
+            <div className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)] space-y-4">
               {/* Head */}
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <div className="text-[18px] font-bold tracking-[-0.35px] text-[#111111]">
-                    Resumo financeiro
+                  <div className="flex items-center gap-2">
+                    <span className="text-[18px] font-bold tracking-[-0.35px] text-[#111111]">
+                      Resumo financeiro
+                    </span>
+                    {projectedMetrics.lucroProjetado > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#eaf8ee] text-[#217a3b] border border-[#217a3b]/20">
+                        +€{projectedMetrics.lucroProjetado.toLocaleString("pt-PT")} lucro projetado
+                      </span>
+                    )}
                   </div>
                   <div className="text-[12px] text-[#8e8e93]">
                     {currentMonthSubtitle}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* View Mode Toggle */}
+                  <div className="flex items-center p-1 bg-[#f4f4f6] rounded-[12px] text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setDashboardFinanceMode("comparative")}
+                      className={`px-2.5 py-1 rounded-[8px] font-semibold transition cursor-pointer ${
+                        dashboardFinanceMode === "comparative"
+                          ? "bg-white text-[#111] shadow-xs"
+                          : "text-[#8e8e93] hover:text-[#111]"
+                      }`}
+                    >
+                      Comparativo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDashboardFinanceMode("projected")}
+                      className={`px-2.5 py-1 rounded-[8px] font-semibold transition cursor-pointer flex items-center gap-1 ${
+                        dashboardFinanceMode === "projected"
+                          ? "bg-white text-[#111] shadow-xs"
+                          : "text-[#8e8e93] hover:text-[#111]"
+                      }`}
+                    >
+                      <span>Projetado</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#6366f1]"></span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDashboardFinanceMode("realized")}
+                      className={`px-2.5 py-1 rounded-[8px] font-semibold transition cursor-pointer flex items-center gap-1 ${
+                        dashboardFinanceMode === "realized"
+                          ? "bg-white text-[#111] shadow-xs"
+                          : "text-[#8e8e93] hover:text-[#111]"
+                      }`}
+                    >
+                      <span>Caixa Real</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#217a3b]"></span>
+                    </button>
+                  </div>
+
                   <button
                     onClick={(e) => handleTabSwitch("finance", "/financas", e)}
-                    className="text-[13px] font-semibold text-[#007aff] hover:underline cursor-pointer"
+                    className="text-[13px] font-semibold text-[#007aff] hover:underline cursor-pointer px-1"
                   >
-                    Ver detalhe financeiro →
+                    Ver detalhe →
                   </button>
                   <button
                     onClick={() => setShowMovementModal(true)}
-                    className="w-[34px] h-[34px] rounded-full bg-[#1c1c1e] text-white flex items-center justify-center font-bold text-base hover:bg-black transition shadow-xs cursor-pointer"
+                    className="w-[32px] h-[32px] rounded-full bg-[#1c1c1e] text-white flex items-center justify-center font-bold text-base hover:bg-black transition shadow-xs cursor-pointer"
                     aria-label="Novo movimento"
                     title="Adicionar entrada, saída ou investimento"
                   >
@@ -935,60 +996,149 @@ export default function EventFlowApp({
                 </div>
               </div>
 
-              {/* 4 Metrics */}
+              {/* 4 Metrics Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5">
-                  <div className="text-[12px] text-[#8e8e93] mb-1.5">Entradas</div>
-                  <div className="text-[24px] font-bold tracking-[-0.7px] text-[#217a3b]">
-                    €{totalEntradas.toLocaleString("pt-PT")}
+                {/* 1. Entradas / Faturação */}
+                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5 flex flex-col justify-between">
+                  <div>
+                    <div className="text-[12px] text-[#8e8e93] mb-1">
+                      {dashboardFinanceMode === "projected" ? "Faturação Prevista" : "Entradas"}
+                    </div>
+                    <div className="text-[24px] font-bold tracking-[-0.7px] text-[#217a3b]">
+                      €{dashboardFinanceMode === "projected"
+                        ? projectedMetrics.faturacao.toLocaleString("pt-PT")
+                        : totalEntradas.toLocaleString("pt-PT")}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-[#8e8e93] mt-1">Recebido este mês</div>
+                  <div className="text-[11px] text-[#8e8e93] mt-2 pt-2 border-t border-black/[0.04]">
+                    {dashboardFinanceMode === "comparative" ? (
+                      <div>
+                        <span>Previsto: </span>
+                        <strong className="text-[#111]">€{projectedMetrics.faturacao.toLocaleString("pt-PT")}</strong>
+                        <span className="text-[#6366f1] ml-1 font-semibold">
+                          (€{projectedMetrics.aReceber.toLocaleString("pt-PT")} a receber)
+                        </span>
+                      </div>
+                    ) : dashboardFinanceMode === "projected" ? (
+                      <div>
+                        <span>A receber: </span>
+                        <strong className="text-[#6366f1]">€{projectedMetrics.aReceber.toLocaleString("pt-PT")}</strong>
+                      </div>
+                    ) : (
+                      "Recebido em caixa"
+                    )}
+                  </div>
                 </div>
 
-                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5">
-                  <div className="text-[12px] text-[#8e8e93] mb-1.5">Saídas</div>
-                  <div className="text-[24px] font-bold tracking-[-0.7px] text-[#b04a3f]">
-                    €{totalSaidas.toLocaleString("pt-PT")}
+                {/* 2. Saídas / Custos */}
+                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5 flex flex-col justify-between">
+                  <div>
+                    <div className="text-[12px] text-[#8e8e93] mb-1">
+                      {dashboardFinanceMode === "projected" ? "Custos Orçados" : "Saídas"}
+                    </div>
+                    <div className="text-[24px] font-bold tracking-[-0.7px] text-[#b04a3f]">
+                      €{dashboardFinanceMode === "projected"
+                        ? projectedMetrics.orcamentoCustos.toLocaleString("pt-PT")
+                        : totalSaidas.toLocaleString("pt-PT")}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-[#8e8e93] mt-1">Despesas operacionais</div>
+                  <div className="text-[11px] text-[#8e8e93] mt-2 pt-2 border-t border-black/[0.04]">
+                    {dashboardFinanceMode === "comparative" ? (
+                      <div>
+                        <span>Orçado: </span>
+                        <strong className="text-[#111]">€{projectedMetrics.orcamentoCustos.toLocaleString("pt-PT")}</strong>
+                      </div>
+                    ) : dashboardFinanceMode === "projected" ? (
+                      "Orçamento interno previsto"
+                    ) : (
+                      "Despesas operacionais pagas"
+                    )}
+                  </div>
                 </div>
 
-                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5">
-                  <div className="text-[12px] text-[#8e8e93] mb-1.5">Investido</div>
-                  <div className="text-[24px] font-bold tracking-[-0.7px] text-[#8c6417]">
-                    €{totalInvestido.toLocaleString("pt-PT")}
+                {/* 3. Investido / A Receber */}
+                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5 flex flex-col justify-between">
+                  <div>
+                    <div className="text-[12px] text-[#8e8e93] mb-1">
+                      {dashboardFinanceMode === "projected" ? "Pendente a Receber" : "Investido"}
+                    </div>
+                    <div className={`text-[24px] font-bold tracking-[-0.7px] ${
+                      dashboardFinanceMode === "projected" ? "text-[#6366f1]" : "text-[#8c6417]"
+                    }`}>
+                      €{dashboardFinanceMode === "projected"
+                        ? projectedMetrics.aReceber.toLocaleString("pt-PT")
+                        : totalInvestido.toLocaleString("pt-PT")}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-[#8e8e93] mt-1">Material e equipamento</div>
+                  <div className="text-[11px] text-[#8e8e93] mt-2 pt-2 border-t border-black/[0.04]">
+                    {dashboardFinanceMode === "projected"
+                      ? "Valor por cobrar aos clientes"
+                      : "Material e equipamento em stock"}
+                  </div>
                 </div>
 
-                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5">
-                  <div className="text-[12px] text-[#8e8e93] mb-1.5">Resultado líquido</div>
-                  <div className="text-[24px] font-bold tracking-[-0.7px] text-[#111111]">
-                    €{resultadoLiquido.toLocaleString("pt-PT")}
+                {/* 4. Resultado Líquido / Lucro Projetado */}
+                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5 flex flex-col justify-between">
+                  <div>
+                    <div className="text-[12px] text-[#8e8e93] mb-1">
+                      {dashboardFinanceMode === "projected" ? "Lucro Projetado" : "Resultado líquido"}
+                    </div>
+                    <div className={`text-[24px] font-bold tracking-[-0.7px] ${
+                      (dashboardFinanceMode === "projected" ? projectedMetrics.lucroProjetado : resultadoLiquido) >= 0
+                        ? "text-[#217a3b]"
+                        : "text-[#b04a3f]"
+                    }`}>
+                      €{dashboardFinanceMode === "projected"
+                        ? projectedMetrics.lucroProjetado.toLocaleString("pt-PT")
+                        : resultadoLiquido.toLocaleString("pt-PT")}
+                    </div>
                   </div>
-                  <div className="text-[11px] text-[#8e8e93] mt-1">
-                    Entradas − saídas − investimento
+                  <div className="text-[11px] text-[#8e8e93] mt-2 pt-2 border-t border-black/[0.04]">
+                    {dashboardFinanceMode === "comparative" ? (
+                      <div>
+                        <span>Lucro Projetado: </span>
+                        <strong className="text-[#217a3b]">€{projectedMetrics.lucroProjetado.toLocaleString("pt-PT")}</strong>
+                        <span className="text-[#8e8e93] ml-1">({projectedMetrics.margemProjetada}%)</span>
+                      </div>
+                    ) : dashboardFinanceMode === "projected" ? (
+                      `Margem prevista: ${projectedMetrics.margemProjetada}%`
+                    ) : (
+                      "Entradas − saídas − investimento"
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* Footer */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-[#ececf0] pt-3.5 mt-3.5 text-[12px] text-[#8e8e93]">
-                <div>
-                  Faturado{" "}
-                  <strong className="text-[#111111] font-semibold">
-                    €{totalFaturado.toLocaleString("pt-PT")}
-                  </strong>{" "}
-                  · A receber{" "}
-                  <strong className="text-[#111111] font-semibold">
-                    €{totalAReceber.toLocaleString("pt-PT")}
-                  </strong>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-[#ececf0] pt-3 text-[12px] text-[#8e8e93]">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span>
+                    Faturado previsto:{" "}
+                    <strong className="text-[#111111] font-semibold">
+                      €{totalFaturado.toLocaleString("pt-PT")}
+                    </strong>
+                  </span>
+                  <span>·</span>
+                  <span>
+                    A receber:{" "}
+                    <strong className="text-[#6366f1] font-semibold">
+                      €{totalAReceber.toLocaleString("pt-PT")}
+                    </strong>
+                  </span>
+                  <span>·</span>
+                  <span>
+                    Lucro projetado:{" "}
+                    <strong className="text-[#217a3b] font-semibold">
+                      €{projectedMetrics.lucroProjetado.toLocaleString("pt-PT")}
+                    </strong>
+                  </span>
                 </div>
                 <div>
-                  Margem operacional{" "}
+                  Margem prevista:{" "}
                   <strong className="text-[#111111] font-semibold">
-                    {margemOperacional}%
+                    {projectedMetrics.margemProjetada}%
                   </strong>
+                  <span className="text-[#8e8e93] ml-1.5">(atual em caixa: {margemOperacional}%)</span>
                 </div>
               </div>
             </div>

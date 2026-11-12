@@ -22,6 +22,15 @@ import {
   Receipt,
   X,
   ExternalLink,
+  Search,
+  Building2,
+  Briefcase,
+  UserCheck,
+  Wallet,
+  Banknote,
+  Coins,
+  Eye,
+  Check,
 } from "lucide-react";
 
 interface FinanceViewProps {
@@ -50,10 +59,28 @@ export default function FinanceView({
   onOpenMovementModal,
 }: FinanceViewProps) {
   // Navigation sub-tabs within Finance View
-  const [subTab, setSubTab] = useState<"overview" | "expenses" | "inventory">("overview");
+  const [subTab, setSubTab] = useState<"overview" | "events-profitability" | "expenses" | "inventory">("overview");
+
+  // Display mode for metrics: comparative (both), realized (caixa), projected (eventos)
+  const [financialMode, setFinancialMode] = useState<"comparative" | "realized" | "projected">("comparative");
 
   // Selected Month filter ("all" or "YYYY-MM")
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
+
+  // Event profitability tab filters & search
+  const [eventSearch, setEventSearch] = useState("");
+  const [eventStatusFilter, setEventStatusFilter] = useState("todos");
+  const [eventSortBy, setEventSortBy] = useState<"date" | "profit_desc" | "price_desc" | "pending_desc">("date");
+
+  // State for Add Income / Payment Modal (Registar Recebimento de Evento)
+  const [showAddIncomeModal, setShowAddIncomeModal] = useState(false);
+  const [incomeEventId, setIncomeEventId] = useState("");
+  const [incomeAmount, setIncomeAmount] = useState("");
+  const [incomeDesc, setIncomeDesc] = useState("");
+  const [incomeDate, setIncomeDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [incomeNotes, setIncomeNotes] = useState("");
+  const [isSubmittingIncome, setIsSubmittingIncome] = useState(false);
+  const [incomeError, setIncomeError] = useState<string | null>(null);
 
   // State for Add Expense Modal
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
@@ -100,25 +127,33 @@ export default function FinanceView({
     return `${monthNames[monthIndex] || m} ${y}`;
   };
 
-  // 1. Group movements and events by month
+  // 1. Group movements and events by month (both Realized Cash Flow and Projected Pipeline)
   const monthlyData = useMemo(() => {
     const monthsMap: Record<
       string,
       {
         monthKey: string;
         label: string;
+        // Realized Cash Flow
         entradas: number;
         saidas: number;
         investimentos: number;
         totalGastos: number;
         lucro: number;
+        marginPct: number;
+        // Projected Pipeline
+        faturacaoProjetada: number;
+        custosProjetados: number;
+        lucroProjetado: number;
+        margemProjetadaPct: number;
+        aReceber: number;
         eventsCount: number;
         events: any[];
         movements: any[];
       }
     > = {};
 
-    // Collect all unique months from movements and events
+    // Collect all unique months from movements
     movements.forEach((m) => {
       const key = getMonthKey(m.date);
       if (!key) return;
@@ -131,6 +166,12 @@ export default function FinanceView({
           investimentos: 0,
           totalGastos: 0,
           lucro: 0,
+          marginPct: 0,
+          faturacaoProjetada: 0,
+          custosProjetados: 0,
+          lucroProjetado: 0,
+          margemProjetadaPct: 0,
+          aReceber: 0,
           eventsCount: 0,
           events: [],
           movements: [],
@@ -146,6 +187,7 @@ export default function FinanceView({
       }
     });
 
+    // Collect all unique months and projected financials from events
     events.forEach((e) => {
       const key = getMonthKey(e.startDate);
       if (!key) return;
@@ -158,6 +200,12 @@ export default function FinanceView({
           investimentos: 0,
           totalGastos: 0,
           lucro: 0,
+          marginPct: 0,
+          faturacaoProjetada: 0,
+          custosProjetados: 0,
+          lucroProjetado: 0,
+          margemProjetadaPct: 0,
+          aReceber: 0,
           eventsCount: 0,
           events: [],
           movements: [],
@@ -165,6 +213,11 @@ export default function FinanceView({
       }
       monthsMap[key].events.push(e);
       monthsMap[key].eventsCount += 1;
+
+      const price = Number(e.customerPrice) || 0;
+      const budget = Number(e.totalBudget) || 0;
+      monthsMap[key].faturacaoProjetada += price;
+      monthsMap[key].custosProjetados += budget;
     });
 
     // Compute totals and sort chronologically (oldest to newest)
@@ -173,6 +226,11 @@ export default function FinanceView({
       const data = monthsMap[key];
       data.totalGastos = data.saidas + data.investimentos;
       data.lucro = data.entradas - data.totalGastos;
+      data.marginPct = data.entradas > 0 ? (data.lucro / data.entradas) * 100 : 0;
+
+      data.lucroProjetado = data.faturacaoProjetada - data.custosProjetados;
+      data.margemProjetadaPct = data.faturacaoProjetada > 0 ? (data.lucroProjetado / data.faturacaoProjetada) * 100 : 0;
+      data.aReceber = Math.max(0, data.faturacaoProjetada - data.entradas);
 
       // Calculate Month-over-Month deltas compared to previous month
       let prev = idx > 0 ? monthsMap[sortedKeys[idx - 1]] : null;
@@ -194,8 +252,6 @@ export default function FinanceView({
           ? ((data.eventsCount - prev.eventsCount) / prev.eventsCount) * 100
           : 0;
 
-      let marginPct = data.entradas > 0 ? (data.lucro / data.entradas) * 100 : 0;
-
       return {
         ...data,
         profitDelta,
@@ -204,7 +260,6 @@ export default function FinanceView({
         spendingGrowthPct,
         eventsDelta,
         eventsGrowthPct,
-        marginPct,
       };
     });
 
@@ -216,7 +271,7 @@ export default function FinanceView({
     return [...monthlyData].reverse();
   }, [monthlyData]);
 
-  // Overall totals / Active filtered data
+  // Overall totals / Active filtered data (Realized Cash + Projected Pipeline)
   const activeMetrics = useMemo(() => {
     if (selectedMonth === "all") {
       const totalEntradas = movements
@@ -233,10 +288,14 @@ export default function FinanceView({
       const margemGeral = totalEntradas > 0 ? (lucroTotal / totalEntradas) * 100 : 0;
       const totalEventos = events.length;
 
+      const faturacaoProjetadaTotal = events.reduce((sum, e) => sum + (Number(e.customerPrice) || 0), 0);
+      const custosProjetadosTotal = events.reduce((sum, e) => sum + (Number(e.totalBudget) || 0), 0);
+      const lucroProjetadoTotal = faturacaoProjetadaTotal - custosProjetadosTotal;
+      const margemProjetadaGeral = faturacaoProjetadaTotal > 0 ? (lucroProjetadoTotal / faturacaoProjetadaTotal) * 100 : 0;
+      const totalAReceber = Math.max(0, faturacaoProjetadaTotal - totalEntradas);
+
       // Latest month vs previous month MoM
       const latestMonth = monthlyData[monthlyData.length - 1];
-      const previousMonth = monthlyData[monthlyData.length - 2];
-
       const momProfitGrowth = latestMonth ? latestMonth.profitGrowthPct : 0;
       const momSpendingGrowth = latestMonth ? latestMonth.spendingGrowthPct : 0;
       const momEventsGrowth = latestMonth ? latestMonth.eventsGrowthPct : 0;
@@ -251,6 +310,11 @@ export default function FinanceView({
         lucro: lucroTotal,
         margemPct: margemGeral,
         eventsCount: totalEventos,
+        faturacaoProjetada: faturacaoProjetadaTotal,
+        custosProjetados: custosProjetadosTotal,
+        lucroProjetado: lucroProjetadoTotal,
+        margemProjetadaPct: margemProjetadaGeral,
+        aReceber: totalAReceber,
         momProfitGrowth,
         momSpendingGrowth,
         momEventsGrowth,
@@ -269,6 +333,11 @@ export default function FinanceView({
           lucro: 0,
           margemPct: 0,
           eventsCount: 0,
+          faturacaoProjetada: 0,
+          custosProjetados: 0,
+          lucroProjetado: 0,
+          margemProjetadaPct: 0,
+          aReceber: 0,
           momProfitGrowth: 0,
           momSpendingGrowth: 0,
           momEventsGrowth: 0,
@@ -285,6 +354,11 @@ export default function FinanceView({
         lucro: match.lucro,
         margemPct: match.marginPct,
         eventsCount: match.eventsCount,
+        faturacaoProjetada: match.faturacaoProjetada,
+        custosProjetados: match.custosProjetados,
+        lucroProjetado: match.lucroProjetado,
+        margemProjetadaPct: match.margemProjetadaPct,
+        aReceber: match.aReceber,
         momProfitGrowth: match.profitGrowthPct,
         momSpendingGrowth: match.spendingGrowthPct,
         momEventsGrowth: match.eventsGrowthPct,
@@ -292,6 +366,124 @@ export default function FinanceView({
       };
     }
   }, [selectedMonth, monthlyData, movements, events]);
+
+  // 2. Event-by-Event Profitability & Projections
+  const eventProfitabilityList = useMemo(() => {
+    const list = events.map((ev) => {
+      const client = clients.find((c) => c.id === ev.clientId);
+      const evMovements = movements.filter((m) => m.eventId === ev.id);
+
+      const entradasReais = evMovements
+        .filter((m) => m.type === "entrada")
+        .reduce((sum, m) => sum + m.amount, 0);
+
+      const despesasReais = evMovements
+        .filter((m) => m.type === "saida" || m.type === "investimento")
+        .reduce((sum, m) => sum + m.amount, 0);
+
+      const precoClienteProjetado = Number(ev.customerPrice) || 0;
+      const custoOrcadoProjetado = Number(ev.totalBudget) || 0;
+      const lucroProjetado = precoClienteProjetado - custoOrcadoProjetado;
+      const margemProjetadaPct = precoClienteProjetado > 0 ? (lucroProjetado / precoClienteProjetado) * 100 : 0;
+
+      const lucroRealizado = entradasReais - despesasReais;
+      const margemRealizadaPct = entradasReais > 0 ? (lucroRealizado / entradasReais) * 100 : 0;
+
+      const saldoAReceber = Math.max(0, precoClienteProjetado - entradasReais);
+      const desvioOrcamental = custoOrcadoProjetado - despesasReais; // positivo = abaixo do orçamento
+      const paymentProgressPct = precoClienteProjetado > 0
+        ? Math.min(100, Math.round((entradasReais / precoClienteProjetado) * 100))
+        : (entradasReais > 0 ? 100 : 0);
+
+      const monthKey = getMonthKey(ev.startDate);
+
+      return {
+        event: ev,
+        client,
+        monthKey,
+        entradasReais,
+        despesasReais,
+        precoClienteProjetado,
+        custoOrcadoProjetado,
+        lucroProjetado,
+        margemProjetadaPct,
+        lucroRealizado,
+        margemRealizadaPct,
+        saldoAReceber,
+        desvioOrcamental,
+        paymentProgressPct,
+        movementsCount: evMovements.length,
+      };
+    });
+
+    // Filter by selectedMonth if active
+    return list.filter((item) => {
+      if (selectedMonth !== "all" && item.monthKey !== selectedMonth) {
+        return false;
+      }
+      if (eventStatusFilter !== "todos" && item.event.status !== eventStatusFilter) {
+        return false;
+      }
+      if (eventSearch.trim()) {
+        const q = eventSearch.toLowerCase();
+        const matchesName = item.event.name?.toLowerCase().includes(q);
+        const matchesClient = item.client?.name?.toLowerCase().includes(q);
+        const matchesVenue = item.event.venue?.toLowerCase().includes(q);
+        if (!matchesName && !matchesClient && !matchesVenue) return false;
+      }
+      return true;
+    }).sort((a, b) => {
+      if (eventSortBy === "profit_desc") return b.lucroProjetado - a.lucroProjetado;
+      if (eventSortBy === "price_desc") return b.precoClienteProjetado - a.precoClienteProjetado;
+      if (eventSortBy === "pending_desc") return b.saldoAReceber - a.saldoAReceber;
+      // Default: date (newest first)
+      return new Date(b.event.startDate).getTime() - new Date(a.event.startDate).getTime();
+    });
+  }, [events, clients, movements, selectedMonth, eventStatusFilter, eventSearch, eventSortBy]);
+
+  // Handle Add Income (Recebimento de Evento)
+  const handleAddIncomeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingIncome(true);
+    setIncomeError(null);
+
+    try {
+      const selectedEv = events.find((ev) => ev.id === incomeEventId);
+      const formData = new FormData();
+      formData.set("type", "entrada");
+      formData.set("description", incomeDesc.trim() || `Recebimento de Cliente · ${selectedEv?.name || "Evento"}`);
+      formData.set("amount", incomeAmount.trim());
+      formData.set("category", "Evento");
+      formData.set("date", new Date(incomeDate).toISOString());
+      if (incomeEventId) formData.set("eventId", incomeEventId);
+      if (selectedEv?.clientId) formData.set("clientId", selectedEv.clientId);
+      if (incomeNotes.trim()) formData.set("notes", incomeNotes.trim());
+
+      const res = await onAddMovement(formData);
+      if (res && res.success) {
+        setShowAddIncomeModal(false);
+        setIncomeEventId("");
+        setIncomeAmount("");
+        setIncomeDesc("");
+        setIncomeNotes("");
+      } else {
+        setIncomeError(res?.error || "Erro ao registar entrada.");
+      }
+    } catch (err: any) {
+      setIncomeError(err?.message || "Erro inesperado ao registar recebimento.");
+    } finally {
+      setIsSubmittingIncome(false);
+    }
+  };
+
+  const handleOpenIncomeForEvent = (eventRow: any) => {
+    setIncomeEventId(eventRow.event.id);
+    setIncomeAmount(eventRow.saldoAReceber > 0 ? String(eventRow.saldoAReceber) : String(eventRow.precoClienteProjetado));
+    setIncomeDesc(`Recebimento Cliente · ${eventRow.event.name}`);
+    setIncomeDate(new Date().toISOString().slice(0, 10));
+    setIncomeNotes(`Liquidação / sinal de cliente para ${eventRow.event.name}`);
+    setShowAddIncomeModal(true);
+  };
 
   // 2. Most Used Inventory Items Calculation
   const mostUsedItems = useMemo(() => {
@@ -466,11 +658,25 @@ export default function FinanceView({
           {/* Quick Actions Buttons */}
           <div className="flex flex-wrap items-center gap-2.5">
             <button
+              onClick={() => {
+                setIncomeEventId("");
+                setIncomeAmount("");
+                setIncomeDesc("");
+                setIncomeNotes("");
+                setShowAddIncomeModal(true);
+              }}
+              className="px-3.5 py-2 rounded-[12px] bg-[#217a3b] hover:bg-[#1b6330] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <Coins className="w-4 h-4" />
+              <span>Registar Recebimento</span>
+            </button>
+
+            <button
               onClick={() => setShowAddExpenseModal(true)}
               className="px-3.5 py-2 rounded-[12px] bg-[#111111] hover:bg-black text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Adicionar Despesa Mensal</span>
+              <span>Adicionar Despesa</span>
             </button>
 
             {onOpenItemWizard && (
@@ -487,9 +693,9 @@ export default function FinanceView({
         </div>
 
         {/* Filter bar & Sub-tab navigation */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-[#ececf0] pt-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-t border-[#ececf0] pt-4">
           {/* Subtabs */}
-          <div className="flex items-center gap-1.5 p-1 bg-[#f4f4f6] rounded-[14px]">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#f4f4f6] rounded-[14px]">
             <button
               onClick={() => setSubTab("overview")}
               className={`px-3.5 py-1.5 rounded-[10px] text-xs font-bold transition cursor-pointer ${
@@ -499,6 +705,19 @@ export default function FinanceView({
               }`}
             >
               Visão Geral & MoM
+            </button>
+            <button
+              onClick={() => setSubTab("events-profitability")}
+              className={`px-3.5 py-1.5 rounded-[10px] text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                subTab === "events-profitability"
+                  ? "bg-white text-[#111111] shadow-xs"
+                  : "text-[#8e8e93] hover:text-[#111111]"
+              }`}
+            >
+              <span>Rentabilidade por Evento</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-[#6366f1]/10 text-[#4f46e5]">
+                {events.length}
+              </span>
             </button>
             <button
               onClick={() => setSubTab("expenses")}
@@ -528,135 +747,247 @@ export default function FinanceView({
             </button>
           </div>
 
-          {/* Month Selector Dropdown */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-[#8e8e93] flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5" />
-              <span>Filtrar por Mês:</span>
-            </span>
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="px-3 py-1.5 text-xs font-semibold bg-[#f8f8fa] border border-[#ececf0] rounded-[10px] text-[#111111] focus:outline-none focus:ring-2 focus:ring-[#007aff] cursor-pointer"
-            >
-              <option value="all">Todos os Meses (Visão Acumulada)</option>
-              {availableMonths.map((m) => (
-                <option key={m.monthKey} value={m.monthKey}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Display Mode Toggle */}
+            <div className="flex items-center p-1 bg-[#f4f4f6] rounded-[12px] text-xs">
+              <button
+                type="button"
+                onClick={() => setFinancialMode("comparative")}
+                className={`px-2.5 py-1 rounded-[8px] font-semibold transition cursor-pointer ${
+                  financialMode === "comparative"
+                    ? "bg-white text-[#111] shadow-xs"
+                    : "text-[#8e8e93] hover:text-[#111]"
+                }`}
+              >
+                Comparativo
+              </button>
+              <button
+                type="button"
+                onClick={() => setFinancialMode("projected")}
+                className={`px-2.5 py-1 rounded-[8px] font-semibold transition cursor-pointer flex items-center gap-1 ${
+                  financialMode === "projected"
+                    ? "bg-white text-[#111] shadow-xs"
+                    : "text-[#8e8e93] hover:text-[#111]"
+                }`}
+              >
+                <span>Projetado</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[#6366f1]"></span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFinancialMode("realized")}
+                className={`px-2.5 py-1 rounded-[8px] font-semibold transition cursor-pointer flex items-center gap-1 ${
+                  financialMode === "realized"
+                    ? "bg-white text-[#111] shadow-xs"
+                    : "text-[#8e8e93] hover:text-[#111]"
+                }`}
+              >
+                <span>Caixa Real</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[#217a3b]"></span>
+              </button>
+            </div>
+
+            {/* Month Selector Dropdown */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[#8e8e93] flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Mês:</span>
+              </span>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="px-3 py-1.5 text-xs font-semibold bg-[#f8f8fa] border border-[#ececf0] rounded-[10px] text-[#111111] focus:outline-none focus:ring-2 focus:ring-[#007aff] cursor-pointer"
+              >
+                <option value="all">Todos os Meses</option>
+                {availableMonths.map((m) => (
+                  <option key={m.monthKey} value={m.monthKey}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
-        {/* Automatic Stock Acquisition Info Banner */}
-        <div className="p-3.5 rounded-[14px] bg-[#fffbf0] border border-[#f5dfa8] flex items-start gap-3 text-xs">
-          <AlertCircle className="w-4 h-4 text-[#8c6417] shrink-0 mt-0.5" />
-          <div className="flex-1 text-[#5c430e]">
-            <strong className="font-semibold text-[#3b2b09]">
-              Automação de Compra de Inventário:
-            </strong>{" "}
-            Sempre que adicionar um novo artigo no Catálogo de Stock com valor de aquisição, é registada automaticamente uma despesa financeira em saídas/investimento no momento da compra.
+        {/* Automatic Stock Acquisition & Projection Info Banner */}
+        <div className="p-3.5 rounded-[14px] bg-[#f8f8fa] border border-[#ececf0] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-start gap-2.5 text-[#3a3a3c]">
+            <Sparkles className="w-4 h-4 text-[#6366f1] shrink-0 mt-0.5" />
+            <div>
+              <strong className="font-semibold text-[#111]">
+                Cálculo Financeiro Dual CFM:
+              </strong>{" "}
+              Ao configurar um evento com preço cliente e orçamento interno, o sistema projeta imediatamente o <strong>lucro potencial</strong> (€{activeMetrics.lucroProjetado.toLocaleString("pt-PT")}) e confronta com as entradas e saídas de caixa efetivamente liquidadas.
+            </div>
           </div>
+          <button
+            onClick={() => setSubTab("events-profitability")}
+            className="text-[11px] font-bold text-[#6366f1] hover:underline whitespace-nowrap cursor-pointer"
+          >
+            Ver Rentabilidade por Evento →
+          </button>
         </div>
       </div>
 
       {/* ========================================================= */}
-      {/* 2. 4 CORE METRIC CARDS (MONTH OVER MONTH) */}
+      {/* 2. 4 CORE METRIC CARDS (REALIZED VS PROJECTED) */}
       {/* ========================================================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* Metric 1: Profits (Lucro Líquido) */}
+        {/* Metric 1: Profits (Lucro Líquido / Lucro Projetado) */}
         <div className="bg-white border border-[#ececf0] rounded-[20px] p-5 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-xs text-[#8e8e93] mb-1.5">
-              <span>Lucro Líquido (MoM)</span>
+              <span>
+                {financialMode === "projected"
+                  ? "Lucro Projetado (Eventos)"
+                  : financialMode === "realized"
+                  ? "Lucro Realizado (Caixa)"
+                  : "Lucro Líquido (Real vs Projetado)"}
+              </span>
               <div className="w-7 h-7 rounded-full bg-[#eaf8ee] text-[#217a3b] flex items-center justify-center">
                 <TrendingUp className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-[26px] font-bold tracking-[-0.7px] text-[#217a3b]">
-              {formatEuro(activeMetrics.lucro)}
+            <div className="flex items-baseline gap-2">
+              <div className={`text-[26px] font-bold tracking-[-0.7px] ${
+                (financialMode === "projected" ? activeMetrics.lucroProjetado : activeMetrics.lucro) >= 0
+                  ? "text-[#217a3b]"
+                  : "text-[#b04a3f]"
+              }`}>
+                {formatEuro(financialMode === "projected" ? activeMetrics.lucroProjetado : activeMetrics.lucro)}
+              </div>
             </div>
           </div>
 
-          <div className="pt-3 border-t border-[#f4f4f6] mt-3 flex items-center justify-between text-xs">
-            <span className="text-[#8e8e93]">Variação MoM:</span>
-            {activeMetrics.momProfitGrowth >= 0 ? (
-              <span className="inline-flex items-center gap-0.5 font-bold text-[#217a3b]">
-                <ArrowUpRight className="w-3.5 h-3.5" />
-                +{activeMetrics.momProfitGrowth.toFixed(1)}%
-              </span>
+          <div className="pt-3 border-t border-[#f4f4f6] mt-3 text-xs">
+            {financialMode === "comparative" ? (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#8e8e93]">Lucro Projetado:</span>
+                  <span className="font-bold text-[#6366f1]">
+                    {formatEuro(activeMetrics.lucroProjetado)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-[#8e8e93]">
+                  <span>Pendente a realizar:</span>
+                  <span className="font-semibold text-[#111]">
+                    {formatEuro(activeMetrics.aReceber)}
+                  </span>
+                </div>
+              </div>
+            ) : financialMode === "projected" ? (
+              <div className="flex items-center justify-between">
+                <span className="text-[#8e8e93]">Margem Prevista:</span>
+                <span className="font-bold text-[#6366f1]">
+                  {activeMetrics.margemProjetadaPct.toFixed(1)}%
+                </span>
+              </div>
             ) : (
-              <span className="inline-flex items-center gap-0.5 font-bold text-[#b04a3f]">
-                <ArrowDownRight className="w-3.5 h-3.5" />
-                {activeMetrics.momProfitGrowth.toFixed(1)}%
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-[#8e8e93]">Variação MoM:</span>
+                {activeMetrics.momProfitGrowth >= 0 ? (
+                  <span className="inline-flex items-center gap-0.5 font-bold text-[#217a3b]">
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                    +{activeMetrics.momProfitGrowth.toFixed(1)}%
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-0.5 font-bold text-[#b04a3f]">
+                    <ArrowDownRight className="w-3.5 h-3.5" />
+                    {activeMetrics.momProfitGrowth.toFixed(1)}%
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>
 
-        {/* Metric 2: Amount of Events Organised */}
+        {/* Metric 2: Amount of Events & Projected Revenue */}
         <div className="bg-white border border-[#ececf0] rounded-[20px] p-5 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-xs text-[#8e8e93] mb-1.5">
-              <span>Eventos Organizados</span>
+              <span>
+                {financialMode === "realized" ? "Entradas Recebidas" : "Faturação Prevista"}
+              </span>
               <div className="w-7 h-7 rounded-full bg-[#f2f2f5] text-[#111111] flex items-center justify-center">
                 <Calendar className="w-4 h-4" />
               </div>
             </div>
             <div className="text-[26px] font-bold tracking-[-0.7px] text-[#111111]">
-              {activeMetrics.eventsCount}
-              <span className="text-sm font-normal text-[#8e8e93] ml-1.5">eventos</span>
+              {formatEuro(financialMode === "realized" ? activeMetrics.entradas : activeMetrics.faturacaoProjetada)}
             </div>
           </div>
 
-          <div className="pt-3 border-t border-[#f4f4f6] mt-3 flex items-center justify-between text-xs">
-            <span className="text-[#8e8e93]">Variação MoM:</span>
-            {activeMetrics.momEventsGrowth >= 0 ? (
-              <span className="inline-flex items-center gap-0.5 font-bold text-[#217a3b]">
-                <ArrowUpRight className="w-3.5 h-3.5" />
-                +{activeMetrics.momEventsGrowth.toFixed(0)}%
-              </span>
+          <div className="pt-3 border-t border-[#f4f4f6] mt-3 text-xs">
+            {financialMode === "comparative" ? (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#8e8e93]">Recebido em Caixa:</span>
+                  <span className="font-bold text-[#217a3b]">
+                    {formatEuro(activeMetrics.entradas)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-[#8e8e93]">A receber de clientes:</span>
+                  <span className="font-semibold text-[#6366f1]">
+                    {formatEuro(activeMetrics.aReceber)}
+                  </span>
+                </div>
+              </div>
             ) : (
-              <span className="inline-flex items-center gap-0.5 font-bold text-[#b04a3f]">
-                <ArrowDownRight className="w-3.5 h-3.5" />
-                {activeMetrics.momEventsGrowth.toFixed(0)}%
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-[#8e8e93]">Volume total:</span>
+                <span className="font-bold text-[#111]">
+                  {activeMetrics.eventsCount} eventos
+                </span>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Metric 3: Spending (Gastos & Despesas) */}
+        {/* Metric 3: Spending & Internal Budget */}
         <div className="bg-white border border-[#ececf0] rounded-[20px] p-5 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-xs text-[#8e8e93] mb-1.5">
-              <span>Gastos & Despesas (MoM)</span>
+              <span>
+                {financialMode === "projected" ? "Custos Orçados" : "Gastos & Despesas"}
+              </span>
               <div className="w-7 h-7 rounded-full bg-[#fde8e8] text-[#b04a3f] flex items-center justify-center">
                 <TrendingDown className="w-4 h-4" />
               </div>
             </div>
             <div className="text-[26px] font-bold tracking-[-0.7px] text-[#b04a3f]">
-              {formatEuro(activeMetrics.totalGastos)}
+              {formatEuro(financialMode === "projected" ? activeMetrics.custosProjetados : activeMetrics.totalGastos)}
             </div>
           </div>
 
-          <div className="pt-3 border-t border-[#f4f4f6] mt-3 flex items-center justify-between text-xs">
-            <span className="text-[#8e8e93]">Variação MoM:</span>
-            {activeMetrics.momSpendingGrowth >= 0 ? (
-              <span className="inline-flex items-center gap-0.5 font-bold text-[#b04a3f]">
-                <ArrowUpRight className="w-3.5 h-3.5" />
-                +{activeMetrics.momSpendingGrowth.toFixed(1)}%
-              </span>
+          <div className="pt-3 border-t border-[#f4f4f6] mt-3 text-xs">
+            {financialMode === "comparative" ? (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#8e8e93]">Orçamento Previsto:</span>
+                  <span className="font-bold text-[#111]">
+                    {formatEuro(activeMetrics.custosProjetados)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-[#8e8e93]">
+                  <span>Despesas pagas:</span>
+                  <span className="font-semibold text-[#b04a3f]">
+                    {formatEuro(activeMetrics.totalGastos)}
+                  </span>
+                </div>
+              </div>
             ) : (
-              <span className="inline-flex items-center gap-0.5 font-bold text-[#217a3b]">
-                <ArrowDownRight className="w-3.5 h-3.5" />
-                {activeMetrics.momSpendingGrowth.toFixed(1)}%
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-[#8e8e93]">Investido em stock:</span>
+                <span className="font-bold text-[#8c6417]">
+                  {formatEuro(activeMetrics.investimentos)}
+                </span>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Metric 4: Profit Margin & Top Item */}
+        {/* Metric 4: Profit Margin */}
         <div className="bg-white border border-[#ececf0] rounded-[20px] p-5 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-xs text-[#8e8e93] mb-1.5">
@@ -666,13 +997,21 @@ export default function FinanceView({
               </div>
             </div>
             <div className="text-[26px] font-bold tracking-[-0.7px] text-[#111111]">
-              {activeMetrics.margemPct.toFixed(1)}%
+              {(financialMode === "realized" ? activeMetrics.margemPct : activeMetrics.margemProjetadaPct).toFixed(1)}%
             </div>
           </div>
 
-          <div className="pt-3 border-t border-[#f4f4f6] mt-3 flex items-center justify-between text-xs text-[#8e8e93]">
-            <span>Entradas totais:</span>
-            <strong className="text-[#111111]">{formatEuro(activeMetrics.entradas)}</strong>
+          <div className="pt-3 border-t border-[#f4f4f6] mt-3 text-xs">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[#8e8e93]">Margem Projetada:</span>
+                <strong className="text-[#6366f1]">{activeMetrics.margemProjetadaPct.toFixed(1)}%</strong>
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-[#8e8e93]">
+                <span>Margem Caixa Atual:</span>
+                <span className="font-semibold text-[#111]">{activeMetrics.margemPct.toFixed(1)}%</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -788,27 +1127,30 @@ export default function FinanceView({
                 <thead>
                   <tr className="border-b border-[#ececf0] text-[#8e8e93]">
                     <th className="pb-3 font-semibold">Mês</th>
-                    <th className="pb-3 font-semibold">Eventos Organizados</th>
-                    <th className="pb-3 font-semibold">Receitas / Entradas</th>
-                    <th className="pb-3 font-semibold">Gastos / Despesas</th>
-                    <th className="pb-3 font-semibold">Lucro Líquido</th>
-                    <th className="pb-3 font-semibold">Margem</th>
-                    <th className="pb-3 font-semibold">Crescimento Lucro MoM</th>
+                    <th className="pb-3 font-semibold">Eventos</th>
+                    <th className="pb-3 font-semibold">Faturação Prevista</th>
+                    <th className="pb-3 font-semibold">Receitas / Entradas Reais</th>
+                    <th className="pb-3 font-semibold">Custos Orçados</th>
+                    <th className="pb-3 font-semibold">Gastos Reais</th>
+                    <th className="pb-3 font-semibold">Lucro Projetado</th>
+                    <th className="pb-3 font-semibold">Lucro Realizado</th>
+                    <th className="pb-3 font-semibold">Pendente a Receber</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#ececf0]">
                   {availableMonths.map((m) => {
                     const isProfitPositive = m.lucro >= 0;
+                    const isProjPositive = m.lucroProjetado >= 0;
                     return (
                       <tr key={m.monthKey} className="hover:bg-[#f8f8fa] transition">
                         <td className="py-3.5 font-bold text-[#111111]">
                           {m.label}
                         </td>
                         <td className="py-3.5 text-[#3a3a3c]">
-                          <span className="font-semibold">{m.eventsCount}</span> eventos
+                          <span className="font-semibold">{m.eventsCount}</span> ev.
                           {m.eventsDelta !== 0 && (
                             <span
-                              className={`ml-1.5 text-[10px] font-bold ${
+                              className={`ml-1 text-[10px] font-bold ${
                                 m.eventsDelta > 0 ? "text-[#217a3b]" : "text-[#b04a3f]"
                               }`}
                             >
@@ -816,11 +1158,24 @@ export default function FinanceView({
                             </span>
                           )}
                         </td>
+                        <td className="py-3.5 font-bold text-[#111111]">
+                          {formatEuro(m.faturacaoProjetada)}
+                        </td>
                         <td className="py-3.5 font-semibold text-[#217a3b]">
                           {formatEuro(m.entradas)}
                         </td>
+                        <td className="py-3.5 font-medium text-[#b04a3f]">
+                          {formatEuro(m.custosProjetados)}
+                        </td>
                         <td className="py-3.5 font-semibold text-[#b04a3f]">
                           {formatEuro(m.totalGastos)}
+                        </td>
+                        <td
+                          className={`py-3.5 font-bold ${
+                            isProjPositive ? "text-[#217a3b]" : "text-[#b04a3f]"
+                          }`}
+                        >
+                          {formatEuro(m.lucroProjetado)}
                         </td>
                         <td
                           className={`py-3.5 font-bold text-sm ${
@@ -829,33 +1184,288 @@ export default function FinanceView({
                         >
                           {formatEuro(m.lucro)}
                         </td>
-                        <td className="py-3.5 font-semibold text-[#111111]">
-                          {m.marginPct.toFixed(1)}%
-                        </td>
-                        <td className="py-3.5">
-                          {m.profitGrowthPct !== 0 ? (
-                            <span
-                              className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                                m.profitGrowthPct > 0
-                                  ? "bg-[#eaf8ee] text-[#217a3b]"
-                                  : "bg-[#fde8e8] text-[#b04a3f]"
-                              }`}
-                            >
-                              {m.profitGrowthPct > 0 ? (
-                                <ArrowUpRight className="w-3 h-3" />
-                              ) : (
-                                <ArrowDownRight className="w-3 h-3" />
-                              )}
-                              {m.profitGrowthPct > 0 ? "+" : ""}
-                              {m.profitGrowthPct.toFixed(1)}%
-                            </span>
-                          ) : (
-                            <span className="text-[#8e8e93]">Base inicial</span>
-                          )}
+                        <td className="py-3.5 font-semibold text-[#6366f1]">
+                          {formatEuro(m.aReceber)}
                         </td>
                       </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 3.1 SUBTAB: RENTABILIDADE POR EVENTO (PROJETADO VS ATUAL) */}
+      {/* ========================================================= */}
+      {subTab === "events-profitability" && (
+        <div className="space-y-6">
+          {/* Summary KPI Banner */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="bg-white border border-[#ececf0] rounded-[18px] p-4 shadow-xs">
+              <div className="text-[11px] text-[#8e8e93] font-medium">Eventos Filtrados</div>
+              <div className="text-xl font-bold text-[#111] mt-1">{eventProfitabilityList.length}</div>
+              <div className="text-[10px] text-[#8e8e93] mt-0.5">no período selecionado</div>
+            </div>
+
+            <div className="bg-white border border-[#ececf0] rounded-[18px] p-4 shadow-xs">
+              <div className="text-[11px] text-[#8e8e93] font-medium">Faturação Prevista</div>
+              <div className="text-xl font-bold text-[#111] mt-1">
+                {formatEuro(eventProfitabilityList.reduce((s, e) => s + e.precoClienteProjetado, 0))}
+              </div>
+              <div className="text-[10px] text-[#8e8e93] mt-0.5">total cobrado aos clientes</div>
+            </div>
+
+            <div className="bg-white border border-[#ececf0] rounded-[18px] p-4 shadow-xs">
+              <div className="text-[11px] text-[#8e8e93] font-medium">Custos Orçados</div>
+              <div className="text-xl font-bold text-[#b04a3f] mt-1">
+                {formatEuro(eventProfitabilityList.reduce((s, e) => s + e.custoOrcadoProjetado, 0))}
+              </div>
+              <div className="text-[10px] text-[#8e8e93] mt-0.5">orçamento interno</div>
+            </div>
+
+            <div className="bg-white border border-[#217a3b]/20 bg-[#eaf8ee]/30 rounded-[18px] p-4 shadow-xs">
+              <div className="text-[11px] text-[#217a3b] font-bold">Lucro Projetado</div>
+              <div className="text-xl font-bold text-[#217a3b] mt-1">
+                {formatEuro(eventProfitabilityList.reduce((s, e) => s + e.lucroProjetado, 0))}
+              </div>
+              <div className="text-[10px] text-[#217a3b] font-semibold mt-0.5">
+                margem est. {
+                  eventProfitabilityList.reduce((s, e) => s + e.precoClienteProjetado, 0) > 0
+                    ? ((eventProfitabilityList.reduce((s, e) => s + e.lucroProjetado, 0) / eventProfitabilityList.reduce((s, e) => s + e.precoClienteProjetado, 0)) * 100).toFixed(1)
+                    : 0
+                }%
+              </div>
+            </div>
+
+            <div className="bg-white border border-[#ececf0] rounded-[18px] p-4 shadow-xs">
+              <div className="text-[11px] text-[#8e8e93] font-medium">Recebido em Caixa</div>
+              <div className="text-xl font-bold text-[#217a3b] mt-1">
+                {formatEuro(eventProfitabilityList.reduce((s, e) => s + e.entradasReais, 0))}
+              </div>
+              <div className="text-[10px] text-[#8e8e93] mt-0.5">pagamentos liquidados</div>
+            </div>
+
+            <div className="bg-white border border-[#ececf0] rounded-[18px] p-4 shadow-xs">
+              <div className="text-[11px] text-[#8e8e93] font-medium">Pendente a Receber</div>
+              <div className="text-xl font-bold text-[#6366f1] mt-1">
+                {formatEuro(eventProfitabilityList.reduce((s, e) => s + e.saldoAReceber, 0))}
+              </div>
+              <div className="text-[10px] text-[#8e8e93] mt-0.5">a liquidar por clientes</div>
+            </div>
+          </div>
+
+          {/* Table Card */}
+          <div className="bg-white border border-[#ececf0] rounded-[22px] p-5 sm:p-6 shadow-xs space-y-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-[18px] font-bold text-[#111111]">
+                  Rentabilidade Individual de Eventos
+                </h3>
+                <p className="text-xs text-[#8e8e93] mt-0.5">
+                  Confronte o valor e lucro projetado no setup de cada evento com os recebimentos e despesas reais de caixa
+                </p>
+              </div>
+
+              {/* Search & Sort Filters */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-[#8e8e93] absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={eventSearch}
+                    onChange={(e) => setEventSearch(e.target.value)}
+                    placeholder="Pesquisar evento, cliente, venue..."
+                    className="pl-8 pr-3 py-1.5 text-xs bg-[#f8f8fa] border border-[#ececf0] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#007aff] w-52"
+                  />
+                </div>
+
+                <select
+                  value={eventStatusFilter}
+                  onChange={(e) => setEventStatusFilter(e.target.value)}
+                  className="px-3 py-1.5 text-xs font-semibold bg-[#f8f8fa] border border-[#ececf0] rounded-[10px] text-[#111] focus:outline-none focus:ring-2 focus:ring-[#007aff] cursor-pointer"
+                >
+                  <option value="todos">Todos os Estados</option>
+                  <option value="planeamento">Planeamento</option>
+                  <option value="orcamento">Orçamento</option>
+                  <option value="confirmado">Confirmado</option>
+                  <option value="em_curso">Em Curso</option>
+                  <option value="concluido">Concluído</option>
+                </select>
+
+                <select
+                  value={eventSortBy}
+                  onChange={(e) => setEventSortBy(e.target.value as any)}
+                  className="px-3 py-1.5 text-xs font-semibold bg-[#f8f8fa] border border-[#ececf0] rounded-[10px] text-[#111] focus:outline-none focus:ring-2 focus:ring-[#007aff] cursor-pointer"
+                >
+                  <option value="date">Ordenar por Data</option>
+                  <option value="profit_desc">Maior Lucro Projetado</option>
+                  <option value="price_desc">Maior Faturação Prevista</option>
+                  <option value="pending_desc">Maior Saldo a Receber</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Event Profitability Table */}
+            <div className="overflow-x-auto pt-2">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#ececf0] text-[#8e8e93]">
+                    <th className="pb-3 font-semibold">Evento & Cliente</th>
+                    <th className="pb-3 font-semibold">Data / Estado</th>
+                    <th className="pb-3 font-semibold">Preço Cliente (Proj.)</th>
+                    <th className="pb-3 font-semibold">Custo Orçado (Proj.)</th>
+                    <th className="pb-3 font-semibold">Lucro Projetado</th>
+                    <th className="pb-3 font-semibold">Recebido em Caixa</th>
+                    <th className="pb-3 font-semibold">Despesas Reais</th>
+                    <th className="pb-3 font-semibold">Lucro Realizado</th>
+                    <th className="pb-3 font-semibold">Saldo a Receber</th>
+                    <th className="pb-3 font-semibold text-right">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#ececf0]">
+                  {eventProfitabilityList.map((item) => {
+                    const isFullyPaid = item.precoClienteProjetado > 0 && item.saldoAReceber === 0;
+                    const isProfitPositive = item.lucroProjetado >= 0;
+
+                    return (
+                      <tr key={item.event.id} className="hover:bg-[#f8f8fa] transition group">
+                        <td className="py-3.5 pr-2">
+                          <div className="font-bold text-[#111111] text-[13px] flex items-center gap-1.5">
+                            <span>{item.event.name}</span>
+                            {item.event.category && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#f2f2f5] text-[#636366] font-normal">
+                                {item.event.category}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-[#8e8e93] mt-0.5 flex items-center gap-2">
+                            <span>{item.client?.name || "Sem cliente associado"}</span>
+                            {item.event.venue && (
+                              <>
+                                <span>·</span>
+                                <span>{item.event.venue}</span>
+                              </>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="py-3.5 whitespace-nowrap">
+                          <div className="font-medium text-[#111]">
+                            {new Date(item.event.startDate).toLocaleDateString("pt-PT", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </div>
+                          <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold capitalize bg-[#f2f2f5] text-[#3a3a3c] border border-[#ececf0]">
+                            {item.event.status}
+                          </span>
+                        </td>
+
+                        {/* Preço Cliente Projetado */}
+                        <td className="py-3.5 font-bold text-[#111] whitespace-nowrap">
+                          {formatEuro(item.precoClienteProjetado)}
+                        </td>
+
+                        {/* Custo Orçado Projetado */}
+                        <td className="py-3.5 font-medium text-[#b04a3f] whitespace-nowrap">
+                          {formatEuro(item.custoOrcadoProjetado)}
+                        </td>
+
+                        {/* Lucro Projetado */}
+                        <td className="py-3.5 whitespace-nowrap">
+                          <div className={`font-bold text-sm ${isProfitPositive ? "text-[#217a3b]" : "text-[#b04a3f]"}`}>
+                            {formatEuro(item.lucroProjetado)}
+                          </div>
+                          <div className="text-[10px] font-semibold text-[#8e8e93]">
+                            margem {item.margemProjetadaPct.toFixed(1)}%
+                          </div>
+                        </td>
+
+                        {/* Recebido em Caixa (Realizado) */}
+                        <td className="py-3.5 whitespace-nowrap">
+                          <div className="font-semibold text-[#217a3b]">
+                            {formatEuro(item.entradasReais)}
+                          </div>
+                          {/* Payment Progress Bar */}
+                          <div className="w-20 bg-[#ececf0] h-1.5 rounded-full overflow-hidden mt-1">
+                            <div
+                              style={{ width: `${item.paymentProgressPct}%` }}
+                              className={`h-full rounded-full ${
+                                isFullyPaid ? "bg-[#217a3b]" : "bg-[#6366f1]"
+                              }`}
+                            ></div>
+                          </div>
+                          <div className="text-[10px] text-[#8e8e93] mt-0.5">
+                            {item.paymentProgressPct}% liquidado
+                          </div>
+                        </td>
+
+                        {/* Despesas Reais Pagas */}
+                        <td className="py-3.5 font-semibold text-[#b04a3f] whitespace-nowrap">
+                          {formatEuro(item.despesasReais)}
+                        </td>
+
+                        {/* Lucro Realizado */}
+                        <td className="py-3.5 whitespace-nowrap">
+                          <div className={`font-bold ${item.lucroRealizado >= 0 ? "text-[#217a3b]" : "text-[#b04a3f]"}`}>
+                            {formatEuro(item.lucroRealizado)}
+                          </div>
+                        </td>
+
+                        {/* Saldo a Receber */}
+                        <td className="py-3.5 whitespace-nowrap">
+                          {item.saldoAReceber > 0 ? (
+                            <span className="font-bold text-[#6366f1]">
+                              {formatEuro(item.saldoAReceber)}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[#217a3b] font-bold text-[11px]">
+                              <Check className="w-3 h-3" />
+                              <span>Totalmente Pago</span>
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Ações */}
+                        <td className="py-3.5 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {item.saldoAReceber > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenIncomeForEvent(item)}
+                                className="px-2.5 py-1 rounded-[8px] bg-[#217a3b] hover:bg-[#1b6330] text-white font-semibold text-[11px] transition inline-flex items-center gap-1 cursor-pointer shadow-xs"
+                                title="Registar recebimento de cliente para este evento"
+                              >
+                                <Coins className="w-3 h-3" />
+                                <span>Receber</span>
+                              </button>
+                            )}
+
+                            <Link
+                              href={`/eventos/${item.event.id}`}
+                              className="px-2.5 py-1 rounded-[8px] bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#111111] font-semibold text-[11px] transition inline-flex items-center gap-1 cursor-pointer"
+                              title="Abrir detalhes operacionais do evento"
+                            >
+                              <span>Ver</span>
+                              <ExternalLink className="w-3 h-3 text-[#8e8e93]" />
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {eventProfitabilityList.length === 0 && (
+                    <tr>
+                      <td colSpan={10} className="py-12 text-center text-xs text-[#8e8e93]">
+                        Nenhum evento encontrado com os filtros selecionados.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1370,6 +1980,140 @@ export default function FinanceView({
                 className="w-full py-2.5 rounded-[12px] bg-[#111111] hover:bg-black text-white text-xs font-bold transition shadow-xs mt-2 cursor-pointer"
               >
                 {isSubmittingExpense ? "A guardar despesa..." : "Registar Despesa Mensal"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 6.1 MODAL: REGISTAR RECEBIMENTO / PAGAMENTO DE CLIENTE */}
+      {/* ========================================================= */}
+      {showAddIncomeModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-[22px] w-full max-w-md border border-[#ececf0] shadow-xl overflow-y-auto max-h-[calc(100dvh-2rem)] p-5 sm:p-6 text-xs">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-[#eaf8ee] flex items-center justify-center text-[#217a3b]">
+                  <Coins className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-[17px] font-bold text-[#111111]">
+                    Registar Recebimento de Cliente
+                  </h2>
+                  <p className="text-[11px] text-[#8e8e93]">
+                    Liquidação total ou adiantamento de cliente para um evento
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAddIncomeModal(false)}
+                className="w-8 h-8 rounded-full hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {incomeError && (
+              <div className="mb-4 p-3 rounded-[12px] bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+                {incomeError}
+              </div>
+            )}
+
+            <form onSubmit={handleAddIncomeSubmit} className="space-y-3.5">
+              <div>
+                <label className="block font-bold text-[#111111] mb-1">
+                  Evento Associado *
+                </label>
+                <select
+                  required
+                  value={incomeEventId}
+                  onChange={(e) => {
+                    setIncomeEventId(e.target.value);
+                    const ev = events.find((x) => x.id === e.target.value);
+                    if (ev) {
+                      const item = eventProfitabilityList.find((x) => x.event.id === ev.id);
+                      if (item) {
+                        setIncomeAmount(String(item.saldoAReceber > 0 ? item.saldoAReceber : item.precoClienteProjetado));
+                      }
+                      setIncomeDesc(`Recebimento Cliente · ${ev.name}`);
+                    }
+                  }}
+                  className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#217a3b]"
+                >
+                  <option value="">Selecione o evento...</option>
+                  {events.map((ev) => (
+                    <option key={ev.id} value={ev.id}>
+                      {ev.name} · {formatEuro(ev.customerPrice || 0)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-[#111111] mb-1">
+                    Valor Recebido (€) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={incomeAmount}
+                    onChange={(e) => setIncomeAmount(e.target.value)}
+                    placeholder="Ex: 3850"
+                    className="w-full px-3 py-2 text-sm font-bold bg-white border border-[#ececf0] rounded-[12px] text-[#217a3b] focus:outline-none focus:ring-2 focus:ring-[#217a3b]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#111111] mb-1">
+                    Data do Recebimento *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={incomeDate}
+                    onChange={(e) => setIncomeDate(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#217a3b]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#111111] mb-1">
+                  Descrição do Movimento *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={incomeDesc}
+                  onChange={(e) => setIncomeDesc(e.target.value)}
+                  placeholder="Ex: Pagamento final Gala Mastercard"
+                  className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#217a3b]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#111111] mb-1">
+                  Observações / Comprovativo
+                </label>
+                <textarea
+                  value={incomeNotes}
+                  onChange={(e) => setIncomeNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Transferência bancária, ref. fatura..."
+                  className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#217a3b]"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmittingIncome || !incomeAmount.trim()}
+                className="w-full py-2.5 rounded-[12px] bg-[#217a3b] hover:bg-[#1b6330] text-white text-xs font-bold transition shadow-xs mt-2 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                <Coins className="w-4 h-4" />
+                <span>{isSubmittingIncome ? "A registar entrada..." : "Confirmar Recebimento em Caixa"}</span>
               </button>
             </form>
           </div>
