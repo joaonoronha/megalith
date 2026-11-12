@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useTransition, useRef } from "react";
 import Link from "next/link";
 import {
   Calendar,
@@ -23,21 +23,22 @@ import {
   ExternalLink,
   MessageSquare,
   ChevronDown,
-  Edit3,
   X,
   Share2,
   Check,
   Copy,
   ShieldAlert,
+  Loader2,
+  Camera,
+  Minus,
 } from "lucide-react";
 import {
-  updateEventDetailsAction,
+  updateEventPatchAction,
   updateEventStatusAction,
-  updateEventVibeAction,
-  updateCustomerPriceAction,
-  addEventAllocationAction,
   updateAllocationStatusAction,
+  updateAllocationQuantityAction,
   deleteAllocationAction,
+  addEventAllocationAction,
   addEventTaskAction,
   toggleEventTaskAction,
   deleteEventTaskAction,
@@ -153,12 +154,12 @@ const PRESET_PALETTES = [
     colors: ["#C97A63", "#E3C9B8", "#687B65", "#FAF6F0"],
   },
   {
-    name: "Gala Black & Gold",
+    name: "Black & Gold",
     theme: "Black & Gold Minimalist",
     colors: ["#111111", "#D4AF37", "#2C3E50", "#E0E0E0"],
   },
   {
-    name: "Rose Gold Glamour",
+    name: "Rose Gold",
     theme: "Rose Gold Glamour",
     colors: ["#B76E79", "#2E151B", "#E8D8D8", "#C0C0C0"],
   },
@@ -172,6 +173,13 @@ const PRESET_PALETTES = [
     theme: "Minimal Chic",
     colors: ["#2B2B2B", "#706E6B", "#D6D1CD", "#FFFFFF"],
   },
+];
+
+const PRESET_COVERS = [
+  { label: "Infantil / Winnie", url: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=1200&q=80" },
+  { label: "Gala / Noite", url: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1200&q=80" },
+  { label: "Casamento Jardim", url: "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80" },
+  { label: "Jantar Elegante", url: "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?auto=format&fit=crop&w=1200&q=80" },
 ];
 
 export default function EventDetailView({
@@ -191,33 +199,17 @@ export default function EventDetailView({
   const [allocations, setAllocations] = useState(initialAllocations);
   const [tasks, setTasks] = useState(initialTasks);
 
-  // Modals & Panels
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showVibeModal, setShowVibeModal] = useState(false);
+  // Auto-save status: "saved" | "saving" | "error"
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Modals for adding items
   const [showAddAllocationModal, setShowAddAllocationModal] = useState(false);
-  const [showPriceModal, setShowPriceModal] = useState(false);
+  const [showCoverPicker, setShowCoverPicker] = useState(false);
 
   // New task inline state
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState<"baixa" | "media" | "alta" | "urgente">("media");
-
-  // Vibe Palette edit state
-  const parseVibeColors = (raw: string | null): string[] => {
-    try {
-      if (!raw) return ["#111111", "#8E8E93", "#E5E5EA"];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : ["#111111"];
-    } catch {
-      return ["#111111", "#8E8E93", "#E5E5EA"];
-    }
-  };
-
-  const [vibeTheme, setVibeTheme] = useState(event.theme || "");
-  const [vibeColors, setVibeColors] = useState<string[]>(parseVibeColors(event.vibeColors));
-  const [newColorHex, setNewColorHex] = useState("#F5A623");
-
-  // Quick Customer Price edit state
-  const [priceInput, setPriceInput] = useState(String(event.customerPrice || 0));
 
   // Add allocation state
   const [selectedItemId, setSelectedItemId] = useState(allItems[0]?.id || "");
@@ -229,26 +221,98 @@ export default function EventDetailView({
   const [copiedQuoteId, setCopiedQuoteId] = useState<string | null>(null);
   const [copiedEventId, setCopiedEventId] = useState(false);
 
-  // Format Dates
-  const formatDate = (d: Date | null) => {
-    if (!d) return "Não definida";
-    return new Date(d).toLocaleDateString("pt-PT", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+  // Parse Vibe Colors helper
+  const parseVibeColors = (raw: string | null): string[] => {
+    try {
+      if (!raw) return ["#111111", "#8E8E93", "#E5E5EA"];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : ["#111111"];
+    } catch {
+      return ["#111111", "#8E8E93", "#E5E5EA"];
+    }
+  };
+
+  const currentColors = parseVibeColors(event.vibeColors);
+
+  // Format date helper for input type="datetime-local"
+  const toInputDate = (d: Date | null) => {
+    if (!d) return "";
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  // -------------------------------------------------------------
+  // INSTANTANEOUS AUTO-SAVE ENGINE
+  // -------------------------------------------------------------
+  const savePatch = async (patch: Record<string, any>) => {
+    setSaveStatus("saving");
+    try {
+      const res = await updateEventPatchAction(event.id, patch);
+      if (res.success) {
+        setSaveStatus("saved");
+      } else {
+        setSaveStatus("error");
+      }
+    } catch (e) {
+      console.error("Auto-save error:", e);
+      setSaveStatus("error");
+    }
+  };
+
+  const handleFieldChange = (field: string, value: any, immediate = false) => {
+    // 1. Optimistic local update
+    setEvent((prev) => ({ ...prev, [field]: value }));
+
+    // 2. Debounced or immediate server persist
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+
+    if (immediate) {
+      savePatch({ [field]: value });
+    } else {
+      setSaveStatus("saving");
+      saveTimeoutRef.current = setTimeout(() => {
+        savePatch({ [field]: value });
+      }, 500);
+    }
+  };
+
+  // Client switcher
+  const handleClientChange = (newClientId: string) => {
+    const foundClient = allClients.find((c) => c.id === newClientId) || null;
+    setClient(foundClient);
+    setEvent((prev) => ({ ...prev, clientId: newClientId || null }));
+    savePatch({ clientId: newClientId || null });
+  };
+
+  // Vibe Palette change
+  const handlePresetPalette = (preset: typeof PRESET_PALETTES[0]) => {
+    const jsonColors = JSON.stringify(preset.colors);
+    setEvent((prev) => ({
+      ...prev,
+      theme: preset.theme,
+      vibeColors: jsonColors,
+    }));
+    savePatch({
+      theme: preset.theme,
+      vibeColors: jsonColors,
     });
   };
 
-  const formatShortDate = (d: Date | null) => {
-    if (!d) return "-";
-    return new Date(d).toLocaleDateString("pt-PT", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const handleColorChange = (index: number, newHex: string) => {
+    const updated = [...currentColors];
+    updated[index] = newHex;
+    const jsonColors = JSON.stringify(updated);
+    setEvent((prev) => ({ ...prev, vibeColors: jsonColors }));
+    savePatch({ vibeColors: jsonColors });
+  };
+
+  const handleAddColor = () => {
+    const updated = [...currentColors, "#D4AF37"];
+    const jsonColors = JSON.stringify(updated);
+    setEvent((prev) => ({ ...prev, vibeColors: jsonColors }));
+    savePatch({ vibeColors: jsonColors });
   };
 
   // Status Styling
@@ -276,14 +340,7 @@ export default function EventDetailView({
     }
   };
 
-  // Handlers
-  const handleStatusChange = async (newStatus: string) => {
-    setEvent((prev) => ({ ...prev, status: newStatus }));
-    startTransition(async () => {
-      await updateEventStatusAction(event.id, newStatus);
-    });
-  };
-
+  // Handlers for tasks
   const handleToggleTask = async (taskId: string, currentStatus: boolean) => {
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, completed: !currentStatus } : t))
@@ -331,6 +388,7 @@ export default function EventDetailView({
     });
   };
 
+  // Handlers for allocations
   const handleUpdateAllocationStatus = async (
     allocationId: string,
     status: "reservado" | "despachado" | "devolvido" | "danificado"
@@ -340,6 +398,16 @@ export default function EventDetailView({
     );
     startTransition(async () => {
       await updateAllocationStatusAction(allocationId, status, event.id);
+    });
+  };
+
+  const handleUpdateAllocationQty = async (allocationId: string, newQty: number) => {
+    if (newQty < 1) return;
+    setAllocations((prev) =>
+      prev.map((a) => (a.id === allocationId ? { ...a, quantity: newQty } : a))
+    );
+    startTransition(async () => {
+      await updateAllocationQuantityAction(allocationId, newQty, event.id);
     });
   };
 
@@ -396,30 +464,6 @@ export default function EventDetailView({
     });
   };
 
-  const handleSaveVibe = async () => {
-    setEvent((prev) => ({
-      ...prev,
-      theme: vibeTheme,
-      vibeColors: JSON.stringify(vibeColors),
-    }));
-    setShowVibeModal(false);
-
-    startTransition(async () => {
-      await updateEventVibeAction(event.id, vibeTheme, vibeColors);
-    });
-  };
-
-  const handleSaveCustomerPrice = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const parsed = parseFloat(priceInput) || 0;
-    setEvent((prev) => ({ ...prev, customerPrice: parsed }));
-    setShowPriceModal(false);
-
-    startTransition(async () => {
-      await updateCustomerPriceAction(event.id, parsed);
-    });
-  };
-
   const handleCopyQuoteLink = (token: string, quoteId: string) => {
     const origin = typeof window !== "undefined" ? window.location.origin : "https://cfm-events.vercel.app";
     navigator.clipboard.writeText(`${origin}/proposta/${token}`);
@@ -439,8 +483,6 @@ export default function EventDetailView({
   const customerPriceVal = event.customerPrice || 0;
   const totalBudgetVal = event.totalBudget || 0;
   const estimatedMargin = customerPriceVal - totalBudgetVal;
-
-  const currentColors = parseVibeColors(event.vibeColors);
 
   // WhatsApp helper
   const cleanPhone = client?.phone?.replace(/\D/g, "");
@@ -464,12 +506,32 @@ export default function EventDetailView({
           </Link>
 
           <div className="flex items-center gap-3">
+            {/* Auto-save Status Indicator */}
+            <div className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-[#fafafc] border border-[#ececf0]">
+              {saveStatus === "saving" ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#007aff]" />
+                  <span className="text-[#007aff] font-semibold">A guardar...</span>
+                </>
+              ) : saveStatus === "saved" ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-emerald-700 font-semibold">Guardado instantaneamente</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                  <span className="text-rose-600 font-semibold">Erro ao guardar</span>
+                </>
+              )}
+            </div>
+
             {/* Status Dropdown */}
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-medium text-[#8e8e93] hidden sm:inline">Estado:</span>
               <select
                 value={event.status}
-                onChange={(e) => handleStatusChange(e.target.value)}
+                onChange={(e) => handleFieldChange("status", e.target.value, true)}
                 className={`text-xs font-bold px-3 py-1.5 rounded-full border outline-none cursor-pointer transition ${
                   getStatusBadge(event.status).bg
                 }`}
@@ -484,14 +546,6 @@ export default function EventDetailView({
                 <option value="cancelado">Cancelado</option>
               </select>
             </div>
-
-            <button
-              onClick={() => setShowEditModal(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#111] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] px-3.5 py-1.5 rounded-[12px] shadow-2xs transition"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              <span>Editar Evento</span>
-            </button>
           </div>
         </div>
       </header>
@@ -503,33 +557,46 @@ export default function EventDetailView({
         {/* ================================================================= */}
         <section className="bg-white border border-[#ececf0] rounded-[24px] overflow-hidden shadow-xs">
           {/* Cover / Vibe Banner */}
-          <div className="relative h-[220px] md:h-[260px] w-full overflow-hidden bg-neutral-900">
+          <div className="relative min-h-[240px] md:min-h-[280px] w-full overflow-hidden bg-neutral-900 flex flex-col justify-between p-6">
             <img
               src={
                 event.coverImageUrl ||
                 "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80"
               }
               alt={event.name}
-              className="w-full h-full object-cover object-center opacity-75"
+              className="absolute inset-0 w-full h-full object-cover object-center opacity-75 pointer-events-none"
             />
             {/* Chromatic overlay gradient inspired by vibe colors */}
             <div
-              className="absolute inset-0 opacity-40 mix-blend-multiply"
+              className="absolute inset-0 opacity-40 mix-blend-multiply pointer-events-none"
               style={{
                 background: `linear-gradient(135deg, ${currentColors[0] || "#111"} 0%, ${
                   currentColors[1] || currentColors[0] || "#333"
                 } 100%)`,
               }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/30 pointer-events-none" />
 
             {/* Top Badges over image */}
-            <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+            <div className="relative z-10 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/90 backdrop-blur-md text-[#111] shadow-xs">
-                  {event.category || "Evento Geral"}
-                </span>
+                {/* Category Inline Selector */}
+                <select
+                  value={event.category || "Geral"}
+                  onChange={(e) => handleFieldChange("category", e.target.value, true)}
+                  className="px-3 py-1 rounded-full text-xs font-bold bg-white/95 text-[#111] shadow-xs border-0 outline-none cursor-pointer hover:bg-white transition"
+                  title="Alterar categoria do evento"
+                >
+                  <option value="Aniversário Infantil">Aniversário Infantil</option>
+                  <option value="Casamento">Casamento</option>
+                  <option value="Gala Corporativa">Gala Corporativa</option>
+                  <option value="Jantar de Marca">Jantar de Marca</option>
+                  <option value="Festa Privada">Festa Privada</option>
+                  <option value="Batizado">Batizado</option>
+                  <option value="Geral">Geral</option>
+                </select>
 
+                {/* Event Unique ID Badge */}
                 <button
                   type="button"
                   onClick={() => {
@@ -548,107 +615,208 @@ export default function EventDetailView({
                   )}
                 </button>
 
-                {event.theme && (
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#F5A623] text-black shadow-xs flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Tema: {event.theme}</span>
-                  </span>
-                )}
+                {/* Theme Inline Editable Tag */}
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F5A623] text-black shadow-xs">
+                  <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="text-[11px] font-bold">Tema:</span>
+                  <input
+                    type="text"
+                    value={event.theme || ""}
+                    placeholder="Sem tema..."
+                    onChange={(e) => handleFieldChange("theme", e.target.value)}
+                    className="bg-transparent border-b border-black/30 hover:border-black focus:border-black text-xs font-bold text-black placeholder:text-black/60 outline-none px-1 py-0 w-36 transition"
+                  />
+                </div>
               </div>
 
-              {/* Vibe Palette Customizer Trigger */}
-              <button
-                onClick={() => {
-                  setVibeTheme(event.theme || "");
-                  setVibeColors(parseVibeColors(event.vibeColors));
-                  setShowVibeModal(true);
-                }}
-                className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-black/60 hover:bg-black/80 backdrop-blur-md text-white border border-white/20 transition flex items-center gap-1.5 shadow-md"
-              >
-                <Palette className="w-3.5 h-3.5 text-[#F5A623]" />
-                <span>Paleta & Vibe</span>
-              </button>
+              {/* Cover Image Quick Switcher */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowCoverPicker(!showCoverPicker)}
+                  className="px-3 py-1 rounded-full text-xs font-medium bg-black/50 hover:bg-black/80 backdrop-blur-md text-white/90 border border-white/20 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Alterar Imagem</span>
+                </button>
+
+                {showCoverPicker && (
+                  <div className="absolute right-0 top-9 w-72 bg-white rounded-[16px] shadow-xl border border-[#ececf0] p-3 text-xs text-[#111] z-20 space-y-2">
+                    <div className="font-bold text-xs">Foto de Capa do Evento</div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {PRESET_COVERS.map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            handleFieldChange("coverImageUrl", preset.url, true);
+                            setShowCoverPicker(false);
+                          }}
+                          className="p-1.5 text-left rounded-lg bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[11px] font-medium truncate"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-[#8e8e93] font-bold uppercase mb-1">Ou URL personalizado:</label>
+                      <input
+                        type="url"
+                        placeholder="https://images.unsplash.com/..."
+                        defaultValue={event.coverImageUrl || ""}
+                        onBlur={(e) => {
+                          if (e.target.value.trim()) {
+                            handleFieldChange("coverImageUrl", e.target.value.trim(), true);
+                            setShowCoverPicker(false);
+                          }
+                        }}
+                        className="w-full px-2 py-1 text-xs border border-[#ececf0] rounded-md outline-none focus:ring-1 focus:ring-[#007aff]"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Bottom Title on Image */}
-            <div className="absolute bottom-4 left-5 right-5 text-white">
-              <div className="flex items-center gap-2 text-xs text-white/80 font-medium mb-1">
-                <Calendar className="w-3.5 h-3.5" />
-                <span>{formatDate(event.startDate)}</span>
-                {event.venue && (
-                  <>
-                    <span>•</span>
-                    <MapPin className="w-3.5 h-3.5" />
-                    <span>{event.venue}</span>
-                  </>
-                )}
+            {/* Bottom Title & Venue on Image */}
+            <div className="relative z-10 text-white space-y-2 pt-8">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-white/90 font-medium">
+                <div className="flex items-center gap-1 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-md">
+                  <MapPin className="w-3.5 h-3.5 text-white/70" />
+                  <input
+                    type="text"
+                    value={event.venue || ""}
+                    placeholder="Adicionar local / quinta..."
+                    onChange={(e) => handleFieldChange("venue", e.target.value)}
+                    className="bg-transparent text-white placeholder:text-white/60 text-xs font-semibold outline-none border-b border-transparent hover:border-white/40 focus:border-white px-1 py-0 w-52 transition"
+                  />
+                </div>
               </div>
-              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white drop-shadow-xs">
-                {event.name}
-              </h1>
+
+              {/* Instantaneously Editable Event Name */}
+              <input
+                type="text"
+                value={event.name}
+                onChange={(e) => handleFieldChange("name", e.target.value)}
+                placeholder="Nome do Evento..."
+                className="w-full text-2xl md:text-3xl font-extrabold tracking-tight text-white bg-transparent border-b border-transparent hover:border-white/30 focus:border-white focus:bg-black/30 px-2 py-1 rounded-lg outline-none transition drop-shadow-sm"
+              />
             </div>
           </div>
 
-          {/* VIBE & PALETTE RIBBON */}
+          {/* VIBE & PALETTE RIBBON (Directly Clickable & Customizable) */}
           <div className="px-6 py-4 bg-[#fafafc] border-b border-[#ececf0] flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-1.5 text-xs font-bold text-[#111]">
                 <Palette className="w-4 h-4 text-[#8e8e93]" />
-                <span>Paleta de Cores & Vibe do Evento:</span>
+                <span>Paleta & Cores (Clique para mudar):</span>
               </div>
 
-              {/* Visual Color Dots */}
-              <div className="flex items-center gap-2">
+              {/* Direct Color Pickers */}
+              <div className="flex items-center gap-2 flex-wrap">
                 {currentColors.map((hex, idx) => (
-                  <div
+                  <label
                     key={idx}
-                    className="group relative flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-[#ececf0] shadow-2xs"
+                    className="relative flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-[#ececf0] shadow-2xs cursor-pointer hover:border-[#d2d2d7] transition"
+                    title="Clique para escolher nova cor"
                   >
                     <span
-                      className="w-3.5 h-3.5 rounded-full shadow-inner border border-black/10 inline-block"
+                      className="w-3.5 h-3.5 rounded-full shadow-inner border border-black/10 inline-block pointer-events-none"
                       style={{ backgroundColor: hex }}
                     />
-                    <span className="text-[11px] font-mono font-medium text-[#636366]">
+                    <span className="text-[11px] font-mono font-bold text-[#636366]">
                       {hex.toUpperCase()}
                     </span>
-                  </div>
+                    <input
+                      type="color"
+                      value={hex}
+                      onChange={(e) => handleColorChange(idx, e.target.value)}
+                      className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                    />
+                  </label>
                 ))}
+
+                <button
+                  type="button"
+                  onClick={handleAddColor}
+                  className="w-7 h-7 rounded-full bg-white border border-[#ececf0] hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] hover:text-[#111] transition shadow-2xs"
+                  title="Adicionar cor à paleta"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-[#8e8e93]">Tema Definido:</span>
-              <span className="font-bold text-[#111] bg-white px-2.5 py-1 rounded-[8px] border border-[#ececf0]">
-                {event.theme || "Padrão CFM"}
-              </span>
+            {/* Quick Palettes Presets Bar */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+              <span className="text-[11px] text-[#8e8e93] font-medium flex-shrink-0">Temas rápidos:</span>
+              {PRESET_PALETTES.map((preset, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handlePresetPalette(preset)}
+                  className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white hover:bg-[#111] hover:text-white border border-[#ececf0] transition shadow-2xs flex-shrink-0 cursor-pointer"
+                >
+                  {preset.name}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* TOP METRICS GRID */}
-          <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[#ececf0] p-4 bg-white">
-            {/* 1. Customer Price */}
-            <div className="p-3">
-              <div className="flex items-center justify-between text-[#8e8e93] text-xs font-medium mb-1">
-                <span>Valor a Pagar (Cliente)</span>
-                <button
-                  onClick={() => {
-                    setPriceInput(String(event.customerPrice || 0));
-                    setShowPriceModal(true);
-                  }}
-                  className="text-[#007aff] hover:underline text-[11px] font-semibold"
-                >
-                  Alterar
-                </button>
+          {/* TOP METRICS & FINANCIALS (Directly Editable Inline) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#ececf0] p-4 bg-white">
+            {/* 1. Customer Price (Directly Editable) */}
+            <div className="p-3 space-y-1">
+              <div className="text-[#8e8e93] text-xs font-medium">Valor Cobrado ao Cliente (€)</div>
+              <div className="flex items-center gap-1">
+                <span className="text-xl font-black text-[#111]">€</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={event.customerPrice || ""}
+                  onChange={(e) =>
+                    handleFieldChange(
+                      "customerPrice",
+                      e.target.value === "" ? 0 : parseFloat(e.target.value)
+                    )
+                  }
+                  className="w-full text-xl md:text-2xl font-black text-[#111] bg-transparent border-b border-transparent hover:border-[#ececf0] focus:border-[#007aff] outline-none px-1 py-0.5 rounded transition"
+                  placeholder="0.00"
+                />
               </div>
-              <div className="text-xl md:text-2xl font-black text-[#111]">
-                €{(event.customerPrice || 0).toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
-              </div>
-              <div className="text-[11px] text-[#8e8e93] mt-0.5">
-                Custo interno orçado: €{(event.totalBudget || 0).toLocaleString("pt-PT")}
+              <div className="text-[11px] text-[#8e8e93]">
+                Margem bruta est.:{" "}
+                <strong className={estimatedMargin >= 0 ? "text-emerald-700" : "text-rose-600"}>
+                  €{estimatedMargin.toFixed(2)}
+                </strong>
               </div>
             </div>
 
-            {/* 2. Action Items Left */}
+            {/* 2. Internal Production Budget (Directly Editable) */}
+            <div className="p-3 space-y-1">
+              <div className="text-[#8e8e93] text-xs font-medium">Custo Interno Orçado (€)</div>
+              <div className="flex items-center gap-1">
+                <span className="text-xl font-black text-[#111]">€</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={event.totalBudget || ""}
+                  onChange={(e) =>
+                    handleFieldChange(
+                      "totalBudget",
+                      e.target.value === "" ? 0 : parseFloat(e.target.value)
+                    )
+                  }
+                  className="w-full text-xl md:text-2xl font-black text-[#111] bg-transparent border-b border-transparent hover:border-[#ececf0] focus:border-[#007aff] outline-none px-1 py-0.5 rounded transition"
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="text-[11px] text-[#8e8e93]">
+                Valor material alugado: €{totalAllocatedRentalValue.toFixed(2)}
+              </div>
+            </div>
+
+            {/* 3. Action Items Checklist Progress */}
             <div className="p-3">
               <div className="text-[#8e8e93] text-xs font-medium mb-1">Ações de Conclusão</div>
               <div className="flex items-baseline gap-2">
@@ -668,33 +836,23 @@ export default function EventDetailView({
               </div>
             </div>
 
-            {/* 3. Inventory Allocated */}
-            <div className="p-3">
-              <div className="text-[#8e8e93] text-xs font-medium mb-1">Inventário Alocado</div>
-              <div className="text-xl md:text-2xl font-black text-[#111]">
-                {totalAllocatedItems} <span className="text-xs font-normal text-[#8e8e93]">unid.</span>
-              </div>
-              <div className="text-[11px] text-[#8e8e93] mt-0.5">
-                {allocations.length} tipos de artigos no evento
-              </div>
-            </div>
-
-            {/* 4. Client Contact */}
-            <div className="p-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[#8e8e93] text-xs font-medium">Cliente / Contacto</span>
-                {client?.id && (
-                  <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0]">
-                    #{client.id}
-                  </span>
-                )}
-              </div>
-              <div className="text-sm font-bold text-[#111] truncate">
-                {client?.name || "Sem cliente associado"}
-              </div>
-              <div className="text-[11px] text-[#8e8e93] truncate mt-0.5">
-                {client?.contactName ? `${client.contactName} • ` : ""}
-                {client?.phone || client?.email || "Sem dados de contacto"}
+            {/* 4. Client Selector & Contact Info */}
+            <div className="p-3 space-y-1">
+              <div className="text-[#8e8e93] text-xs font-medium">Cliente Associado</div>
+              <select
+                value={event.clientId || ""}
+                onChange={(e) => handleClientChange(e.target.value)}
+                className="w-full font-bold text-sm text-[#111] bg-[#fafafc] hover:bg-[#f2f2f5] border border-[#ececf0] rounded-lg px-2.5 py-1 outline-none cursor-pointer truncate transition"
+              >
+                <option value="">(Sem cliente associado)</option>
+                {allClients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} {c.contactName ? `(${c.contactName})` : ""}
+                  </option>
+                ))}
+              </select>
+              <div className="text-[11px] text-[#8e8e93] truncate pt-0.5">
+                {client?.phone || client?.email || "Sem dados de contacto adicionais"}
               </div>
             </div>
           </div>
@@ -725,7 +883,7 @@ export default function EventDetailView({
 
                 <button
                   onClick={() => setShowAddAllocationModal(true)}
-                  className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 transition self-start sm:self-auto shadow-xs"
+                  className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 transition self-start sm:self-auto shadow-xs cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Alocar Artigo</span>
@@ -741,7 +899,7 @@ export default function EventDetailView({
                   </p>
                   <button
                     onClick={() => setShowAddAllocationModal(true)}
-                    className="px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold inline-flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Adicionar primeiro artigo</span>
@@ -815,14 +973,38 @@ export default function EventDetailView({
                         </div>
                       </div>
 
-                      {/* Right side controls */}
+                      {/* Right side controls: Instant Quantity & Status */}
                       <div className="flex items-center justify-between md:justify-end gap-3 flex-shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-[#ececf0]">
-                        <div className="text-right">
-                          <div className="text-sm font-extrabold text-[#111]">
-                            {a.quantity} <span className="text-xs font-normal text-[#8e8e93]">unid.</span>
-                          </div>
-                          <div className="text-[11px] text-[#8e8e93]">
+                        {/* Instant Qty Adjustment Buttons */}
+                        <div className="flex items-center gap-1.5 bg-white border border-[#ececf0] rounded-[10px] p-1">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateAllocationQty(a.id, a.quantity - 1)}
+                            disabled={a.quantity <= 1}
+                            className="w-6 h-6 rounded-md hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] hover:text-[#111] disabled:opacity-30"
+                            title="Diminuir quantidade"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="w-8 text-center text-xs font-extrabold text-[#111]">
+                            {a.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateAllocationQty(a.id, a.quantity + 1)}
+                            className="w-6 h-6 rounded-md hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] hover:text-[#111]"
+                            title="Aumentar quantidade"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+
+                        <div className="text-right min-w-[65px]">
+                          <div className="text-[11px] font-semibold text-[#111]">
                             €{(a.quantity * (a.itemUnitPrice || 0)).toFixed(2)}
+                          </div>
+                          <div className="text-[9px] text-[#8e8e93]">
+                            €{a.itemUnitPrice?.toFixed(2)}/un
                           </div>
                         </div>
 
@@ -851,32 +1033,26 @@ export default function EventDetailView({
                           <option value="danificado">Danificado</option>
                         </select>
 
-                        {/* Delete button */}
+                        {/* Delete action */}
                         <button
                           onClick={() => handleDeleteAllocation(a.id)}
-                          className="p-1.5 text-[#8e8e93] hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                          title="Remover do evento"
+                          className="p-1.5 text-[#8e8e93] hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                          title="Remover alocação"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
                   ))}
-
-                  {/* Total summary row */}
-                  <div className="pt-3 border-t border-[#ececf0] flex items-center justify-between text-xs font-bold text-[#111] px-2">
-                    <span>Total de Aluguer Alocado</span>
-                    <span className="text-sm">€{totalAllocatedRentalValue.toFixed(2)}</span>
-                  </div>
                 </div>
               )}
             </section>
 
             {/* ----------------------------------------------------------------- */}
-            {/* ACTION ITEMS CHECKLIST (What's left to complete the event) */}
+            {/* ACTION ITEMS CHECKLIST */}
             {/* ----------------------------------------------------------------- */}
             <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
                 <div>
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-[#137333]" />
@@ -918,7 +1094,7 @@ export default function EventDetailView({
                 <button
                   type="submit"
                   disabled={!newTaskTitle.trim()}
-                  className="px-4 py-2 bg-[#111] hover:bg-black disabled:opacity-50 text-white rounded-[12px] text-xs font-bold transition flex items-center gap-1"
+                  className="px-4 py-2 bg-[#111] hover:bg-black disabled:opacity-50 text-white rounded-[12px] text-xs font-bold transition flex items-center gap-1 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Adicionar</span>
@@ -945,7 +1121,7 @@ export default function EventDetailView({
                         <button
                           type="button"
                           onClick={() => handleToggleTask(t.id, t.completed)}
-                          className="flex-shrink-0 text-[#111] focus:outline-none"
+                          className="flex-shrink-0 text-[#111] focus:outline-none cursor-pointer"
                         >
                           {t.completed ? (
                             <CheckCircle2 className="w-5 h-5 text-[#137333] fill-emerald-100" />
@@ -988,7 +1164,7 @@ export default function EventDetailView({
 
                         <button
                           onClick={() => handleDeleteTask(t.id)}
-                          className="text-[#8e8e93] hover:text-red-600 p-1 rounded transition"
+                          className="p-1 text-[#8e8e93] hover:text-rose-600 rounded-md transition cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1000,20 +1176,111 @@ export default function EventDetailView({
             </section>
           </div>
 
-          {/* RIGHT COLUMN: CLIENT INFO, SPECIAL NEEDS, CRONOGRAMA, PROPOSTAS */}
+          {/* RIGHT COLUMN: CRONOGRAMA, PEDIDOS ESPECIAIS, NOTAS & CLIENT CONTACT */}
           <div className="space-y-6">
             {/* ----------------------------------------------------------------- */}
-            {/* CLIENT / CONTACT INFORMATION */}
+            {/* SCHEDULE & CRONOGRAMA (Directly Editable Datetime Inputs) */}
             {/* ----------------------------------------------------------------- */}
-            <section className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs">
-              <div className="flex items-center justify-between mb-3.5">
+            <section className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-[#111]" />
+                  <h3 className="text-sm font-bold text-[#111]">Cronograma Operacional</h3>
+                </div>
+                <span className="text-[10px] text-[#8e8e93]">Edição imediata</span>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                {/* 1. Prep Date */}
+                <div className="p-2.5 rounded-[12px] bg-[#fafafc] border border-[#ececf0] space-y-1">
+                  <span className="text-[#8e8e93] font-medium block text-[11px]">Montagem / Carga:</span>
+                  <input
+                    type="datetime-local"
+                    value={toInputDate(event.prepDate)}
+                    onChange={(e) => handleFieldChange("prepDate", e.target.value, true)}
+                    className="w-full bg-white border border-[#ececf0] rounded-md px-2 py-1 text-xs font-semibold text-[#111] outline-none cursor-pointer"
+                  />
+                </div>
+
+                {/* 2. Start Date */}
+                <div className="p-2.5 rounded-[12px] bg-emerald-50/70 border border-emerald-200/80 space-y-1">
+                  <span className="text-emerald-800 font-bold block text-[11px]">Início do Evento:</span>
+                  <input
+                    type="datetime-local"
+                    value={toInputDate(event.startDate)}
+                    onChange={(e) => handleFieldChange("startDate", e.target.value, true)}
+                    className="w-full bg-white border border-emerald-200 rounded-md px-2 py-1 text-xs font-bold text-emerald-950 outline-none cursor-pointer"
+                  />
+                </div>
+
+                {/* 3. End Date */}
+                <div className="p-2.5 rounded-[12px] bg-emerald-50/70 border border-emerald-200/80 space-y-1">
+                  <span className="text-emerald-800 font-bold block text-[11px]">Fim do Evento:</span>
+                  <input
+                    type="datetime-local"
+                    value={toInputDate(event.endDate)}
+                    onChange={(e) => handleFieldChange("endDate", e.target.value, true)}
+                    className="w-full bg-white border border-emerald-200 rounded-md px-2 py-1 text-xs font-bold text-emerald-950 outline-none cursor-pointer"
+                  />
+                </div>
+
+                {/* 4. Return Date */}
+                <div className="p-2.5 rounded-[12px] bg-[#fafafc] border border-[#ececf0] space-y-1">
+                  <span className="text-[#8e8e93] font-medium block text-[11px]">Desmontagem & Recolha:</span>
+                  <input
+                    type="datetime-local"
+                    value={toInputDate(event.returnDate)}
+                    onChange={(e) => handleFieldChange("returnDate", e.target.value, true)}
+                    className="w-full bg-white border border-[#ececf0] rounded-md px-2 py-1 text-xs font-semibold text-[#111] outline-none cursor-pointer"
+                  />
+                </div>
+              </div>
+            </section>
+
+            {/* ----------------------------------------------------------------- */}
+            {/* SPECIAL NEEDS & RESTRICTIONS (Directly Editable Inline) */}
+            {/* ----------------------------------------------------------------- */}
+            <section className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-[#D32F2F]" />
+                  <h3 className="text-sm font-bold text-[#111]">Pedidos Especiais & Alergias</h3>
+                </div>
+                <span className="text-[10px] text-[#8e8e93]">Guarda ao escrever</span>
+              </div>
+
+              <textarea
+                rows={3}
+                value={event.specialNeeds || ""}
+                onChange={(e) => handleFieldChange("specialNeeds", e.target.value)}
+                placeholder="Ex: Alergia a amendoim, restrição de ruído após as 22h, tomadas 220V no jardim..."
+                className="w-full p-3 bg-rose-50/60 border border-rose-200/80 rounded-[12px] text-xs text-rose-950 placeholder:text-rose-900/40 outline-none focus:ring-1 focus:ring-rose-400 transition"
+              />
+
+              <div className="pt-2 border-t border-[#ececf0]">
+                <div className="font-bold text-xs text-[#111] mb-1.5">Notas Operacionais Internas:</div>
+                <textarea
+                  rows={2}
+                  value={event.notes || ""}
+                  onChange={(e) => handleFieldChange("notes", e.target.value)}
+                  placeholder="Instruções de logística, montagem ou camiões..."
+                  className="w-full p-3 bg-[#fafafc] border border-[#ececf0] rounded-[12px] text-xs text-[#111] placeholder:text-[#8e8e93] outline-none focus:ring-1 focus:ring-[#007aff] transition"
+                />
+              </div>
+            </section>
+
+            {/* ----------------------------------------------------------------- */}
+            {/* CLIENT CONTACT CARD */}
+            {/* ----------------------------------------------------------------- */}
+            <section className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <User className="w-4 h-4 text-[#111]" />
-                  <h3 className="text-sm font-bold text-[#111]">Informações de Contacto</h3>
+                  <h3 className="text-sm font-bold text-[#111]">Ficha do Cliente</h3>
                 </div>
-                {client && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f2f2f5] text-[#48484a] uppercase">
-                    {client.source || "CRM"}
+                {client?.id && (
+                  <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0]">
+                    #{client.id}
                   </span>
                 )}
               </div>
@@ -1021,13 +1288,15 @@ export default function EventDetailView({
               {client ? (
                 <div className="space-y-3 text-xs">
                   <div>
-                    <div className="font-extrabold text-[#111] text-[15px]">{client.name}</div>
-                    {client.contactName && client.contactName !== client.name && (
-                      <div className="text-[#8e8e93]">Pessoa de contacto: {client.contactName}</div>
+                    <div className="font-bold text-sm text-[#111]">{client.name}</div>
+                    {client.contactName && (
+                      <div className="text-[#8e8e93] text-[11px] mt-0.5">
+                        Contacto direto: {client.contactName}
+                      </div>
                     )}
                   </div>
 
-                  <div className="space-y-2 pt-2 border-t border-[#ececf0]">
+                  <div className="space-y-2 pt-1 border-t border-[#ececf0]">
                     {client.phone && (
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 text-[#48484a]">
@@ -1045,8 +1314,8 @@ export default function EventDetailView({
                             <a
                               href={whatsappUrl}
                               target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-2 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-[11px] font-bold text-emerald-700 flex items-center gap-1"
+                              rel="noreferrer"
+                              className="px-2 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[11px] font-bold flex items-center gap-1"
                             >
                               <MessageSquare className="w-3 h-3" />
                               <span>WhatsApp</span>
@@ -1078,86 +1347,12 @@ export default function EventDetailView({
                       </div>
                     )}
                   </div>
-
-                  {client.notes && (
-                    <div className="pt-2 border-t border-[#ececf0] text-[11px] text-[#636366] bg-[#fafafc] p-2 rounded-[10px]">
-                      {client.notes}
-                    </div>
-                  )}
                 </div>
               ) : (
-                <div className="text-xs text-[#8e8e93] py-4 text-center">
-                  Sem cliente associado. Edite o evento para vincular um cliente do CRM.
+                <div className="text-xs text-[#8e8e93] py-2 italic">
+                  Selecione um cliente no topo para ver os contactos diretos aqui.
                 </div>
               )}
-            </section>
-
-            {/* ----------------------------------------------------------------- */}
-            {/* SPECIAL NEEDS & RESTRICTIONS ASKS */}
-            {/* ----------------------------------------------------------------- */}
-            <section className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-4 h-4 text-[#D32F2F]" />
-                  <h3 className="text-sm font-bold text-[#111]">Pedidos Especiais & Notas</h3>
-                </div>
-                <button
-                  onClick={() => setShowEditModal(true)}
-                  className="text-xs text-[#007aff] hover:underline font-semibold"
-                >
-                  Editar
-                </button>
-              </div>
-
-              {event.specialNeeds ? (
-                <div className="p-3 bg-rose-50/60 border border-rose-100 rounded-[14px] text-xs text-[#78281F] leading-relaxed">
-                  <div className="font-bold mb-1 flex items-center gap-1.5 text-rose-800">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    <span>Alergias, Restrições & Especificações do Cliente:</span>
-                  </div>
-                  {event.specialNeeds}
-                </div>
-              ) : (
-                <div className="text-xs text-[#8e8e93] italic py-2">
-                  Nenhum pedido especial ou restrição registada (ex: sem glúten, sem nozes, limite de ruído, tomadas elétricas).
-                </div>
-              )}
-
-              {event.notes && (
-                <div className="mt-3 pt-3 border-t border-[#ececf0] text-xs text-[#48484a] leading-relaxed">
-                  <div className="font-bold text-[#111] mb-1">Notas Internas:</div>
-                  {event.notes}
-                </div>
-              )}
-            </section>
-
-            {/* ----------------------------------------------------------------- */}
-            {/* SCHEDULE & CRONOGRAMA */}
-            {/* ----------------------------------------------------------------- */}
-            <section className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs">
-              <div className="flex items-center gap-2 mb-3">
-                <Clock className="w-4 h-4 text-[#111]" />
-                <h3 className="text-sm font-bold text-[#111]">Cronograma Operacional</h3>
-              </div>
-
-              <div className="space-y-2.5 text-xs">
-                <div className="flex items-center justify-between p-2 rounded-[10px] bg-[#fafafc]">
-                  <span className="text-[#8e8e93]">Montagem / Carga:</span>
-                  <span className="font-semibold text-[#111]">{formatShortDate(event.prepDate)}</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-[10px] bg-emerald-50/60 border border-emerald-100">
-                  <span className="text-emerald-800 font-bold">Início do Evento:</span>
-                  <span className="font-extrabold text-emerald-900">{formatShortDate(event.startDate)}</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-[10px] bg-emerald-50/60 border border-emerald-100">
-                  <span className="text-emerald-800 font-bold">Fim do Evento:</span>
-                  <span className="font-extrabold text-emerald-900">{formatShortDate(event.endDate)}</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-[10px] bg-[#fafafc]">
-                  <span className="text-[#8e8e93]">Desmontagem:</span>
-                  <span className="font-semibold text-[#111]">{formatShortDate(event.returnDate)}</span>
-                </div>
-              </div>
             </section>
 
             {/* ----------------------------------------------------------------- */}
@@ -1193,25 +1388,32 @@ export default function EventDetailView({
                       </div>
 
                       <div className="flex items-center gap-1.5">
-                        <Link
-                          href={`/proposta/${q.accessToken}`}
-                          target="_blank"
-                          className="px-2.5 py-1 rounded-lg bg-white border border-[#ececf0] text-[11px] font-semibold text-[#111] hover:bg-[#f2f2f5] flex items-center gap-1"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          <span>Abrir</span>
-                        </Link>
                         <button
                           onClick={() => handleCopyQuoteLink(q.accessToken, q.id)}
-                          className="p-1 rounded-lg bg-white border border-[#ececf0] text-[#111] hover:bg-[#f2f2f5]"
-                          title="Copiar link da proposta para o cliente"
+                          className="px-2.5 py-1 rounded-[8px] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[11px] font-semibold text-[#111] flex items-center gap-1 transition cursor-pointer"
                         >
                           {copiedQuoteId === q.id ? (
-                            <Check className="w-3.5 h-3.5 text-[#137333]" />
+                            <>
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              <span>Copiado!</span>
+                            </>
                           ) : (
-                            <Share2 className="w-3.5 h-3.5 text-[#8e8e93]" />
+                            <>
+                              <Share2 className="w-3 h-3 text-[#8e8e93]" />
+                              <span>Link</span>
+                            </>
                           )}
                         </button>
+
+                        <a
+                          href={`/proposta/${q.accessToken}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 rounded-[8px] bg-[#111] hover:bg-black text-white text-xs"
+                          title="Abrir proposta pública"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
                       </div>
                     </div>
                   ))}
@@ -1223,180 +1425,36 @@ export default function EventDetailView({
       </main>
 
       {/* ===================================================================== */}
-      {/* MODAL 1: CUSTOMIZE VIBE PALETTE & THEME */}
-      {/* ===================================================================== */}
-      {showVibeModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-[24px] w-full max-w-lg border border-[#ececf0] shadow-2xl overflow-hidden p-6 space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-[#ececf0]">
-              <div className="flex items-center gap-2">
-                <Palette className="w-5 h-5 text-[#F5A623]" />
-                <h3 className="text-base font-bold text-[#111]">Paleta de Cores & Vibe do Evento</h3>
-              </div>
-              <button
-                onClick={() => setShowVibeModal(false)}
-                className="text-[#8e8e93] hover:text-[#111] p-1 rounded-full"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Theme Name */}
-            <div>
-              <label className="block text-xs font-bold text-[#111] mb-1">
-                Nome do Tema do Evento
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: Winnie the Pooh, Sunset Gala, Romântico Boho"
-                value={vibeTheme}
-                onChange={(e) => setVibeTheme(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-xs bg-[#fafafc] border border-[#ececf0] rounded-[12px] focus:ring-2 focus:ring-[#007aff] outline-none"
-              />
-            </div>
-
-            {/* Current Palette */}
-            <div>
-              <label className="block text-xs font-bold text-[#111] mb-2">
-                Cores Atuais da Paleta
-              </label>
-              <div className="flex flex-wrap items-center gap-2">
-                {vibeColors.map((hex, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#fafafc] border border-[#ececf0]"
-                  >
-                    <span
-                      className="w-4 h-4 rounded-full border border-black/10 shadow-inner"
-                      style={{ backgroundColor: hex }}
-                    />
-                    <span className="text-xs font-mono font-bold text-[#111]">{hex.toUpperCase()}</span>
-                    {vibeColors.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setVibeColors(vibeColors.filter((_, i) => i !== index))}
-                        className="text-[#8e8e93] hover:text-red-600"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Add custom color */}
-              <div className="flex items-center gap-2 mt-3">
-                <input
-                  type="color"
-                  value={newColorHex}
-                  onChange={(e) => setNewColorHex(e.target.value)}
-                  className="w-8 h-8 rounded-full border-0 cursor-pointer p-0"
-                />
-                <input
-                  type="text"
-                  value={newColorHex}
-                  onChange={(e) => setNewColorHex(e.target.value)}
-                  placeholder="#F5A623"
-                  className="px-3 py-1.5 text-xs font-mono uppercase bg-[#fafafc] border border-[#ececf0] rounded-[10px] w-28"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (newColorHex && !vibeColors.includes(newColorHex)) {
-                      setVibeColors([...vibeColors, newColorHex]);
-                    }
-                  }}
-                  className="px-3 py-1.5 bg-[#f2f2f5] hover:bg-[#e5e5ea] text-xs font-bold rounded-[10px] text-[#111]"
-                >
-                  ＋ Adicionar Cor
-                </button>
-              </div>
-            </div>
-
-            {/* Presets */}
-            <div>
-              <label className="block text-xs font-bold text-[#8e8e93] mb-2">
-                Inspiração / Paletas Prontas
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {PRESET_PALETTES.map((preset, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      setVibeTheme(preset.theme);
-                      setVibeColors(preset.colors);
-                    }}
-                    className="p-2.5 rounded-[12px] border border-[#ececf0] hover:border-[#111] bg-white text-left transition flex items-center justify-between"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-[#111] truncate">{preset.name}</div>
-                      <div className="flex items-center gap-1 mt-1.5">
-                        {preset.colors.map((c, i) => (
-                          <span
-                            key={i}
-                            className="w-3 h-3 rounded-full border border-black/10"
-                            style={{ backgroundColor: c }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="pt-3 border-t border-[#ececf0] flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowVibeModal(false)}
-                className="px-4 py-2 rounded-[12px] bg-[#f2f2f5] text-xs font-bold text-[#111]"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveVibe}
-                className="px-5 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold shadow-xs"
-              >
-                Guardar Paleta & Tema
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===================================================================== */}
-      {/* MODAL 2: ADD INVENTORY ALLOCATION */}
+      {/* MODAL: ADD ALLOCATION (For selecting items from warehouse catalog) */}
       {/* ===================================================================== */}
       {showAddAllocationModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-[24px] w-full max-w-lg border border-[#ececf0] shadow-2xl overflow-hidden p-6 space-y-4">
+          <div className="bg-white rounded-[24px] w-full max-w-md border border-[#ececf0] shadow-2xl overflow-hidden p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#ececf0]">
               <div className="flex items-center gap-2">
                 <Package className="w-5 h-5 text-[#111]" />
-                <h3 className="text-base font-bold text-[#111]">Alocar Artigo do Inventário</h3>
+                <h3 className="text-base font-bold text-[#111]">Alocar Material do Armazém</h3>
               </div>
               <button
                 onClick={() => setShowAddAllocationModal(false)}
-                className="text-[#8e8e93] hover:text-[#111] p-1 rounded-full"
+                className="text-[#8e8e93] hover:text-[#111] p-1 rounded-full cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleAddAllocation} className="space-y-4 text-xs">
-              {/* Item selection with search */}
+            <form onSubmit={handleAddAllocation} className="space-y-3.5 text-xs">
+              {/* Item Search / Selector */}
               <div>
-                <label className="block font-bold text-[#111] mb-1">Selecionar Artigo</label>
+                <label className="block font-bold text-[#111] mb-1">Pesquisar ou Selecionar Artigo</label>
                 <input
                   type="text"
-                  placeholder="Pesquisar por nome ou SKU..."
+                  placeholder="Filtrar por nome ou SKU..."
                   value={itemSearchQuery}
                   onChange={(e) => setItemSearchQuery(e.target.value)}
-                  className="w-full px-3 py-1.5 mb-2 bg-[#fafafc] border border-[#ececf0] rounded-[10px] text-xs"
+                  className="w-full px-3 py-1.5 bg-[#fafafc] border border-[#ececf0] rounded-[10px] text-xs mb-2"
                 />
+
                 <select
                   value={selectedItemId}
                   onChange={(e) => setSelectedItemId(e.target.value)}
@@ -1435,7 +1493,7 @@ export default function EventDetailView({
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: Mesa de honra, Bar exterior, Zona de fotografias"
+                  placeholder="Ex: Mesa de honra, Bar exterior, Zona de fotos"
                   value={allocationNotes}
                   onChange={(e) => setAllocationNotes(e.target.value)}
                   className="w-full px-3.5 py-2 bg-white border border-[#ececf0] rounded-[12px] text-xs"
@@ -1446,266 +1504,15 @@ export default function EventDetailView({
                 <button
                   type="button"
                   onClick={() => setShowAddAllocationModal(false)}
-                  className="px-4 py-2 rounded-[12px] bg-[#f2f2f5] text-xs font-bold text-[#111]"
+                  className="px-4 py-2 rounded-[12px] bg-[#f2f2f5] text-xs font-bold text-[#111] cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold"
+                  className="px-5 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold cursor-pointer"
                 >
                   Confirmar Alocação
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ===================================================================== */}
-      {/* MODAL 3: CUSTOMER PRICE EDIT */}
-      {/* ===================================================================== */}
-      {showPriceModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-[24px] w-full max-w-sm border border-[#ececf0] shadow-2xl overflow-hidden p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#ececf0]">
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-[#111]" />
-                <h3 className="text-base font-bold text-[#111]">Valor a Pagar pelo Cliente</h3>
-              </div>
-              <button
-                onClick={() => setShowPriceModal(false)}
-                className="text-[#8e8e93] hover:text-[#111] p-1 rounded-full"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveCustomerPrice} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-[#111] mb-1">Valor Total Cobrado (€)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={priceInput}
-                  onChange={(e) => setPriceInput(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-base font-bold bg-[#fafafc] border border-[#ececf0] rounded-[12px] text-[#111] outline-none"
-                />
-                <p className="text-[11px] text-[#8e8e93] mt-1">
-                  Este valor representa o total acordado que o cliente pagará pelo evento completo.
-                </p>
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPriceModal(false)}
-                  className="px-4 py-2 rounded-[12px] bg-[#f2f2f5] text-xs font-bold text-[#111]"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold"
-                >
-                  Guardar Valor
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ===================================================================== */}
-      {/* MODAL 4: FULL EVENT EDIT MODAL */}
-      {/* ===================================================================== */}
-      {showEditModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-[24px] w-full max-w-xl border border-[#ececf0] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-5 border-b border-[#ececf0] flex items-center justify-between">
-              <h3 className="text-base font-bold text-[#111]">Editar Informações do Evento</h3>
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="text-[#8e8e93] hover:text-[#111] p-1 rounded-full"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form
-              action={async (formData) => {
-                await updateEventDetailsAction(formData);
-                setShowEditModal(false);
-                // Refresh client side
-                window.location.reload();
-              }}
-              className="p-6 overflow-y-auto flex-1 space-y-4 text-xs"
-            >
-              <input type="hidden" name="eventId" value={event.id} />
-              <input type="hidden" name="vibeColors" value={event.vibeColors || ""} />
-
-              <div>
-                <label className="block font-bold text-[#111] mb-1">Identificador Único (ID)</label>
-                <input
-                  type="text"
-                  value={event.id}
-                  disabled
-                  className="w-full px-3 py-2 bg-[#f2f2f7] text-[#8e8e93] font-mono border border-[#ececf0] rounded-[10px] cursor-not-allowed select-all"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#111] mb-1">Nome do Evento</label>
-                <input
-                  type="text"
-                  name="name"
-                  defaultValue={event.name}
-                  required
-                  className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#111] mb-1">Categoria</label>
-                  <select
-                    name="category"
-                    defaultValue={event.category || "Geral"}
-                    className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px]"
-                  >
-                    <option value="Aniversário Infantil">Aniversário Infantil</option>
-                    <option value="Casamento">Casamento</option>
-                    <option value="Gala Corporativa">Gala Corporativa</option>
-                    <option value="Jantar de Marca">Jantar de Marca</option>
-                    <option value="Festa Privada">Festa Privada</option>
-                    <option value="Batizado">Batizado</option>
-                    <option value="Geral">Geral</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-[#111] mb-1">Tema do Evento</label>
-                  <input
-                    type="text"
-                    name="theme"
-                    placeholder="Ex: Winnie the Pooh"
-                    defaultValue={event.theme || ""}
-                    className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#111] mb-1">Cliente</label>
-                  <select
-                    name="clientId"
-                    defaultValue={event.clientId || ""}
-                    className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px]"
-                  >
-                    <option value="">(Sem cliente)</option>
-                    {allClients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-[#111] mb-1">Local / Quinta</label>
-                  <input
-                    type="text"
-                    name="venue"
-                    defaultValue={event.venue || ""}
-                    className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#111] mb-1">Data Início</label>
-                  <input
-                    type="datetime-local"
-                    name="startDate"
-                    defaultValue={event.startDate ? new Date(event.startDate).toISOString().slice(0, 16) : ""}
-                    required
-                    className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-[#111] mb-1">Data Fim</label>
-                  <input
-                    type="datetime-local"
-                    name="endDate"
-                    defaultValue={event.endDate ? new Date(event.endDate).toISOString().slice(0, 16) : ""}
-                    className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px]"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#111] mb-1">Valor a Pagar Cliente (€)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="customerPrice"
-                    defaultValue={event.customerPrice || 0}
-                    className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-[#111] mb-1">Custo / Orçamento Interno (€)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="totalBudget"
-                    defaultValue={event.totalBudget || 0}
-                    className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#111] mb-1">
-                  Pedidos Especiais / Alergias / Necessidades Específicas
-                </label>
-                <textarea
-                  name="specialNeeds"
-                  rows={3}
-                  placeholder="Ex: Alergia a amendoim, restrição de ruído a partir das 22h, tomada 220V no jardim..."
-                  defaultValue={event.specialNeeds || ""}
-                  className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#111] mb-1">Notas Gerais</label>
-                <textarea
-                  name="notes"
-                  rows={2}
-                  defaultValue={event.notes || ""}
-                  className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px]"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-[#ececf0] flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 rounded-[12px] bg-[#f2f2f5] text-xs font-bold text-[#111]"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold"
-                >
-                  Guardar Alterações
                 </button>
               </div>
             </form>
