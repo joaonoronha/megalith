@@ -51,6 +51,8 @@ export const inventoryItems = sqliteTable("inventory_items", {
   dimensions: text("dimensions"), // e.g. "40 × 45 × 92 cm"
   unitPrice: real("unit_price").default(0).notNull(), // rental price per unit / event
   replacementCost: real("replacement_cost").default(0),
+  purchaseStatus: text("purchase_status", { enum: ["bought", "not_bought"] }).default("bought").notNull(), // "bought" (contabilizado em finanças) | "not_bought" (deduzido no lucro projetado)
+  purchaseCost: real("purchase_cost").default(0), // total acquisition / purchase cost
   imageUrl: text("image_url"),
   damagedQuantity: integer("damaged_quantity").default(0),
   inMaintenanceQuantity: integer("in_maintenance_quantity").default(0),

@@ -453,8 +453,14 @@ export async function createItemAction(formData: FormData) {
     return { success: false, error: "SKU, nome e categoria são obrigatórios." };
   }
 
-  // Acquisition cost / bought price calculation:
-  // Automatically creates a financial expense for the value that the item was bought.
+  // Acquisition cost / purchase status calculation:
+  // Items can have a state of "bought" or "not_bought" (not yet bought).
+  // Only bought items can be accounted for finance (immediate expense).
+  // Not bought yet items are stored with purchaseCost to be deducted from projected value.
+  const rawPurchaseStatus = formData.get("purchaseStatus") as string;
+  const purchaseStatus: "bought" | "not_bought" =
+    rawPurchaseStatus === "not_bought" ? "not_bought" : "bought";
+
   const rawPurchasePrice = formData.get("purchasePrice") as string;
   const rawTotalPurchasePrice = formData.get("totalPurchasePrice") as string;
   let totalCost = 0;
@@ -480,15 +486,17 @@ export async function createItemAction(formData: FormData) {
     dimensions,
     unitPrice,
     replacementCost,
+    purchaseStatus,
+    purchaseCost: totalCost,
     imageUrl: imageUrl || "https://images.unsplash.com/photo-1549497538-303791108f95?auto=format&fit=crop&w=400&q=80",
     damagedQuantity: 0,
     inMaintenanceQuantity: 0,
   };
   await db.insert(inventoryItems).values(item);
 
-  // Auto-create expense for the value that item was bought
+  // Auto-create expense ONLY for items that are marked as "bought"
   let createdMovement: any = null;
-  if (totalCost > 0) {
+  if (purchaseStatus === "bought" && totalCost > 0) {
     const movId = generateId("mov");
     createdMovement = {
       id: movId,
@@ -505,12 +513,17 @@ export async function createItemAction(formData: FormData) {
     await db.insert(financialMovements).values(createdMovement);
   }
 
+  const auditDetails =
+    purchaseStatus === "bought"
+      ? `${name} (${sku}) adicionado ao inventário como "Comprado" (${totalQuantity} un., €${unitPrice}/evento, local: ${warehouseLocation || "Armazém Principal"})${totalCost > 0 ? ` · Despesa automática de €${totalCost.toFixed(2)} registada em Finanças.` : ""}`
+      : `${name} (${sku}) adicionado ao inventário como "Ainda Não Comprado" (${totalQuantity} un., €${unitPrice}/evento, local: ${warehouseLocation || "Armazém Principal"})${totalCost > 0 ? ` · Custo de aquisição previsto de €${totalCost.toFixed(2)} deduzido do Lucro Projetado.` : ""}`;
+
   await recordAuditLog({
     entityType: "inventory",
     entityId: id,
     action: "criado",
     title: "Artigo criado",
-    details: `${name} (${sku}) adicionado ao inventário (${totalQuantity} un., €${unitPrice}/evento, local: ${warehouseLocation || "Armazém Principal"})${totalCost > 0 ? ` · Despesa automática de €${totalCost.toFixed(2)} registada em Finanças.` : ""}`,
+    details: auditDetails,
   });
 
   invalidateAllCaches();
@@ -616,6 +629,8 @@ export async function updateItemPatchAction(
     dimensions?: string | null;
     unitPrice?: number;
     replacementCost?: number | null;
+    purchaseStatus?: "bought" | "not_bought" | null;
+    purchaseCost?: number | null;
     imageUrl?: string | null;
     damagedQuantity?: number | null;
     inMaintenanceQuantity?: number | null;
@@ -637,6 +652,8 @@ export async function updateItemPatchAction(
   if (patch.dimensions !== undefined) updateData.dimensions = patch.dimensions || null;
   if (patch.unitPrice !== undefined) updateData.unitPrice = Math.max(0, patch.unitPrice);
   if (patch.replacementCost !== undefined) updateData.replacementCost = patch.replacementCost === null ? null : Math.max(0, patch.replacementCost);
+  if (patch.purchaseStatus !== undefined) updateData.purchaseStatus = patch.purchaseStatus;
+  if (patch.purchaseCost !== undefined) updateData.purchaseCost = patch.purchaseCost === null ? 0 : Math.max(0, patch.purchaseCost);
   if (patch.imageUrl !== undefined) updateData.imageUrl = patch.imageUrl || null;
   if (patch.damagedQuantity !== undefined) updateData.damagedQuantity = patch.damagedQuantity === null ? 0 : Math.max(0, patch.damagedQuantity);
   if (patch.inMaintenanceQuantity !== undefined) updateData.inMaintenanceQuantity = patch.inMaintenanceQuantity === null ? 0 : Math.max(0, patch.inMaintenanceQuantity);
@@ -655,6 +672,7 @@ export async function updateItemPatchAction(
   );
   let summary = "Campos alterados";
   if (patch.name !== undefined) summary = `Nome alterado para "${patch.name}"`;
+  else if (patch.purchaseStatus !== undefined) summary = `Estado de compra alterado para "${patch.purchaseStatus === "bought" ? "Comprado" : "Não Comprado"}"`;
   else if (patch.unitPrice !== undefined) summary = `Preço diário ajustado para €${patch.unitPrice.toFixed(2)}`;
   else if (patch.totalQuantity !== undefined) summary = `Stock total alterado para ${patch.totalQuantity} un.`;
   else if (patch.warehouseLocation !== undefined) summary = `Localização alterada para "${patch.warehouseLocation}"`;
@@ -674,6 +692,79 @@ export async function updateItemPatchAction(
   revalidatePath(`/inventory/${itemId}`);
   revalidatePath(`/artigos/${itemId}`);
   return { success: true };
+}
+
+// 6.3 Mark Item as Bought and Automatically Create Financial Expense
+export async function markItemAsBoughtAction(
+  itemId: string,
+  customPurchaseCost?: number
+) {
+  if (!itemId) return { success: false, error: "ID do artigo é obrigatório." };
+
+  const item = await db.query.inventoryItems.findFirst({
+    where: eq(inventoryItems.id, itemId),
+  });
+
+  if (!item) {
+    return { success: false, error: "Artigo não encontrado." };
+  }
+
+  const cost =
+    customPurchaseCost !== undefined && customPurchaseCost > 0
+      ? customPurchaseCost
+      : item.purchaseCost && item.purchaseCost > 0
+      ? item.purchaseCost
+      : (item.replacementCost || 0) * (item.totalQuantity || 1);
+
+  // Update item to bought
+  await db
+    .update(inventoryItems)
+    .set({
+      purchaseStatus: "bought",
+      purchaseCost: cost,
+      updatedAt: new Date(),
+    })
+    .where(eq(inventoryItems.id, itemId));
+
+  let createdMovement: any = null;
+  if (cost > 0) {
+    const movId = generateId("mov");
+    createdMovement = {
+      id: movId,
+      type: "saida" as const,
+      category: "Material / Stock",
+      description: `Aquisição de Stock: ${item.name} (${item.totalQuantity} un.)`,
+      amount: cost,
+      date: new Date(),
+      eventId: null,
+      clientId: null,
+      notes: `Despesa gerada automaticamente ao marcar como comprado o artigo ${item.sku} (${item.id})`,
+      createdAt: new Date(),
+    };
+    await db.insert(financialMovements).values(createdMovement);
+  }
+
+  await recordAuditLog({
+    entityType: "inventory",
+    entityId: itemId,
+    action: "atualizado",
+    title: "Artigo marcado como Comprado",
+    details: `${item.name} (${item.sku}) passou a Comprado.${cost > 0 ? ` Despesa de €${cost.toFixed(2)} lançada em Finanças.` : ""}`,
+  });
+
+  invalidateAllCaches();
+  revalidatePath(`/inventario/${itemId}`);
+  revalidatePath(`/inventory/${itemId}`);
+  revalidatePath(`/artigos/${itemId}`);
+  revalidatePath("/inventario");
+  revalidatePath("/financas");
+  revalidatePath("/");
+
+  return {
+    success: true,
+    item: { ...item, purchaseStatus: "bought" as const, purchaseCost: cost },
+    movement: createdMovement,
+  };
 }
 
 // 7. Create Client CRM
@@ -2773,5 +2864,242 @@ export async function deleteMeetingAction(meetingId: string) {
   safeRevalidate("/calendar");
   return { success: true };
 }
+
+// ---------------------------------------------------------------------------
+// 14. Gemini Receipt Reader & Smart Inventory Ingestion
+// ---------------------------------------------------------------------------
+
+export async function parseReceiptAction(formData: FormData) {
+  try {
+    await ensureDbMigrated().catch(() => {});
+    const file = formData.get("file") as File | null;
+    const textContent = (formData.get("text") as string)?.trim() || "";
+
+    if (!file && !textContent) {
+      return { success: false as const, error: "Nenhum ficheiro ou texto de fatura foi fornecido." };
+    }
+
+    let buffer: Buffer | undefined;
+    let mimeType: string | undefined;
+
+    if (file && file.size > 0) {
+      const bytes = await file.arrayBuffer();
+      buffer = Buffer.from(bytes);
+      mimeType = file.type;
+
+      // Handle common extensions if browser sent generic octet-stream
+      const fileNameLower = file.name.toLowerCase();
+      if (!mimeType || mimeType === "application/octet-stream") {
+        if (fileNameLower.endsWith(".pdf")) mimeType = "application/pdf";
+        else if (fileNameLower.endsWith(".png")) mimeType = "image/png";
+        else if (fileNameLower.endsWith(".jpg") || fileNameLower.endsWith(".jpeg")) mimeType = "image/jpeg";
+        else if (fileNameLower.endsWith(".webp")) mimeType = "image/webp";
+        else if (fileNameLower.endsWith(".txt") || fileNameLower.endsWith(".csv")) mimeType = "text/plain";
+      }
+
+      // If it's a plain text file, also extract textContent
+      if (mimeType?.startsWith("text/")) {
+        const textFromBuf = buffer.toString("utf-8");
+        buffer = undefined;
+        mimeType = undefined;
+        return await parseTextContent(textFromBuf);
+      }
+    }
+
+    const { parseReceiptWithGemini, reconcileReceiptWithInventory } = await import("@/lib/gemini-receipt");
+    const extracted = await parseReceiptWithGemini({ buffer, mimeType, textContent });
+    const reconciled = await reconcileReceiptWithInventory(extracted);
+
+    return {
+      success: true as const,
+      receipt: reconciled.receipt,
+      items: reconciled.items,
+    };
+  } catch (err: any) {
+    console.error("parseReceiptAction error:", err);
+    return {
+      success: false as const,
+      error: err?.message || "Ocorreu um erro ao processar a fatura com Gemini AI.",
+    };
+  }
+}
+
+async function parseTextContent(text: string) {
+  const { parseReceiptWithGemini, reconcileReceiptWithInventory } = await import("@/lib/gemini-receipt");
+  const extracted = await parseReceiptWithGemini({ textContent: text });
+  const reconciled = await reconcileReceiptWithInventory(extracted);
+  return {
+    success: true as const,
+    receipt: reconciled.receipt,
+    items: reconciled.items,
+  };
+}
+
+export async function commitReceiptInventoryAction(payload: {
+  merchantName: string;
+  invoiceNumber?: string;
+  date?: string;
+  totalAmount: number;
+  createExpenseMovement: boolean;
+  items: Array<{
+    action: "add_to_existing" | "create_new" | "ignore";
+    matchedItemId?: string;
+    name: string;
+    sku: string;
+    category: string;
+    quantityToAdd: number;
+    unitPurchasePrice: number;
+    unitRentalPrice: number;
+    locationId?: string;
+    dimensions?: string;
+  }>;
+}) {
+  try {
+    await ensureDbMigrated().catch(() => {});
+    const {
+      merchantName,
+      invoiceNumber,
+      date,
+      totalAmount,
+      createExpenseMovement,
+      items,
+    } = payload;
+
+    const validItems = (items || []).filter((i) => i.action !== "ignore" && i.quantityToAdd > 0);
+    if (validItems.length === 0) {
+      return { success: false, error: "Nenhum artigo válido selecionado para importação." };
+    }
+
+    const locations = await db.query.storageLocations.findMany();
+    const locationMap = new Map(locations.map((loc) => [loc.id, loc.name]));
+
+    let updatedCount = 0;
+    let createdCount = 0;
+
+    for (const item of validItems) {
+      if (item.action === "add_to_existing" && item.matchedItemId) {
+        const existing = await db.query.inventoryItems.findFirst({
+          where: eq(inventoryItems.id, item.matchedItemId),
+        });
+
+        if (existing) {
+          const newQty = existing.totalQuantity + item.quantityToAdd;
+          const patchObj: any = {
+            totalQuantity: newQty,
+            updatedAt: new Date(),
+          };
+
+          if (item.unitPurchasePrice > 0) {
+            patchObj.replacementCost = item.unitPurchasePrice;
+          }
+          if (item.unitRentalPrice > 0) {
+            patchObj.unitPrice = item.unitRentalPrice;
+          }
+          if (item.locationId) {
+            patchObj.locationId = item.locationId;
+            patchObj.warehouseLocation = locationMap.get(item.locationId) || existing.warehouseLocation;
+          }
+
+          await db
+            .update(inventoryItems)
+            .set(patchObj)
+            .where(eq(inventoryItems.id, existing.id));
+
+          await recordAuditLog({
+            entityType: "inventory",
+            entityId: existing.id,
+            action: "atualizado",
+            title: "Stock reposto via fatura",
+            details: `Adicionadas +${item.quantityToAdd} un. a "${existing.name}" (Stock total: ${newQty} un.) da compra em ${merchantName}${invoiceNumber ? ` (Doc: ${invoiceNumber})` : ""}`,
+          });
+
+          updatedCount++;
+          continue;
+        }
+      }
+
+      // Create new inventory item
+      const newId = generateId("itm");
+      const warehouseLoc = (item.locationId && locationMap.get(item.locationId)) || "Armazém Principal";
+
+      await db.insert(inventoryItems).values({
+        id: newId,
+        sku: item.sku.trim().toUpperCase() || generateReferenceCode("ITM"),
+        name: item.name.trim(),
+        category: item.category || "Decoração",
+        totalQuantity: item.quantityToAdd,
+        minStock: 0,
+        warehouseLocation: warehouseLoc,
+        locationId: item.locationId || null,
+        dimensions: item.dimensions || null,
+        unitPrice: item.unitRentalPrice || Math.max(1, Math.round(item.unitPurchasePrice * 0.25 * 10) / 10),
+        replacementCost: item.unitPurchasePrice || 0,
+        imageUrl: "https://images.unsplash.com/photo-1549497538-303791108f95?auto=format&fit=crop&w=400&q=80",
+        damagedQuantity: 0,
+        inMaintenanceQuantity: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      await recordAuditLog({
+        entityType: "inventory",
+        entityId: newId,
+        action: "criado",
+        title: "Novo artigo criado via fatura",
+        details: `Criado artigo "${item.name}" (${item.quantityToAdd} un., custo: €${item.unitPurchasePrice}) a partir da fatura de ${merchantName}`,
+      });
+
+      createdCount++;
+    }
+
+    // Auto-create financial expense movement if requested
+    if (createExpenseMovement && totalAmount > 0) {
+      const movId = generateId("mov");
+      const parsedDate = date ? new Date(date) : new Date();
+      const safeDate = isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+
+      await db.insert(financialMovements).values({
+        id: movId,
+        type: "saida",
+        category: "Material / Stock",
+        description: `Aquisição de Stock: ${merchantName}${invoiceNumber ? ` (${invoiceNumber})` : ""}`,
+        amount: totalAmount,
+        date: safeDate,
+        eventId: null,
+        clientId: null,
+        notes: `Despesa gerada automaticamente via Leitor de Faturas Gemini. Importados ${validItems.length} artigo(s) (${updatedCount} repostos, ${createdCount} novos).`,
+        createdAt: new Date(),
+      });
+
+      await recordAuditLog({
+        entityType: "inventory",
+        entityId: movId,
+        action: "criado",
+        title: "Despesa de Stock Registada",
+        details: `Despesa de €${totalAmount.toLocaleString("pt-PT", { minimumFractionDigits: 2 })} registada em "Material / Stock" referente à fatura de ${merchantName}`,
+      });
+    }
+
+    invalidateAllCaches();
+    safeRevalidate("/inventario");
+    safeRevalidate("/inventory");
+    safeRevalidate("/financas");
+    safeRevalidate("/finance");
+
+    return {
+      success: true,
+      updatedCount,
+      createdCount,
+      totalProcessed: validItems.length,
+    };
+  } catch (err: any) {
+    console.error("commitReceiptInventoryAction error:", err);
+    return {
+      success: false,
+      error: err?.message || "Ocorreu um erro ao registar os artigos no inventário.",
+    };
+  }
+}
+
 
 

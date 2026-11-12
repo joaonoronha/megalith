@@ -273,6 +273,23 @@ export default function FinanceView({
     return [...monthlyData].reverse();
   }, [monthlyData]);
 
+  // Pending Stock Purchases (Items with purchaseStatus === "not_bought")
+  // Only bought items can be accounted for finance, not bought yet can be deducted from the projected value.
+  const pendingStockPurchases = useMemo(() => {
+    return items
+      .filter((item) => item.purchaseStatus === "not_bought")
+      .reduce((sum, item) => {
+        const cost = Number(item.purchaseCost) > 0
+          ? Number(item.purchaseCost)
+          : (Number(item.replacementCost) || 0) * (Number(item.totalQuantity) || 1);
+        return sum + cost;
+      }, 0);
+  }, [items]);
+
+  const pendingStockCount = useMemo(() => {
+    return items.filter((item) => item.purchaseStatus === "not_bought").length;
+  }, [items]);
+
   // Overall totals / Active filtered data (Realized Cash + Projected Pipeline)
   const activeMetrics = useMemo(() => {
     if (selectedMonth === "all") {
@@ -292,7 +309,8 @@ export default function FinanceView({
       const totalEventos = activeEvents.length;
 
       const faturacaoProjetadaTotal = activeEvents.reduce((sum, e) => sum + (Number(e.customerPrice) || 0), 0);
-      const custosProjetadosTotal = activeEvents.reduce((sum, e) => sum + (Number(e.totalBudget) || 0), 0);
+      const orcamentoCustosTotal = activeEvents.reduce((sum, e) => sum + (Number(e.totalBudget) || 0), 0);
+      const custosProjetadosTotal = orcamentoCustosTotal + pendingStockPurchases;
       const lucroProjetadoTotal = faturacaoProjetadaTotal - custosProjetadosTotal;
       const margemProjetadaGeral = faturacaoProjetadaTotal > 0 ? (lucroProjetadoTotal / faturacaoProjetadaTotal) * 100 : 0;
       const totalAReceber = Math.max(0, faturacaoProjetadaTotal - totalEntradas);
@@ -314,6 +332,9 @@ export default function FinanceView({
         margemPct: margemGeral,
         eventsCount: totalEventos,
         faturacaoProjetada: faturacaoProjetadaTotal,
+        orcamentoCustos: orcamentoCustosTotal,
+        pendingStockPurchases,
+        pendingStockCount,
         custosProjetados: custosProjetadosTotal,
         lucroProjetado: lucroProjetadoTotal,
         margemProjetadaPct: margemProjetadaGeral,
@@ -337,6 +358,9 @@ export default function FinanceView({
           margemPct: 0,
           eventsCount: 0,
           faturacaoProjetada: 0,
+          orcamentoCustos: 0,
+          pendingStockPurchases: 0,
+          pendingStockCount: 0,
           custosProjetados: 0,
           lucroProjetado: 0,
           margemProjetadaPct: 0,
@@ -358,6 +382,9 @@ export default function FinanceView({
         margemPct: match.marginPct,
         eventsCount: match.eventsCount,
         faturacaoProjetada: match.faturacaoProjetada,
+        orcamentoCustos: match.custosProjetados,
+        pendingStockPurchases: 0,
+        pendingStockCount: 0,
         custosProjetados: match.custosProjetados,
         lucroProjetado: match.lucroProjetado,
         margemProjetadaPct: match.margemProjetadaPct,
@@ -368,7 +395,7 @@ export default function FinanceView({
         latestMonthLabel: match.label,
       };
     }
-  }, [selectedMonth, monthlyData, movements, events]);
+  }, [selectedMonth, monthlyData, movements, events, pendingStockPurchases, pendingStockCount]);
 
   // 2. Event-by-Event Profitability & Projections (excluding cancelled events)
   const eventProfitabilityList = useMemo(() => {
@@ -830,6 +857,11 @@ export default function FinanceView({
                 Cálculo Financeiro Dual CFM:
               </strong>{" "}
               Ao configurar um evento com preço cliente e orçamento interno, o sistema projeta imediatamente o <strong>lucro potencial</strong> (€{activeMetrics.lucroProjetado.toLocaleString("pt-PT")}) e confronta com as entradas e saídas de caixa efetivamente liquidadas.
+              {activeMetrics.pendingStockPurchases > 0 && (
+                <span className="block text-[11px] text-amber-700 mt-1 font-medium">
+                  📦 <strong>Stock a Adquirir:</strong> {formatEuro(activeMetrics.pendingStockPurchases)} ({activeMetrics.pendingStockCount} artigos pendentes) deduzidos da projeção até efetivação da compra.
+                </span>
+              )}
             </div>
           </div>
           <button
@@ -880,6 +912,12 @@ export default function FinanceView({
                     {formatEuro(activeMetrics.lucroProjetado)}
                   </span>
                 </div>
+                {activeMetrics.pendingStockPurchases > 0 && (
+                  <div className="flex items-center justify-between text-[10px] text-amber-700 font-medium">
+                    <span>Stock pendente deduzido:</span>
+                    <span>-{formatEuro(activeMetrics.pendingStockPurchases)}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-[11px] text-[#8e8e93]">
                   <span>Pendente a realizar:</span>
                   <span className="font-semibold text-[#111]">
@@ -888,11 +926,18 @@ export default function FinanceView({
                 </div>
               </div>
             ) : financialMode === "projected" ? (
-              <div className="flex items-center justify-between">
-                <span className="text-[#8e8e93]">Margem Prevista:</span>
-                <span className="font-bold text-[#6366f1]">
-                  {activeMetrics.margemProjetadaPct.toFixed(1)}%
-                </span>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#8e8e93]">Margem Prevista:</span>
+                  <span className="font-bold text-[#6366f1]">
+                    {activeMetrics.margemProjetadaPct.toFixed(1)}%
+                  </span>
+                </div>
+                {activeMetrics.pendingStockPurchases > 0 && (
+                  <div className="text-[10px] text-amber-700 font-medium text-right">
+                    Deduzido {formatEuro(activeMetrics.pendingStockPurchases)} stock a comprar
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex items-center justify-between">
@@ -961,7 +1006,7 @@ export default function FinanceView({
           <div>
             <div className="flex items-center justify-between text-xs text-[#8e8e93] mb-1.5">
               <span>
-                {financialMode === "projected" ? "Custos Orçados" : "Gastos & Despesas"}
+                {financialMode === "projected" ? "Custos Previstos" : "Gastos & Despesas"}
               </span>
               <div className="w-7 h-7 rounded-full bg-[#fde8e8] text-[#b04a3f] flex items-center justify-center">
                 <TrendingDown className="w-4 h-4" />
@@ -976,11 +1021,17 @@ export default function FinanceView({
             {financialMode === "comparative" ? (
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[#8e8e93]">Orçamento Previsto:</span>
+                  <span className="text-[#8e8e93]">Custos Previstos:</span>
                   <span className="font-bold text-[#111]">
                     {formatEuro(activeMetrics.custosProjetados)}
                   </span>
                 </div>
+                {activeMetrics.pendingStockPurchases > 0 && (
+                  <div className="flex items-center justify-between text-[10px] text-amber-700 font-medium">
+                    <span>Inclui stock a comprar:</span>
+                    <span>+{formatEuro(activeMetrics.pendingStockPurchases)}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-[11px] text-[#8e8e93]">
                   <span>Despesas pagas:</span>
                   <span className="font-semibold text-[#b04a3f]">
@@ -989,11 +1040,21 @@ export default function FinanceView({
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-between">
-                <span className="text-[#8e8e93]">Investido em stock:</span>
-                <span className="font-bold text-[#8c6417]">
-                  {formatEuro(activeMetrics.investimentos)}
-                </span>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#8e8e93]">
+                    {financialMode === "projected" ? "Orçamento Eventos:" : "Investido em stock:"}
+                  </span>
+                  <span className="font-bold text-[#8c6417]">
+                    {formatEuro(financialMode === "projected" ? activeMetrics.orcamentoCustos : activeMetrics.investimentos)}
+                  </span>
+                </div>
+                {financialMode === "projected" && activeMetrics.pendingStockPurchases > 0 && (
+                  <div className="flex items-center justify-between text-[10px] text-amber-700 font-medium">
+                    <span>Stock a comprar:</span>
+                    <span>+{formatEuro(activeMetrics.pendingStockPurchases)}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>

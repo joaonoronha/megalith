@@ -1,6 +1,6 @@
 id: eventflow
-name: EventFlow (CFM Eventos)
-description: Operations management, temporal inventory allocation, digital quote approval, and financial ledger platform for CFM Eventos.
+name: EventFlow (CFM Events)
+description: Operations management, temporal inventory allocation, digital quote approval, and financial ledger platform for CFM Events.
 docs: README.md
 services:
   - id: web
