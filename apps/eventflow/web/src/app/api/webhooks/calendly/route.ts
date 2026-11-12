@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { clients, events } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
+import { generateId } from "@/lib/id";
 
 export async function GET() {
   return NextResponse.json({
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
       let clientId = existingClient?.id;
 
       if (!clientId) {
-        clientId = `cli-cal-${Date.now()}`;
+        clientId = generateId("cli");
         await db.insert(clients).values({
           id: clientId,
           name: inviteeName,
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
       }
 
       // 2. Create Event in "Planeamento" stage
-      const eventId = `evt-cal-${Date.now()}`;
+      const eventId = generateId("evt");
       await db.insert(events).values({
         id: eventId,
         name: `${inviteeName} · ${meetingName}`,
