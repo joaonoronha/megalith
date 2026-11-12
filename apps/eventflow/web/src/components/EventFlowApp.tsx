@@ -3364,6 +3364,9 @@ export default function EventFlowApp({
             setShowEventWizard(false);
             setEventWizardInitialDate(null);
           }}
+          onClientCreated={(newClient) => {
+            setClientsList((prev) => [newClient, ...prev]);
+          }}
           onCreated={(newEvent) => {
             setEventsList((prev) => [newEvent, ...prev]);
             setShowEventWizard(false);
@@ -4979,11 +4982,13 @@ function EventWizardModal({
   initialDate,
   onClose,
   onCreated,
+  onClientCreated,
 }: {
   clients: any[];
   initialDate?: string | null;
   onClose: () => void;
   onCreated: (event: any) => void;
+  onClientCreated?: (client: any) => void;
 }) {
   const baseDate = initialDate
     ? initialDate.split("T")[0]
@@ -4991,7 +4996,9 @@ function EventWizardModal({
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [customId, setCustomId] = useState("");
-  const [clientId, setClientId] = useState(clients[0]?.id || "");
+  const [localClients, setLocalClients] = useState(clients);
+  const [clientId, setClientId] = useState("");
+  const [showCreateClientModal, setShowCreateClientModal] = useState(false);
   const [venue, setVenue] = useState("");
   const [category, setCategory] = useState("Aniversário Infantil");
   const [theme, setTheme] = useState("");
@@ -5052,7 +5059,7 @@ function EventWizardModal({
       onCreated({
         id: res.id,
         name,
-        clientId,
+        clientId: clientId || null,
         venue,
         category,
         theme,
@@ -5155,18 +5162,39 @@ function EventWizardModal({
               </div>
 
               <div>
-                <label className="block font-bold text-[#3a3a3c] mb-1">Cliente Associado</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-bold text-[#3a3a3c]">Cliente Associado (Opcional)</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateClientModal(true)}
+                    className="text-[11px] font-bold text-[#007aff] hover:text-[#0051a8] flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Novo Cliente</span>
+                  </button>
+                </div>
                 <select
                   value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
+                  onChange={(e) => {
+                    if (e.target.value === "__create_new__") {
+                      setShowCreateClientModal(true);
+                    } else {
+                      setClientId(e.target.value);
+                    }
+                  }}
                   className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                 >
-                  {clients.map((c) => (
+                  <option value="">(Sem cliente associado - definir mais tarde)</option>
+                  {localClients.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name} ({c.contactName || "Sem contacto"})
+                      {c.name} {c.contactName ? `(${c.contactName})` : ""}
                     </option>
                   ))}
+                  <option value="__create_new__">+ Criar novo cliente...</option>
                 </select>
+                <span className="text-[10px] text-[#8e8e93] mt-0.5 block">
+                  Pode criar o evento sem cliente e atribuir ou registar um novo cliente mais tarde na edição do evento.
+                </span>
               </div>
 
               <div>
@@ -5333,6 +5361,18 @@ function EventWizardModal({
           </div>
         </form>
       </div>
+
+      {showCreateClientModal && (
+        <ClientWizardModal
+          onClose={() => setShowCreateClientModal(false)}
+          onCreated={(newClient) => {
+            setLocalClients((prev) => [newClient, ...prev]);
+            setClientId(newClient.id);
+            if (onClientCreated) onClientCreated(newClient);
+            setShowCreateClientModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }
