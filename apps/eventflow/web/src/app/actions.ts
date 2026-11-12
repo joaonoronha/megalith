@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/db/client";
+import { db, ensureDbMigrated } from "@/db/client";
 import {
   events,
   eventAllocations,

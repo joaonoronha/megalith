@@ -1,4 +1,4 @@
-import { db } from "@/db/client";
+import { db, ensureDbMigrated } from "@/db/client";
 import {
   events,
   inventoryItems,
@@ -16,6 +16,8 @@ import { desc, asc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 
 export async function getAppInitialData() {
+  await ensureDbMigrated().catch(() => {});
+
   let currentUser = null;
   try {
     currentUser = await getCurrentUser();

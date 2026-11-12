@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { db } from "@/db/client";
+import { db, ensureDbMigrated } from "@/db/client";
 import {
   events,
   clients,
@@ -25,6 +25,7 @@ interface PageProps {
 }
 
 export default async function EventPage({ params }: PageProps) {
+  await ensureDbMigrated().catch(() => {});
   const { id } = await params;
 
   const event = await db.query.events.findFirst({

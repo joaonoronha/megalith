@@ -1,4 +1,4 @@
-import { db } from "@/db/client";
+import { db, ensureDbMigrated } from "@/db/client";
 import { clients, events, integrations, auditLogs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { generateId } from "@/lib/id";
@@ -85,6 +85,8 @@ export async function refreshCalendlyOAuthToken(refreshToken: string): Promise<s
 }
 
 export async function pullCalendlyMeetings(overrideToken?: string): Promise<CalendlySyncResult> {
+  await ensureDbMigrated().catch(() => {});
+
   const token = overrideToken?.trim() || (await getCalendlyAccessToken());
   if (!token) {
     return {
