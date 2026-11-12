@@ -50,7 +50,46 @@ export async function GET(req: NextRequest) {
       const tokenData = await response.json();
       console.log("Calendly OAuth connected successfully for user:", tokenData.owner);
 
-      return NextResponse.redirect(`${baseUrl}?calendly_status=connected`);
+      // Save tokens to integrations table
+      const { db } = await import("@/db/client");
+      const { integrations } = await import("@/db/schema");
+      const { pullCalendlyMeetings } = await import("@/lib/calendly-sync");
+
+      const expiresAt = new Date(Date.now() + (tokenData.expires_in || 7200) * 1000);
+
+      await db
+        .insert(integrations)
+        .values({
+          id: "calendly",
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token,
+          tokenType: tokenData.token_type,
+          expiresAt,
+          userUri: tokenData.owner,
+          organizationUri: tokenData.organization,
+          syncStatus: "syncing",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: integrations.id,
+          set: {
+            accessToken: tokenData.access_token,
+            refreshToken: tokenData.refresh_token,
+            tokenType: tokenData.token_type,
+            expiresAt,
+            userUri: tokenData.owner,
+            organizationUri: tokenData.organization,
+            syncStatus: "syncing",
+            updatedAt: new Date(),
+          },
+        });
+
+      // Automatically pull meetings immediately
+      const syncResult = await pullCalendlyMeetings(tokenData.access_token);
+      console.log("Initial Calendly meetings sync result:", syncResult.count, "meetings");
+
+      return NextResponse.redirect(`${baseUrl}?calendly_status=connected&synced_count=${syncResult.count}`);
     } catch (err) {
       console.error("Error exchanging Calendly OAuth code:", err);
       return NextResponse.redirect(`${baseUrl}?calendly_status=error`);

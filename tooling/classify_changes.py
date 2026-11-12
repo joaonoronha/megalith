@@ -133,7 +133,33 @@ def discover_registered_services(repo_root: Path) -> Tuple[Dict[str, List[str]],
                 svc_pattern = f"apps/{prod_id}/{svc_id}/**"
                 service_patterns.setdefault(qualified, []).append(svc_pattern)
     except Exception:
-        pass
+        # Zero-dependency fallback: parse basic YAML keys with regex/lines
+        import re
+        try:
+            current_prod_id = None
+            with open(projects_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    id_match = re.search(r"-\s*id:\s*([a-zA-Z0-9_-]+)", line)
+                    if id_match:
+                        current_prod_id = id_match.group(1)
+                    manifest_match = re.search(r"manifest:\s*(\S+)", line)
+                    if manifest_match and current_prod_id:
+                        norm = manifest_match.group(1).strip("\"'").replace("\\", "/").lstrip("./")
+                        product_manifests[norm] = current_prod_id
+                        current_prod_id = None
+
+            for norm_manifest, prod_id in product_manifests.items():
+                p_path = repo_root / norm_manifest
+                if p_path.is_file():
+                    with open(p_path, "r", encoding="utf-8") as pf:
+                        for pline in pf:
+                            s_match = re.search(r"-\s*id:\s*([a-zA-Z0-9_-]+)", pline)
+                            if s_match:
+                                svc_id = s_match.group(1)
+                                qualified = f"{prod_id}/{svc_id}"
+                                service_patterns.setdefault(qualified, []).append(f"apps/{prod_id}/{svc_id}/**")
+        except Exception:
+            pass
 
     return product_manifests, service_patterns
 

@@ -109,6 +109,7 @@ export const eventMedia = sqliteTable("event_media", {
   title: text("title").notNull(),
   description: text("description"),
   imageUrl: text("image_url").notNull(),
+  images: text("images"),
   tag: text("tag"), // e.g. "Mesa de Honra", "Iluminação", "Flores", "Mobiliário", "Lounge"
   orderIndex: integer("order_index").default(0),
   uploadedByName: text("uploaded_by_name").default("Administrador CFM"),
@@ -246,6 +247,24 @@ export const alerts = sqliteTable("alerts", {
   lastTriggeredAt: integer("last_triggered_at", { mode: "timestamp" }).notNull(),
   acknowledgedAt: integer("acknowledged_at", { mode: "timestamp" }),
   acknowledgedByUserId: text("acknowledged_by_user_id").references(() => users.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+});
+
+// 13. Third-party Integrations & OAuth Tokens (Calendly, etc.)
+export const integrations = sqliteTable("integrations", {
+  id: text("id").primaryKey(), // e.g. "calendly"
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  tokenType: text("token_type"),
+  expiresAt: integer("expires_at", { mode: "timestamp" }),
+  userUri: text("user_uri"),
+  organizationUri: text("organization_uri"),
+  ownerName: text("owner_name"),
+  ownerEmail: text("owner_email"),
+  lastSyncedAt: integer("last_synced_at", { mode: "timestamp" }),
+  syncStatus: text("sync_status"), // "idle" | "syncing" | "success" | "error"
+  syncError: text("sync_error"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
 });

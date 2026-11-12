@@ -402,6 +402,23 @@ export async function seed() {
     eventColecaoSep,
     eventNovGala,
     eventNovAniversario,
+    {
+      id: "evt-cal-marta",
+      name: "Reunião: Marta Almeida (Briefing de Decoração)",
+      clientId: clientMarta.id,
+      venue: "Google Meet · meet.google.com/cfm-briefing-marta",
+      startDate: new Date("2026-11-18T10:30:00Z"),
+      endDate: new Date("2026-11-18T11:15:00Z"),
+      status: "planeamento" as const,
+      totalBudget: 0,
+      customerPrice: 0,
+      category: "Reunião Calendly",
+      theme: "Briefing & Consulta de Evento",
+      coverImageUrl: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=600&q=80",
+      notes: "Agendado via Calendly para discutir detalhes de flores e centros de mesa para o casamento.\n\n• Número estimado de convidados: 120 pessoas\n• Local previsto: Sintra",
+      calendlyEventUri: "https://api.calendly.com/scheduled_events/evt-cal-seed-001",
+      createdAt: new Date("2026-11-10"),
+    },
   ]).onConflictDoUpdate({
     target: events.id,
     set: {

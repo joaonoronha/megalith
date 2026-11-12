@@ -49,6 +49,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           BEFORE_SHA: ${{ github.event.before }}
         run: |
+          python3 -m pip install --quiet pyyaml
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             echo "Manual workflow dispatch: triggering all jobs conservatively."
             python3 tooling/classify_changes.py --force-all

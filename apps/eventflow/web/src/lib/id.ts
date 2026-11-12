@@ -16,7 +16,9 @@ export type EntityPrefix =
   | "alt"  // Alerts
   | "loc"  // Storage Locations
   | "f"    // Uploaded Files
+  | "img"  // Staged / Nested Media Images
   | "log"; // Audit Logs
+
 
 /**
  * Generates a collision-proof unique identifier with a standard entity prefix.
