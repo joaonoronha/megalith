@@ -983,7 +983,7 @@ export default function EventFlowApp({
 
                   {filteredEvents.length === 0 && (
                     <div className="py-8 text-center text-xs text-[#8e8e93]">
-                      Nenhum evento encontrado para "{searchTerm}".
+                      {searchTerm ? `Nenhum evento encontrado para "${searchTerm}".` : "Ainda não existem eventos registados."}
                     </div>
                   )}
                 </div>
