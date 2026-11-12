@@ -14,6 +14,7 @@ export type EntityPrefix =
   | "tpl"  // Templates
   | "med"  // Media items / Photos
   | "alt"  // Alerts
+  | "loc"  // Storage Locations
   | "log"; // Audit Logs
 
 /**
