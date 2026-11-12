@@ -125,7 +125,7 @@ export default function InventoryDetailView({
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-[#ececf0] px-4 py-3">
         <div className="max-w-[1100px] mx-auto flex items-center justify-between">
           <Link
-            href="/?tab=inventory"
+            href="/inventario"
             className="inline-flex items-center gap-2 text-xs font-semibold text-[#636366] hover:text-[#111111] transition bg-[#f2f2f5] hover:bg-[#e5e5ea] px-3 py-1.5 rounded-full"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -310,7 +310,7 @@ export default function InventoryDetailView({
                 Este artigo está totalmente desimpedido no armazém e pronto a ser reservado para novos eventos.
               </p>
               <Link
-                href="/?tab=events"
+                href="/eventos"
                 className="px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold inline-flex items-center gap-1.5 shadow-xs"
               >
                 <span>Ver Eventos em Planeamento</span>
