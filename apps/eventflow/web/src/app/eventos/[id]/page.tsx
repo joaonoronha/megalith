@@ -5,6 +5,7 @@ import {
   clients,
   inventoryItems,
   eventAllocations,
+  eventCustomItems,
   eventTasks,
   eventMedia,
   moodboardComments,
@@ -224,6 +225,17 @@ export default async function EventPage({ params }: PageProps) {
     console.error("Error fetching linkable meetings:", err);
   }
 
+  // 10. Event Custom Items (Bespoke items specific only to this event, added directly to quota)
+  let customItems: any[] = [];
+  try {
+    customItems = await db.query.eventCustomItems.findMany({
+      where: eq(eventCustomItems.eventId, id),
+      orderBy: [asc(eventCustomItems.createdAt)],
+    });
+  } catch (err) {
+    console.error("Error fetching custom items:", err);
+  }
+
   return (
     <EventDetailView
       event={event}
@@ -231,6 +243,7 @@ export default async function EventPage({ params }: PageProps) {
       allClients={allClients}
       allItems={allItems}
       initialAllocations={rawAllocations}
+      initialCustomItems={customItems}
       initialTasks={tasks}
       initialMedia={media}
       initialMeetings={meetings}

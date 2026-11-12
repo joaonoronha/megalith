@@ -9,6 +9,7 @@ import {
   storageLocations,
   users,
   eventAllocations,
+  eventCustomItems,
   eventMeetings,
   alerts,
 } from "@/db/schema";
@@ -33,6 +34,7 @@ export async function getAppInitialData() {
   let allUsers: any[] = [];
   let allLocations: any[] = [];
   let allAllocations: any[] = [];
+  let allCustomItems: any[] = [];
   let allMeetings: any[] = [];
   let templateRow: any = null;
 
@@ -105,6 +107,10 @@ export async function getAppInitialData() {
         console.error("getAppInitialData: error loading meetings", e);
         return [];
       }),
+      db.query.eventCustomItems.findMany().catch((e) => {
+        console.error("getAppInitialData: error loading custom items", e);
+        return [];
+      }),
     ]);
 
     allEvents = (results[0] || []).filter(
@@ -119,6 +125,7 @@ export async function getAppInitialData() {
     allAllocations = results[7] || [];
     templateRow = results[8] || null;
     allMeetings = results[9] || [];
+    allCustomItems = results[10] || [];
   } catch (err) {
     console.error("getAppInitialData: bulk query error", err);
   }
@@ -157,6 +164,7 @@ export async function getAppInitialData() {
     allUsers: allUsers || [],
     allLocations: allLocations || [],
     allAllocations: allAllocations || [],
+    allCustomItems: allCustomItems || [],
     allMeetings: allMeetings || [],
     template,
     allAlerts: allAlerts || [],

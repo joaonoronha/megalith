@@ -149,6 +149,21 @@ export const eventAllocations = sqliteTable("event_allocations", {
   notes: text("notes"),
 });
 
+// 5.1 Event Custom Items (Single-event bespoke items, added directly to event quota/budget)
+export const eventCustomItems = sqliteTable("event_custom_items", {
+  id: text("id").primaryKey(),
+  eventId: text("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  name: text("name").notNull(),
+  category: text("category").default("Personalizado").notNull(),
+  quantity: integer("quantity").default(1).notNull(),
+  unitCost: real("unit_cost").default(0).notNull(), // Internal CFM purchase/production cost
+  unitPrice: real("unit_price").default(0).notNull(), // Price charged to customer in quota
+  supplier: text("supplier"), // Supplier / manufacturer
+  notes: text("notes"), // Dimensions, specifications, colors
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+});
+
 // 6. Commercial Quotes / Orçamentos
 export const quotes = sqliteTable("quotes", {
   id: text("id").primaryKey(),

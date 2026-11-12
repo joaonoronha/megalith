@@ -9,6 +9,7 @@ export type EntityPrefix =
   | "ql"   // Quote Lines
   | "mov"  // Financial Movements
   | "alc"  // Event Allocations
+  | "eci"  // Event Custom Items (Bespoke items specific to 1 event)
   | "tsk"  // Event Tasks / Checklist
   | "doc"  // Documents
   | "tpl"  // Templates

@@ -4,6 +4,7 @@ import { db, ensureDbMigrated } from "@/db/client";
 import {
   events,
   eventAllocations,
+  eventCustomItems,
   eventTasks,
   eventMedia,
   moodboardComments,
@@ -1157,6 +1158,260 @@ export async function deleteAllocationAction(allocationId: string, eventId: stri
     action: "removeu_material",
     title: "Material removido do evento",
     details: `Removida alocação de material #${allocationId}`,
+  });
+
+  invalidateAllCaches();
+  revalidatePath(`/eventos/${eventId}`);
+  return { success: true };
+}
+
+// 14.1 Add Custom Item Specific to 1 Event (with direct quota addition)
+export async function addEventCustomItemAction(params: {
+  eventId: string;
+  name: string;
+  category?: string;
+  quantity: number;
+  unitCost: number;
+  unitPrice: number;
+  supplier?: string;
+  notes?: string;
+  addToQuota?: boolean;
+}) {
+  await ensureDbMigrated().catch(() => {});
+  const {
+    eventId,
+    name,
+    category = "Personalizado",
+    quantity = 1,
+    unitCost = 0,
+    unitPrice = 0,
+    supplier,
+    notes,
+    addToQuota = true,
+  } = params;
+
+  if (!eventId || !name?.trim()) {
+    return { success: false, error: "Nome do artigo e ID do evento são obrigatórios." };
+  }
+
+  const cleanQty = Math.max(1, Number(quantity) || 1);
+  const cleanUnitCost = Math.max(0, Number(unitCost) || 0);
+  const cleanUnitPrice = Math.max(0, Number(unitPrice) || 0);
+  const totalCost = cleanQty * cleanUnitCost;
+  const totalPrice = cleanQty * cleanUnitPrice;
+
+  const id = generateId("eci");
+  const now = new Date();
+
+  await db.insert(eventCustomItems).values({
+    id,
+    eventId,
+    name: name.trim(),
+    category: category.trim() || "Personalizado",
+    quantity: cleanQty,
+    unitCost: cleanUnitCost,
+    unitPrice: cleanUnitPrice,
+    supplier: supplier?.trim() || null,
+    notes: notes?.trim() || null,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  // If addToQuota is enabled, directly add costs & prices to the event quota/budget
+  if (addToQuota) {
+    const targetEvt = await db.query.events.findFirst({
+      where: eq(events.id, eventId),
+    });
+    if (targetEvt) {
+      const currentPrice = Number(targetEvt.customerPrice) || 0;
+      const currentBudget = Number(targetEvt.totalBudget) || 0;
+      await db
+        .update(events)
+        .set({
+          customerPrice: Math.round((currentPrice + totalPrice) * 100) / 100,
+          totalBudget: Math.round((currentBudget + totalCost) * 100) / 100,
+          updatedAt: now,
+        })
+        .where(eq(events.id, eventId));
+    }
+  }
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "atualizado",
+    title: "Artigo personalizado adicionado",
+    details: `Adicionado artigo exclusivo "${name.trim()}" (Qtd: ${cleanQty}, Custo: €${cleanUnitCost.toFixed(2)}, Quota: €${cleanUnitPrice.toFixed(2)}${
+      addToQuota ? ` · +€${totalPrice.toFixed(2)} adicionado à quota` : ""
+    })`,
+  });
+
+  invalidateAllCaches();
+  revalidatePath(`/eventos/${eventId}`);
+  return {
+    success: true,
+    item: {
+      id,
+      eventId,
+      name: name.trim(),
+      category: category.trim() || "Personalizado",
+      quantity: cleanQty,
+      unitCost: cleanUnitCost,
+      unitPrice: cleanUnitPrice,
+      supplier: supplier?.trim() || null,
+      notes: notes?.trim() || null,
+      createdAt: now,
+      updatedAt: now,
+    },
+  };
+}
+
+// 14.2 Update Custom Item Specific to Event (with quota delta sync)
+export async function updateEventCustomItemAction(params: {
+  id: string;
+  eventId: string;
+  name: string;
+  category?: string;
+  quantity: number;
+  unitCost: number;
+  unitPrice: number;
+  supplier?: string;
+  notes?: string;
+  syncQuotaDifference?: boolean;
+}) {
+  await ensureDbMigrated().catch(() => {});
+  const {
+    id,
+    eventId,
+    name,
+    category = "Personalizado",
+    quantity = 1,
+    unitCost = 0,
+    unitPrice = 0,
+    supplier,
+    notes,
+    syncQuotaDifference = true,
+  } = params;
+
+  if (!id || !eventId || !name?.trim()) {
+    return { success: false, error: "Dados inválidos para atualizar artigo personalizado." };
+  }
+
+  const existing = await db.query.eventCustomItems.findFirst({
+    where: eq(eventCustomItems.id, id),
+  });
+
+  if (!existing) {
+    return { success: false, error: "Artigo personalizado não encontrado." };
+  }
+
+  const cleanQty = Math.max(1, Number(quantity) || 1);
+  const cleanUnitCost = Math.max(0, Number(unitCost) || 0);
+  const cleanUnitPrice = Math.max(0, Number(unitPrice) || 0);
+
+  const oldTotalPrice = (existing.quantity || 1) * (existing.unitPrice || 0);
+  const oldTotalCost = (existing.quantity || 1) * (existing.unitCost || 0);
+
+  const newTotalPrice = cleanQty * cleanUnitPrice;
+  const newTotalCost = cleanQty * cleanUnitCost;
+
+  const diffPrice = newTotalPrice - oldTotalPrice;
+  const diffCost = newTotalCost - oldTotalCost;
+
+  const now = new Date();
+
+  await db
+    .update(eventCustomItems)
+    .set({
+      name: name.trim(),
+      category: category.trim() || "Personalizado",
+      quantity: cleanQty,
+      unitCost: cleanUnitCost,
+      unitPrice: cleanUnitPrice,
+      supplier: supplier?.trim() || null,
+      notes: notes?.trim() || null,
+      updatedAt: now,
+    })
+    .where(eq(eventCustomItems.id, id));
+
+  if (syncQuotaDifference && (diffPrice !== 0 || diffCost !== 0)) {
+    const targetEvt = await db.query.events.findFirst({
+      where: eq(events.id, eventId),
+    });
+    if (targetEvt) {
+      const currentPrice = Number(targetEvt.customerPrice) || 0;
+      const currentBudget = Number(targetEvt.totalBudget) || 0;
+      await db
+        .update(events)
+        .set({
+          customerPrice: Math.max(0, Math.round((currentPrice + diffPrice) * 100) / 100),
+          totalBudget: Math.max(0, Math.round((currentBudget + diffCost) * 100) / 100),
+          updatedAt: now,
+        })
+        .where(eq(events.id, eventId));
+    }
+  }
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "atualizado",
+    title: "Artigo personalizado atualizado",
+    details: `Artigo exclusivo "${name.trim()}" atualizado (Qtd: ${cleanQty}, Custo: €${cleanUnitCost.toFixed(2)}, Quota: €${cleanUnitPrice.toFixed(2)})`,
+  });
+
+  invalidateAllCaches();
+  revalidatePath(`/eventos/${eventId}`);
+  return { success: true };
+}
+
+// 14.3 Delete Custom Item Specific to Event (deduct from quota)
+export async function deleteEventCustomItemAction(params: {
+  id: string;
+  eventId: string;
+  removeFromQuota?: boolean;
+}) {
+  await ensureDbMigrated().catch(() => {});
+  const { id, eventId, removeFromQuota = true } = params;
+
+  if (!id || !eventId) {
+    return { success: false, error: "ID do artigo e ID do evento são obrigatórios." };
+  }
+
+  const existing = await db.query.eventCustomItems.findFirst({
+    where: eq(eventCustomItems.id, id),
+  });
+
+  if (existing && removeFromQuota) {
+    const totalPrice = (existing.quantity || 1) * (existing.unitPrice || 0);
+    const totalCost = (existing.quantity || 1) * (existing.unitCost || 0);
+    const targetEvt = await db.query.events.findFirst({
+      where: eq(events.id, eventId),
+    });
+    if (targetEvt) {
+      const currentPrice = Number(targetEvt.customerPrice) || 0;
+      const currentBudget = Number(targetEvt.totalBudget) || 0;
+      await db
+        .update(events)
+        .set({
+          customerPrice: Math.max(0, Math.round((currentPrice - totalPrice) * 100) / 100),
+          totalBudget: Math.max(0, Math.round((currentBudget - totalCost) * 100) / 100),
+          updatedAt: new Date(),
+        })
+        .where(eq(events.id, eventId));
+    }
+  }
+
+  await db.delete(eventCustomItems).where(eq(eventCustomItems.id, id));
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "removeu_material",
+    title: "Artigo personalizado removido",
+    details: `Artigo exclusivo "${existing?.name || id}" removido do evento${
+      removeFromQuota ? " e deduzido da quota" : ""
+    }`,
   });
 
   invalidateAllCaches();

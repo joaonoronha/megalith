@@ -48,6 +48,7 @@ import {
   Send,
   Paperclip,
   Tag,
+  Pencil,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AuditLogModal from "@/components/AuditLogModal";
@@ -61,6 +62,9 @@ import {
   updateAllocationQuantityAction,
   deleteAllocationAction,
   addEventAllocationAction,
+  addEventCustomItemAction,
+  updateEventCustomItemAction,
+  deleteEventCustomItemAction,
   addEventTaskAction,
   toggleEventTaskAction,
   deleteEventTaskAction,
@@ -1418,12 +1422,27 @@ export interface StagedMediaItem {
   fileSizeFormatted?: string;
 }
 
+export interface EventCustomItem {
+  id: string;
+  eventId: string;
+  name: string;
+  category: string;
+  quantity: number;
+  unitCost: number;
+  unitPrice: number;
+  supplier?: string | null;
+  notes?: string | null;
+  createdAt?: Date | string | null;
+  updatedAt?: Date | string | null;
+}
+
 interface Props {
   event: EventData;
   client: Client | null;
   allClients: Client[];
   allItems: InventoryItem[];
   initialAllocations: Allocation[];
+  initialCustomItems?: EventCustomItem[];
   initialTasks: Task[];
   initialMedia?: EventMediaItem[];
   initialMeetings?: EventMeeting[];
@@ -1538,6 +1557,7 @@ export default function EventDetailView({
   allClients,
   allItems,
   initialAllocations,
+  initialCustomItems = [],
   initialTasks,
   initialMedia = [],
   initialMeetings = [],
@@ -1863,6 +1883,23 @@ export default function EventDetailView({
   const [showCoverPicker, setShowCoverPicker] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
 
+  // Custom Items state (Single-event bespoke items added directly to quota/budget)
+  const [customItems, setCustomItems] = useState<EventCustomItem[]>(initialCustomItems || []);
+  const [inventoryTab, setInventoryTab] = useState<"stock" | "custom">("stock");
+  const [showAddCustomItemModal, setShowAddCustomItemModal] = useState(false);
+  const [editingCustomItem, setEditingCustomItem] = useState<EventCustomItem | null>(null);
+
+  // Custom Item form state
+  const [customItemName, setCustomItemName] = useState("");
+  const [customItemCategory, setCustomItemCategory] = useState("Flores & Decoração");
+  const [customItemQuantity, setCustomItemQuantity] = useState(1);
+  const [customItemUnitCost, setCustomItemUnitCost] = useState(0);
+  const [customItemUnitPrice, setCustomItemUnitPrice] = useState(0);
+  const [customItemSupplier, setCustomItemSupplier] = useState("");
+  const [customItemNotes, setCustomItemNotes] = useState("");
+  const [customItemAddToQuota, setCustomItemAddToQuota] = useState(true);
+  const [isSubmittingCustomItem, setIsSubmittingCustomItem] = useState(false);
+
   // New task inline state
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState<"baixa" | "media" | "alta" | "urgente">("media");
@@ -2139,6 +2176,146 @@ export default function EventDetailView({
         );
       }
     });
+  };
+
+  // Custom Item Handlers
+  const handleOpenAddCustomItem = () => {
+    setEditingCustomItem(null);
+    setCustomItemName("");
+    setCustomItemCategory("Flores & Decoração");
+    setCustomItemQuantity(1);
+    setCustomItemUnitCost(0);
+    setCustomItemUnitPrice(0);
+    setCustomItemSupplier("");
+    setCustomItemNotes("");
+    setCustomItemAddToQuota(true);
+    setShowAddCustomItemModal(true);
+  };
+
+  const handleOpenEditCustomItem = (item: EventCustomItem) => {
+    setEditingCustomItem(item);
+    setCustomItemName(item.name);
+    setCustomItemCategory(item.category || "Personalizado");
+    setCustomItemQuantity(item.quantity);
+    setCustomItemUnitCost(item.unitCost);
+    setCustomItemUnitPrice(item.unitPrice);
+    setCustomItemSupplier(item.supplier || "");
+    setCustomItemNotes(item.notes || "");
+    setCustomItemAddToQuota(true);
+    setShowAddCustomItemModal(true);
+  };
+
+  const handleSaveCustomItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customItemName.trim()) return;
+
+    setIsSubmittingCustomItem(true);
+    try {
+      if (editingCustomItem) {
+        const oldPrice = (editingCustomItem.quantity || 1) * (editingCustomItem.unitPrice || 0);
+        const oldCost = (editingCustomItem.quantity || 1) * (editingCustomItem.unitCost || 0);
+        const newPrice = customItemQuantity * customItemUnitPrice;
+        const newCost = customItemQuantity * customItemUnitCost;
+
+        await updateEventCustomItemAction({
+          id: editingCustomItem.id,
+          eventId: event.id,
+          name: customItemName.trim(),
+          category: customItemCategory,
+          quantity: customItemQuantity,
+          unitCost: customItemUnitCost,
+          unitPrice: customItemUnitPrice,
+          supplier: customItemSupplier.trim() || undefined,
+          notes: customItemNotes.trim() || undefined,
+          syncQuotaDifference: customItemAddToQuota,
+        });
+
+        if (customItemAddToQuota) {
+          setEvent((prev) => ({
+            ...prev,
+            customerPrice: Math.max(0, Math.round(((prev.customerPrice || 0) + (newPrice - oldPrice)) * 100) / 100),
+            totalBudget: Math.max(0, Math.round(((prev.totalBudget || 0) + (newCost - oldCost)) * 100) / 100),
+          }));
+        }
+
+        setCustomItems((prev) =>
+          prev.map((c) =>
+            c.id === editingCustomItem.id
+              ? {
+                  ...c,
+                  name: customItemName.trim(),
+                  category: customItemCategory,
+                  quantity: customItemQuantity,
+                  unitCost: customItemUnitCost,
+                  unitPrice: customItemUnitPrice,
+                  supplier: customItemSupplier.trim() || null,
+                  notes: customItemNotes.trim() || null,
+                  updatedAt: new Date(),
+                }
+              : c
+          )
+        );
+      } else {
+        const addedPrice = customItemQuantity * customItemUnitPrice;
+        const addedCost = customItemQuantity * customItemUnitCost;
+
+        const res = await addEventCustomItemAction({
+          eventId: event.id,
+          name: customItemName.trim(),
+          category: customItemCategory,
+          quantity: customItemQuantity,
+          unitCost: customItemUnitCost,
+          unitPrice: customItemUnitPrice,
+          supplier: customItemSupplier.trim() || undefined,
+          notes: customItemNotes.trim() || undefined,
+          addToQuota: customItemAddToQuota,
+        });
+
+        if (res.success && res.item) {
+          setCustomItems((prev) => [...prev, res.item as EventCustomItem]);
+          if (customItemAddToQuota) {
+            setEvent((prev) => ({
+              ...prev,
+              customerPrice: Math.round(((prev.customerPrice || 0) + addedPrice) * 100) / 100,
+              totalBudget: Math.round(((prev.totalBudget || 0) + addedCost) * 100) / 100,
+            }));
+          }
+        }
+      }
+      setShowAddCustomItemModal(false);
+    } catch (err) {
+      console.error("Erro ao guardar artigo personalizado:", err);
+    } finally {
+      setIsSubmittingCustomItem(false);
+    }
+  };
+
+  const handleDeleteCustomItem = async (item: EventCustomItem) => {
+    const confirmDelete = window.confirm(
+      `Pretende remover o artigo exclusivo "${item.name}" deste evento?\nO valor correspondente será deduzido da quota do evento.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      const removedPrice = (item.quantity || 1) * (item.unitPrice || 0);
+      const removedCost = (item.quantity || 1) * (item.unitCost || 0);
+
+      await deleteEventCustomItemAction({
+        id: item.id,
+        eventId: event.id,
+        removeFromQuota: true,
+      });
+
+      setEvent((prev) => ({
+        ...prev,
+        customerPrice: Math.max(0, Math.round(((prev.customerPrice || 0) - removedPrice) * 100) / 100),
+        totalBudget: Math.max(0, Math.round(((prev.totalBudget || 0) - removedCost) * 100) / 100),
+      }));
+
+      setCustomItems((prev) => prev.filter((c) => c.id !== item.id));
+    } catch (err) {
+      console.error("Erro ao remover artigo personalizado:", err);
+    }
   };
 
   const handleCopyQuoteLink = (token: string, quoteId: string) => {
@@ -2651,6 +2828,11 @@ export default function EventDetailView({
   const totalAllocatedItems = allocations.reduce((sum, a) => sum + a.quantity, 0);
   const totalAllocatedRentalValue = allocations.reduce((sum, a) => sum + a.quantity * (a.itemUnitPrice || 0), 0);
 
+  const totalCustomItemsCount = customItems.reduce((sum, c) => sum + (c.quantity || 1), 0);
+  const totalCustomCost = customItems.reduce((sum, c) => sum + (c.quantity || 1) * (c.unitCost || 0), 0);
+  const totalCustomPrice = customItems.reduce((sum, c) => sum + (c.quantity || 1) * (c.unitPrice || 0), 0);
+  const totalCustomMargin = totalCustomPrice - totalCustomCost;
+
   const customerPriceVal = event.customerPrice || 0;
   const totalBudgetVal = event.totalBudget || 0;
   const estimatedMargin = customerPriceVal - totalBudgetVal;
@@ -3039,6 +3221,12 @@ export default function EventDetailView({
                   €{estimatedMargin.toFixed(2)}
                 </strong>
               </div>
+              {totalCustomPrice > 0 && (
+                <div className="text-[10px] text-[#007aff] font-semibold flex items-center gap-1 pt-0.5">
+                  <Sparkles className="w-3 h-3 shrink-0" />
+                  <span>Inclui €{totalCustomPrice.toFixed(2)} em {totalCustomItemsCount} exclusivo(s)</span>
+                </div>
+              )}
             </div>
 
             {/* 2. Internal Production Budget (Directly Editable) */}
@@ -3061,7 +3249,10 @@ export default function EventDetailView({
                 />
               </div>
               <div className="text-[11px] text-[#8e8e93]">
-                Valor material alugado: €{totalAllocatedRentalValue.toFixed(2)}
+                Material armazém: €{totalAllocatedRentalValue.toFixed(2)}
+                {totalCustomCost > 0 && (
+                  <span className="text-amber-800 font-medium"> · Exclusivos: €{totalCustomCost.toFixed(2)}</span>
+                )}
               </div>
             </div>
 
@@ -3138,183 +3329,414 @@ export default function EventDetailView({
             {/* ----------------------------------------------------------------- */}
             {/* INVENTORY MANAGEMENT */}
             {/* ----------------------------------------------------------------- */}
+            {/* ----------------------------------------------------------------- */}
+            {/* INVENTORY & CUSTOM BESPOKE ITEMS MANAGEMENT */}
+            {/* ----------------------------------------------------------------- */}
             <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
                 <div>
                   <div className="flex items-center gap-2">
                     <Package className="w-5 h-5 text-[#111]" />
                     <h2 className="text-lg font-bold text-[#111]">
-                      Gestão de Inventário Alocado ao Evento
+                      Artigos & Materiais do Evento
                     </h2>
                   </div>
                   <p className="text-xs text-[#8e8e93] mt-0.5">
-                    Artigos reservados, despachados e devolvidos para este evento
+                    Artigos de stock de armazém e artigos personalizados exclusivos deste evento
                   </p>
                 </div>
 
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setShowAddAllocationModal(true)}
+                    className="px-3.5 py-2 rounded-[12px] bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#111] text-xs font-bold flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+                  >
+                    <Package className="w-3.5 h-3.5 text-[#007aff]" />
+                    <span>+ Alocar Stock CFM</span>
+                  </button>
+                  <button
+                    onClick={handleOpenAddCustomItem}
+                    className="px-3.5 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                    <span>+ Artigo Personalizado</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Sub-tabs: Armazém Stock vs Artigos Personalizados */}
+              <div className="flex items-center gap-2 pb-4 mb-5 border-b border-[#ececf0]">
                 <button
-                  onClick={() => setShowAddAllocationModal(true)}
-                  className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 transition self-start sm:self-auto shadow-xs cursor-pointer"
+                  type="button"
+                  onClick={() => setInventoryTab("stock")}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-2 ${
+                    inventoryTab === "stock"
+                      ? "bg-[#111] text-white shadow-xs"
+                      : "bg-[#f2f2f5] text-[#636366] hover:bg-[#e5e5ea]"
+                  }`}
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>Alocar Artigo</span>
+                  <Package className="w-3.5 h-3.5" />
+                  <span>Stock de Armazém CFM</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                      inventoryTab === "stock" ? "bg-white/20 text-white" : "bg-black/5 text-[#8e8e93]"
+                    }`}
+                  >
+                    {allocations.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setInventoryTab("custom")}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-2 ${
+                    inventoryTab === "custom"
+                      ? "bg-[#111] text-white shadow-xs"
+                      : "bg-[#f2f2f5] text-[#636366] hover:bg-[#e5e5ea]"
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Artigos Personalizados</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                      inventoryTab === "custom" ? "bg-white/20 text-white" : "bg-black/5 text-[#8e8e93]"
+                    }`}
+                  >
+                    {customItems.length}
+                  </span>
+                  {customItems.length > 0 && (
+                    <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-bold">
+                      Exclusivo
+                    </span>
+                  )}
                 </button>
               </div>
 
-              {allocations.length === 0 ? (
-                <div className="text-center py-10 px-4 border border-dashed border-[#ececf0] rounded-[16px] bg-[#fafafc]">
-                  <Package className="w-9 h-9 text-[#8e8e93] mx-auto mb-2 opacity-50" />
-                  <div className="text-sm font-bold text-[#111]">Nenhum artigo alocado</div>
-                  <p className="text-xs text-[#8e8e93] max-w-sm mx-auto mt-1 mb-4">
-                    Adicione cadeiras, mesas, velas, copos ou mobiliário para gerir a preparação e montagem deste evento.
-                  </p>
-                  <button
-                    onClick={() => setShowAddAllocationModal(true)}
-                    className="px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Adicionar primeiro artigo</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {allocations.map((a) => (
-                    <div
-                      key={a.id}
-                      className="p-4 rounded-[16px] border border-[#ececf0] bg-[#fafafc] hover:bg-white transition flex flex-col md:flex-row md:items-center justify-between gap-4"
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        {a.itemImageUrl ? (
-                          <Link href={`/inventario/${a.itemId}`} className="flex-shrink-0" title="Ver ficha do artigo">
-                            <img
-                              src={a.itemImageUrl}
-                              alt={a.itemName}
-                              className="w-12 h-12 rounded-[10px] object-cover border border-black/5 hover:opacity-85 transition"
-                            />
-                          </Link>
-                        ) : (
-                          <Link
-                            href={`/inventario/${a.itemId}`}
-                            className="w-12 h-12 rounded-[10px] bg-[#ececf0] hover:bg-[#e5e5ea] flex items-center justify-center text-[#8e8e93] font-bold text-xs flex-shrink-0 transition"
-                            title="Ver ficha do artigo"
-                          >
-                            {a.itemSku?.substring(0, 3)}
-                          </Link>
-                        )}
-
-                        <div className="min-w-0">
-                          <div className="font-bold text-sm text-[#111] truncate">
-                            <Link
-                              href={`/inventario/${a.itemId}`}
-                              className="hover:text-[#007aff] transition"
-                              title="Ver ficha do artigo no inventário"
-                            >
-                              {a.itemName}
-                            </Link>
-                          </div>
-                          <div className="text-xs text-[#8e8e93] flex flex-wrap items-center gap-2 mt-0.5">
-                            <Link
-                              href={`/inventario/${a.itemId}`}
-                              className="font-mono bg-white hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] text-[10px] transition"
-                              title="SKU do Artigo"
-                            >
-                              {a.itemSku}
-                            </Link>
-                            <Link
-                              href={`/inventario/${a.itemId}`}
-                              className="font-mono text-[#8e8e93] hover:text-[#007aff] text-[10px] transition"
-                              title="ID do Artigo"
-                            >
-                              #{a.itemId}
-                            </Link>
-                            <span>•</span>
-                            <span>{a.itemCategory}</span>
-                            {a.itemWarehouseLocation && (
-                              <>
-                                <span>•</span>
-                                <span className="text-[#007aff]">{a.itemWarehouseLocation}</span>
-                              </>
+              {/* TAB 1: STOCK DE ARMAZÉM CFM */}
+              {inventoryTab === "stock" && (
+                <>
+                  {allocations.length === 0 ? (
+                    <div className="text-center py-10 px-4 border border-dashed border-[#ececf0] rounded-[16px] bg-[#fafafc]">
+                      <Package className="w-9 h-9 text-[#8e8e93] mx-auto mb-2 opacity-50" />
+                      <div className="text-sm font-bold text-[#111]">Nenhum artigo de armazém alocado</div>
+                      <p className="text-xs text-[#8e8e93] max-w-sm mx-auto mt-1 mb-4">
+                        Adicione cadeiras, mesas, velas, copos ou mobiliário para gerir a preparação e montagem deste evento.
+                      </p>
+                      <button
+                        onClick={() => setShowAddAllocationModal(true)}
+                        className="px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Adicionar primeiro artigo de stock</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {allocations.map((a) => (
+                        <div
+                          key={a.id}
+                          className="p-4 rounded-[16px] border border-[#ececf0] bg-[#fafafc] hover:bg-white transition flex flex-col md:flex-row md:items-center justify-between gap-4"
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            {a.itemImageUrl ? (
+                              <Link href={`/inventario/${a.itemId}`} className="flex-shrink-0" title="Ver ficha do artigo">
+                                <img
+                                  src={a.itemImageUrl}
+                                  alt={a.itemName}
+                                  className="w-12 h-12 rounded-[10px] object-cover border border-black/5 hover:opacity-85 transition"
+                                />
+                              </Link>
+                            ) : (
+                              <Link
+                                href={`/inventario/${a.itemId}`}
+                                className="w-12 h-12 rounded-[10px] bg-[#ececf0] hover:bg-[#e5e5ea] flex items-center justify-center text-[#8e8e93] font-bold text-xs flex-shrink-0 transition"
+                                title="Ver ficha do artigo"
+                              >
+                                {a.itemSku?.substring(0, 3)}
+                              </Link>
                             )}
-                          </div>
-                          {a.notes && (
-                            <div className="text-[11px] text-[#48484a] italic mt-1 bg-white/70 px-2 py-0.5 rounded border border-[#ececf0]/60 inline-block">
-                              Nota: {a.notes}
+
+                            <div className="min-w-0">
+                              <div className="font-bold text-sm text-[#111] truncate">
+                                <Link
+                                  href={`/inventario/${a.itemId}`}
+                                  className="hover:text-[#007aff] transition"
+                                  title="Ver ficha do artigo no inventário"
+                                >
+                                  {a.itemName}
+                                </Link>
+                              </div>
+                              <div className="text-xs text-[#8e8e93] flex flex-wrap items-center gap-2 mt-0.5">
+                                <Link
+                                  href={`/inventario/${a.itemId}`}
+                                  className="font-mono bg-white hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] text-[10px] transition"
+                                  title="SKU do Artigo"
+                                >
+                                  {a.itemSku}
+                                </Link>
+                                <Link
+                                  href={`/inventario/${a.itemId}`}
+                                  className="font-mono text-[#8e8e93] hover:text-[#007aff] text-[10px] transition"
+                                  title="ID do Artigo"
+                                >
+                                  #{a.itemId}
+                                </Link>
+                                <span>•</span>
+                                <span>{a.itemCategory}</span>
+                                {a.itemWarehouseLocation && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-[#007aff]">{a.itemWarehouseLocation}</span>
+                                  </>
+                                )}
+                              </div>
+                              {a.notes && (
+                                <div className="text-[11px] text-[#48484a] italic mt-1 bg-white/70 px-2 py-0.5 rounded border border-[#ececf0]/60 inline-block">
+                                  Nota: {a.notes}
+                                </div>
+                              )}
                             </div>
+                          </div>
+
+                          {/* Right side controls: Instant Quantity & Status */}
+                          <div className="flex items-center justify-between md:justify-end gap-3 flex-shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-[#ececf0]">
+                            {/* Instant Qty Adjustment Buttons */}
+                            <div className="flex items-center gap-1.5 bg-white border border-[#ececf0] rounded-[10px] p-1">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateAllocationQty(a.id, a.quantity - 1)}
+                                disabled={a.quantity <= 1}
+                                className="w-6 h-6 rounded-md hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] hover:text-[#111] disabled:opacity-30"
+                                title="Diminuir quantidade"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <span className="w-8 text-center text-xs font-extrabold text-[#111]">
+                                {a.quantity}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateAllocationQty(a.id, a.quantity + 1)}
+                                className="w-6 h-6 rounded-md hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] hover:text-[#111]"
+                                title="Aumentar quantidade"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+
+                            <div className="text-right min-w-[65px]">
+                              <div className="text-[11px] font-semibold text-[#111]">
+                                €{(a.quantity * (a.itemUnitPrice || 0)).toFixed(2)}
+                              </div>
+                              <div className="text-[9px] text-[#8e8e93]">
+                                €{a.itemUnitPrice?.toFixed(2)}/un
+                              </div>
+                            </div>
+
+                            {/* Status selector */}
+                            <select
+                              value={a.status}
+                              onChange={(e) =>
+                                handleUpdateAllocationStatus(
+                                  a.id,
+                                  e.target.value as "reservado" | "despachado" | "devolvido" | "danificado"
+                                )
+                              }
+                              className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border outline-none cursor-pointer ${
+                                a.status === "despachado"
+                                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                                  : a.status === "devolvido"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : a.status === "danificado"
+                                  ? "bg-rose-50 text-rose-700 border-rose-200"
+                                  : "bg-amber-50 text-amber-700 border-amber-200"
+                              }`}
+                            >
+                              <option value="reservado">Reservado</option>
+                              <option value="despachado">Despachado</option>
+                              <option value="devolvido">Devolvido</option>
+                              <option value="danificado">Danificado</option>
+                            </select>
+
+                            {/* Delete action */}
+                            <button
+                              onClick={() => handleDeleteAllocation(a.id)}
+                              className="p-1.5 text-[#8e8e93] hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                              title="Remover alocação"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* TAB 2: ARTIGOS PERSONALIZADOS (EXCLUSIVOS DESTE EVENTO) */}
+              {inventoryTab === "custom" && (
+                <div className="space-y-4">
+                  {/* Informative description banner */}
+                  <div className="p-3.5 rounded-[16px] bg-gradient-to-r from-amber-50/80 via-white to-amber-50/40 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-7 h-7 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div className="text-xs">
+                        <div className="font-bold text-[#111]">Artigos Exclusivos do Evento</div>
+                        <p className="text-[#636366] text-[11px] mt-0.5 leading-relaxed">
+                          Itens desenhados ou contratados especificamente para este evento (ex: néons personalizados, arranjos de flores dedicados, bolo artístico, sinalética ou estruturas). Não poluem o catálogo do armazém e o seu custo/venda é imputado diretamente na Quota deste evento.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleOpenAddCustomItem}
+                      className="px-3 py-1.5 rounded-lg bg-[#111] hover:bg-black text-white text-[11px] font-bold flex items-center gap-1.5 transition self-start sm:self-auto shrink-0 cursor-pointer shadow-2xs"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Novo Artigo Exclusivo</span>
+                    </button>
+                  </div>
+
+                  {/* Financial Summary for Custom Items */}
+                  {customItems.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-[16px] bg-[#fafafc] border border-[#ececf0]">
+                      <div className="p-2">
+                        <div className="text-[10px] text-[#8e8e93] font-medium uppercase tracking-wider">Total Itens</div>
+                        <div className="text-base font-black text-[#111] mt-0.5">{totalCustomItemsCount} un</div>
+                      </div>
+                      <div className="p-2">
+                        <div className="text-[10px] text-[#8e8e93] font-medium uppercase tracking-wider">Custo Fornecedores</div>
+                        <div className="text-base font-black text-amber-700 mt-0.5">€{totalCustomCost.toFixed(2)}</div>
+                      </div>
+                      <div className="p-2">
+                        <div className="text-[10px] text-[#8e8e93] font-medium uppercase tracking-wider">Adicionado à Quota</div>
+                        <div className="text-base font-black text-[#007aff] mt-0.5">€{totalCustomPrice.toFixed(2)}</div>
+                      </div>
+                      <div className="p-2">
+                        <div className="text-[10px] text-[#8e8e93] font-medium uppercase tracking-wider">Margem Bruta</div>
+                        <div className="text-base font-black text-emerald-700 mt-0.5">
+                          +€{totalCustomMargin.toFixed(2)}
+                          {totalCustomPrice > 0 && (
+                            <span className="text-[10px] text-emerald-600 font-semibold ml-1">
+                              ({Math.round((totalCustomMargin / totalCustomPrice) * 100)}%)
+                            </span>
                           )}
                         </div>
                       </div>
-
-                      {/* Right side controls: Instant Quantity & Status */}
-                      <div className="flex items-center justify-between md:justify-end gap-3 flex-shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-[#ececf0]">
-                        {/* Instant Qty Adjustment Buttons */}
-                        <div className="flex items-center gap-1.5 bg-white border border-[#ececf0] rounded-[10px] p-1">
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateAllocationQty(a.id, a.quantity - 1)}
-                            disabled={a.quantity <= 1}
-                            className="w-6 h-6 rounded-md hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] hover:text-[#111] disabled:opacity-30"
-                            title="Diminuir quantidade"
-                          >
-                            <Minus className="w-3 h-3" />
-                          </button>
-                          <span className="w-8 text-center text-xs font-extrabold text-[#111]">
-                            {a.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateAllocationQty(a.id, a.quantity + 1)}
-                            className="w-6 h-6 rounded-md hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] hover:text-[#111]"
-                            title="Aumentar quantidade"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        </div>
-
-                        <div className="text-right min-w-[65px]">
-                          <div className="text-[11px] font-semibold text-[#111]">
-                            €{(a.quantity * (a.itemUnitPrice || 0)).toFixed(2)}
-                          </div>
-                          <div className="text-[9px] text-[#8e8e93]">
-                            €{a.itemUnitPrice?.toFixed(2)}/un
-                          </div>
-                        </div>
-
-                        {/* Status selector */}
-                        <select
-                          value={a.status}
-                          onChange={(e) =>
-                            handleUpdateAllocationStatus(
-                              a.id,
-                              e.target.value as "reservado" | "despachado" | "devolvido" | "danificado"
-                            )
-                          }
-                          className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border outline-none cursor-pointer ${
-                            a.status === "despachado"
-                              ? "bg-blue-50 text-blue-700 border-blue-200"
-                              : a.status === "devolvido"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : a.status === "danificado"
-                              ? "bg-rose-50 text-rose-700 border-rose-200"
-                              : "bg-amber-50 text-amber-700 border-amber-200"
-                          }`}
-                        >
-                          <option value="reservado">Reservado</option>
-                          <option value="despachado">Despachado</option>
-                          <option value="devolvido">Devolvido</option>
-                          <option value="danificado">Danificado</option>
-                        </select>
-
-                        {/* Delete action */}
-                        <button
-                          onClick={() => handleDeleteAllocation(a.id)}
-                          className="p-1.5 text-[#8e8e93] hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
-                          title="Remover alocação"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
                     </div>
-                  ))}
+                  )}
+
+                  {/* Custom Items List */}
+                  {customItems.length === 0 ? (
+                    <div className="text-center py-10 px-4 border border-dashed border-[#ececf0] rounded-[16px] bg-[#fafafc]">
+                      <Sparkles className="w-9 h-9 text-amber-500 mx-auto mb-2 opacity-60" />
+                      <div className="text-sm font-bold text-[#111]">Nenhum artigo exclusivo registado</div>
+                      <p className="text-xs text-[#8e8e93] max-w-md mx-auto mt-1 mb-4 leading-relaxed">
+                        Adicione peças feitas por medida para este evento (letreiros néon com nomes, arranjos de flores específicos, bolo artístico, sinalética ou artigos alugados externamente). O custo e valor são imputados diretamente na quota.
+                      </p>
+                      <button
+                        onClick={handleOpenAddCustomItem}
+                        className="px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-xs hover:bg-black transition"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-amber-300" />
+                        <span>Adicionar primeiro artigo exclusivo</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {customItems.map((item) => {
+                        const lineCost = (item.quantity || 1) * (item.unitCost || 0);
+                        const linePrice = (item.quantity || 1) * (item.unitPrice || 0);
+                        const lineMargin = linePrice - lineCost;
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="p-4 rounded-[16px] border border-[#ececf0] bg-[#fafafc] hover:bg-white hover:border-[#d2d2d7] transition flex flex-col md:flex-row md:items-center justify-between gap-4"
+                          >
+                            <div className="flex items-start gap-3.5 min-w-0">
+                              <div className="w-11 h-11 rounded-[12px] bg-gradient-to-br from-amber-100 to-amber-200 border border-amber-300/60 flex items-center justify-center text-amber-700 shrink-0 font-bold text-xs shadow-2xs">
+                                <Sparkles className="w-5 h-5" />
+                              </div>
+
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-sm text-[#111]">{item.name}</span>
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#e5e5ea] text-[#1c1c1e]">
+                                    {item.category || "Personalizado"}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                    Exclusivo deste evento
+                                  </span>
+                                </div>
+
+                                <div className="text-xs text-[#8e8e93] flex flex-wrap items-center gap-2 mt-1">
+                                  <span className="font-semibold text-[#111] bg-white px-1.5 py-0.5 rounded border border-[#ececf0] text-[10px]">
+                                    Qtd: {item.quantity} un
+                                  </span>
+                                  {item.supplier && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="text-[#48484a] text-[11px]">
+                                        Fornecedor: <strong className="text-[#111]">{item.supplier}</strong>
+                                      </span>
+                                    </>
+                                  )}
+                                  {item.notes && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="text-[#636366] text-[11px] italic truncate max-w-xs" title={item.notes}>
+                                        {item.notes}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Right side values & actions */}
+                            <div className="flex items-center justify-between md:justify-end gap-4 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-[#ececf0]">
+                              {/* Price breakdown */}
+                              <div className="text-right">
+                                <div className="text-xs font-bold text-[#007aff] flex items-center justify-end gap-1">
+                                  <span>Quota: €{linePrice.toFixed(2)}</span>
+                                </div>
+                                <div className="text-[10px] text-[#8e8e93] flex items-center justify-end gap-1 mt-0.5">
+                                  <span>Custo: €{lineCost.toFixed(2)}</span>
+                                  <span>•</span>
+                                  <span className={lineMargin >= 0 ? "text-emerald-700 font-semibold" : "text-rose-600 font-semibold"}>
+                                    Margem: €{lineMargin.toFixed(2)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Edit & Delete */}
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditCustomItem(item)}
+                                  className="p-1.5 text-[#8e8e93] hover:text-[#007aff] rounded-lg hover:bg-[#f2f2f5] transition cursor-pointer"
+                                  title="Editar artigo exclusivo"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCustomItem(item)}
+                                  className="p-1.5 text-[#8e8e93] hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                                  title="Remover e deduzir da quota"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </section>
@@ -4281,6 +4703,7 @@ export default function EventDetailView({
           event={event}
           client={client}
           allocations={allocations}
+          customItems={customItems}
           allItems={allItems}
           onClose={() => setShowQuoteWizard(false)}
           onCreated={(newQuote) => {
@@ -4378,6 +4801,210 @@ export default function EventDetailView({
                   className="px-5 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold cursor-pointer"
                 >
                   Confirmar Alocação
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL: ADD / EDIT CUSTOM BESPOKE ITEM (Single-Event Specific) */}
+      {/* ===================================================================== */}
+      {showAddCustomItemModal && (
+        <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-[24px] w-full max-w-lg border border-[#ececf0] shadow-2xl overflow-hidden p-6 space-y-4 max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-[#ececf0]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#111]">
+                    {editingCustomItem ? "Editar Artigo Personalizado" : "Novo Artigo Personalizado"}
+                  </h3>
+                  <p className="text-[11px] text-[#8e8e93]">
+                    Exclusivo para este evento · Adicionado diretamente à Quota
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddCustomItemModal(false)}
+                className="text-[#8e8e93] hover:text-[#111] p-1 rounded-full cursor-pointer transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCustomItem} className="space-y-4 text-xs overflow-y-auto flex-1 pr-1">
+              {/* Name */}
+              <div>
+                <label className="block font-bold text-[#111] mb-1">
+                  Nome do Artigo ou Serviço Personalizado <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Letreiro Néon 'Better Together', Bolo Artístico 3 Andares..."
+                  value={customItemName}
+                  onChange={(e) => setCustomItemName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-white border border-[#ececf0] focus:border-[#007aff] rounded-[12px] text-xs font-semibold outline-none transition"
+                />
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block font-bold text-[#111] mb-1">Categoria</label>
+                <select
+                  value={customItemCategory}
+                  onChange={(e) => setCustomItemCategory(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-white border border-[#ececf0] focus:border-[#007aff] rounded-[12px] text-xs font-semibold outline-none transition cursor-pointer"
+                >
+                  <option value="Flores & Decoração">Flores & Decoração Floral</option>
+                  <option value="Sinalética & Gráfica">Sinalética, Lona & Impressão</option>
+                  <option value="Audiovisuais & Som">Audiovisuais & Iluminação Especial</option>
+                  <option value="Catering & Pastelaria">Catering, Bolo & Doçaria</option>
+                  <option value="Estruturas & Tendas">Estruturas Especiais & Tendas</option>
+                  <option value="Lembranças & Papelaria">Lembranças & Papelaria Personalizada</option>
+                  <option value="Personalizado">Outro Artigo Personalizado</option>
+                </select>
+              </div>
+
+              {/* Quantity, Unit Cost, Unit Price */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-[#111] mb-1">Quantidade</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={customItemQuantity}
+                    onChange={(e) => setCustomItemQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    className="w-full px-3 py-2 bg-white border border-[#ececf0] focus:border-[#007aff] rounded-[10px] text-xs font-semibold outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#111] mb-1">
+                    Custo Unit. (€) <span className="text-[10px] text-[#8e8e93] font-normal">(CFM)</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={customItemUnitCost === 0 ? "" : customItemUnitCost}
+                    onChange={(e) => setCustomItemUnitCost(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 bg-white border border-[#ececf0] focus:border-[#007aff] rounded-[10px] text-xs font-semibold outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#111] mb-1">
+                    Preço Unit. (€) <span className="text-[10px] text-[#007aff] font-normal">(Quota)</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={customItemUnitPrice === 0 ? "" : customItemUnitPrice}
+                    onChange={(e) => setCustomItemUnitPrice(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 bg-white border border-[#ececf0] focus:border-[#007aff] rounded-[10px] text-xs font-semibold outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Live Preview Card */}
+              <div className="p-3 rounded-[14px] bg-[#fafafc] border border-[#ececf0] space-y-1.5">
+                <div className="text-[11px] font-bold text-[#111] flex items-center justify-between">
+                  <span>Simulação Financeira desta Linha:</span>
+                  <span className="text-[#007aff] font-mono">
+                    Quota Total: €{(customItemQuantity * customItemUnitPrice).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-[#8e8e93]">
+                  <span>Custo Total de Produção / Fornecedor:</span>
+                  <span className="text-amber-800 font-mono">€{(customItemQuantity * customItemUnitCost).toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] font-semibold pt-1 border-t border-[#ececf0]">
+                  <span>Margem Bruta Estimada:</span>
+                  <span
+                    className={
+                      customItemUnitPrice >= customItemUnitCost ? "text-emerald-700 font-mono" : "text-rose-600 font-mono"
+                    }
+                  >
+                    €{(customItemQuantity * (customItemUnitPrice - customItemUnitCost)).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Supplier */}
+              <div>
+                <label className="block font-bold text-[#111] mb-1">
+                  Fornecedor / Fabricante <span className="text-[10px] text-[#8e8e93] font-normal">(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: Neon Lisboa Lda, Florista Rosa, Pastelaria Central..."
+                  value={customItemSupplier}
+                  onChange={(e) => setCustomItemSupplier(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-white border border-[#ececf0] focus:border-[#007aff] rounded-[10px] text-xs outline-none"
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block font-bold text-[#111] mb-1">
+                  Especificações / Notas <span className="text-[10px] text-[#8e8e93] font-normal">(opcional)</span>
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Medidas, acabamento, cor da luz, hora de entrega, instruções especiais..."
+                  value={customItemNotes}
+                  onChange={(e) => setCustomItemNotes(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-white border border-[#ececf0] focus:border-[#007aff] rounded-[10px] text-xs outline-none resize-none"
+                />
+              </div>
+
+              {/* Quota addition toggle */}
+              <div className="p-3 rounded-[12px] bg-blue-50/60 border border-blue-200/80 flex items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  id="addToQuotaCheck"
+                  checked={customItemAddToQuota}
+                  onChange={(e) => setCustomItemAddToQuota(e.target.checked)}
+                  className="mt-0.5 rounded border-blue-300 text-[#007aff] focus:ring-[#007aff] cursor-pointer"
+                />
+                <label htmlFor="addToQuotaCheck" className="text-[11px] text-[#1c1c1e] cursor-pointer select-none">
+                  <strong className="text-[#007aff] block">Adicionar diretamente à Quota do Evento</strong>
+                  Acrescenta automaticamente +€{(customItemQuantity * customItemUnitPrice).toFixed(2)} ao valor cobrado ao cliente e +€{(customItemQuantity * customItemUnitCost).toFixed(2)} ao orçamento de custos.
+                </label>
+              </div>
+
+              {/* Actions */}
+              <div className="pt-3 border-t border-[#ececf0] flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddCustomItemModal(false)}
+                  className="px-4 py-2 rounded-[12px] bg-[#f2f2f5] hover:bg-[#e5e5ea] text-xs font-bold text-[#111] cursor-pointer transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingCustomItem}
+                  className="px-5 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold cursor-pointer transition flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                >
+                  {isSubmittingCustomItem ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>A guardar...</span>
+                    </>
+                  ) : (
+                    <span>{editingCustomItem ? "Atualizar Artigo" : "Adicionar à Quota"}</span>
+                  )}
                 </button>
               </div>
             </form>
