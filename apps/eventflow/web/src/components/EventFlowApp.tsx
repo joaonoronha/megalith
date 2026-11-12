@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
   X,
   Plus,
@@ -44,6 +45,7 @@ interface Props {
   initialQuotes: any[];
   initialMovements: any[];
   initialTemplate: any;
+  initialTab?: "home" | "calendar" | "events" | "inventory" | "more";
 }
 
 // Helpers
@@ -127,8 +129,20 @@ export default function EventFlowApp({
   initialQuotes,
   initialMovements,
   initialTemplate,
+  initialTab = "home",
 }: Props) {
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const getTabFromPath = (path: string): "home" | "calendar" | "events" | "inventory" | "more" => {
+    if (path === "/calendario" || path === "/calendar") return "calendar";
+    if (path === "/eventos" || path === "/events") return "events";
+    if (path === "/inventario" || path === "/inventory") return "inventory";
+    if (path === "/mais" || path === "/more") return "more";
+    if (path === "/") return "home";
+    return initialTab || "home";
+  };
 
   // Core App State
   const [user, setUser] = useState(currentUser);
@@ -143,10 +157,25 @@ export default function EventFlowApp({
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<
     "home" | "calendar" | "events" | "inventory" | "more"
-  >("home");
+  >(() => getTabFromPath(pathname));
 
-  // Selected calendar day & status popup
+  useEffect(() => {
+    setActiveTab(getTabFromPath(pathname));
+  }, [pathname]);
+
+  // Calendar State & Interactive Day Details Modal
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(() => new Date(2026, 9, 1)); // Default Outubro 2026
+  const currentCalendarYear = currentCalendarDate.getFullYear();
+  const currentCalendarMonth = currentCalendarDate.getMonth(); // 9 = Outubro
+
   const [selectedDay, setSelectedDay] = useState<number>(30);
+  const [calendarPopupDate, setCalendarPopupDate] = useState<{
+    year: number;
+    month: number;
+    day: number;
+  } | null>(null);
+
+  const [eventWizardInitialDate, setEventWizardInitialDate] = useState<string | null>(null);
   const [activeStatusDropdown, setActiveStatusDropdown] = useState<string | null>(
     null
   );
@@ -232,15 +261,53 @@ export default function EventFlowApp({
     );
   });
 
-  // Days with events in October 2026 (matching prototype)
+  // Dynamic Calendar Calculations
+  const daysInMonth = new Date(currentCalendarYear, currentCalendarMonth + 1, 0).getDate();
+  const firstDayOfWeek = (new Date(currentCalendarYear, currentCalendarMonth, 1).getDay() + 6) % 7;
+
+  const monthNames = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+  ];
+  const currentMonthName = monthNames[currentCalendarMonth];
+
+  const handlePrevMonth = () => {
+    setCurrentCalendarDate(new Date(currentCalendarYear, currentCalendarMonth - 1, 1));
+  };
+  const handleNextMonth = () => {
+    setCurrentCalendarDate(new Date(currentCalendarYear, currentCalendarMonth + 1, 1));
+  };
+
+  const getEventsForCalendarDay = (day: number, month = currentCalendarMonth, year = currentCalendarYear) => {
+    return eventsList.filter((e) => {
+      if (!e.startDate) return false;
+      const d = new Date(e.startDate);
+      return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
+    });
+  };
+
+  // Days with events in current calendar month
   const eventDays = new Set(
-    eventsList.map((e) => new Date(e.startDate).getDate())
+    eventsList
+      .filter((e) => {
+        if (!e.startDate) return false;
+        const d = new Date(e.startDate);
+        return d.getFullYear() === currentCalendarYear && d.getMonth() === currentCalendarMonth;
+      })
+      .map((e) => new Date(e.startDate).getDate())
   );
 
   // Events for selected day
-  const eventsForSelectedDay = eventsList.filter(
-    (e) => new Date(e.startDate).getDate() === selectedDay
-  );
+  const eventsForSelectedDay = getEventsForCalendarDay(selectedDay);
+
+  const handleCalendarDayClick = (day: number, month = currentCalendarMonth, year = currentCalendarYear) => {
+    setSelectedDay(day);
+    setCalendarPopupDate({ year, month, day });
+  };
+
+  const eventsForPopupDate = calendarPopupDate
+    ? getEventsForCalendarDay(calendarPopupDate.day, calendarPopupDate.month, calendarPopupDate.year)
+    : [];
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] text-[#111111] pb-28 font-sans antialiased">
@@ -394,12 +461,12 @@ export default function EventFlowApp({
                   <h3 className="text-[18px] font-bold tracking-[-0.35px] text-[#111111]">
                     Próximos eventos
                   </h3>
-                  <button
-                    onClick={() => setActiveTab("events")}
+                  <Link
+                    href="/eventos"
                     className="text-[12px] text-[#8e8e93] hover:text-[#007aff] cursor-pointer"
                   >
                     Ver todos ({filteredEvents.length}) →
-                  </button>
+                  </Link>
                 </div>
 
                 <div className="divide-y divide-[#f0f0f3]">
@@ -413,12 +480,13 @@ export default function EventFlowApp({
                     return (
                       <div
                         key={evt.id}
-                        className="py-3.5 flex items-center justify-between gap-3 relative"
+                        onClick={() => router.push(`/eventos/${evt.id}`)}
+                        className="py-3 px-3 -mx-3 rounded-[16px] hover:bg-[#f8f8fa] active:bg-[#f0f0f3] flex items-center justify-between gap-3 relative cursor-pointer transition group"
                       >
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                           {/* Image with Day Overlay */}
                           <div
-                            className="w-[58px] h-[58px] rounded-[14px] flex-shrink-0 bg-cover bg-center relative overflow-hidden border border-black/5"
+                            className="w-[58px] h-[58px] rounded-[14px] flex-shrink-0 bg-cover bg-center relative overflow-hidden border border-black/5 group-hover:scale-102 transition duration-200"
                             style={{
                               backgroundImage: `url("${
                                 evt.coverImageUrl ||
@@ -434,19 +502,17 @@ export default function EventFlowApp({
 
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <Link
-                                href={`/eventos/${evt.id}`}
-                                className="text-[14px] font-bold text-[#111111] hover:text-[#007aff] transition truncate"
+                              <span
+                                className="text-[14px] font-bold text-[#111111] group-hover:text-[#007aff] transition truncate"
                               >
                                 {evt.name}
-                              </Link>
-                              <Link
-                                href={`/eventos/${evt.id}`}
-                                className="font-mono text-[10px] text-[#8e8e93] hover:text-[#007aff] bg-[#fafafc] hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] flex-shrink-0 transition"
+                              </span>
+                              <span
+                                className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] group-hover:bg-white px-1.5 py-0.5 rounded border border-[#ececf0] flex-shrink-0 transition"
                                 title="ID do Evento"
                               >
                                 #{evt.id}
-                              </Link>
+                              </span>
                               {evt.theme && (
                                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#fef7e0] text-[#b06000] border border-[#feefc3] flex items-center gap-1 flex-shrink-0">
                                   <Sparkles className="w-2.5 h-2.5" />
@@ -461,7 +527,10 @@ export default function EventFlowApp({
                         </div>
 
                         {/* Status Badge with Quick State Dropdown */}
-                        <div className="relative flex-shrink-0">
+                        <div
+                          className="relative flex-shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <button
                             onClick={() =>
                               setActiveStatusDropdown(
@@ -515,16 +584,32 @@ export default function EventFlowApp({
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <div className="text-[18px] font-bold tracking-[-0.35px] text-[#111111]">
-                      Outubro
+                      {currentMonthName}
                     </div>
-                    <div className="text-[12px] text-[#8e8e93]">2026</div>
+                    <div className="text-[12px] text-[#8e8e93]">{currentCalendarYear}</div>
                   </div>
-                  <button
-                    onClick={() => setActiveTab("calendar")}
-                    className="text-[12px] text-[#8e8e93] hover:text-[#007aff] cursor-pointer"
-                  >
-                    Abrir →
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={handlePrevMonth}
+                      className="p-1 rounded-lg hover:bg-[#f2f2f5] text-[#8e8e93] hover:text-[#111] transition cursor-pointer"
+                      title="Mês anterior"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={handleNextMonth}
+                      className="p-1 rounded-lg hover:bg-[#f2f2f5] text-[#8e8e93] hover:text-[#111] transition cursor-pointer"
+                      title="Mês seguinte"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    <Link
+                      href="/calendario"
+                      className="text-[12px] text-[#8e8e93] hover:text-[#007aff] cursor-pointer ml-1"
+                    >
+                      Abrir →
+                    </Link>
+                  </div>
                 </div>
 
                 {/* Day of Week Labels */}
@@ -540,51 +625,67 @@ export default function EventFlowApp({
 
                 {/* Calendar Days */}
                 <div className="grid grid-cols-7 gap-1 text-center text-[12px]">
-                  {/* Blanks */}
-                  <div></div>
-                  <div></div>
-                  <div></div>
-                  {[
-                    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
-                    18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
-                  ].map((day) => {
+                  {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+                    <div key={`blank-${i}`} />
+                  ))}
+                  {Array.from({ length: daysInMonth }).map((_, i) => {
+                    const day = i + 1;
                     const isSelected = selectedDay === day;
                     const hasEvent = eventDays.has(day);
+                    const dayEvents = getEventsForCalendarDay(day);
 
                     return (
                       <button
                         key={day}
-                        onClick={() => setSelectedDay(day)}
-                        className={`h-8 flex items-center justify-center rounded-[9px] transition cursor-pointer ${
+                        onClick={() => handleCalendarDayClick(day)}
+                        className={`h-8 flex flex-col items-center justify-center rounded-[9px] transition cursor-pointer relative ${
                           isSelected
                             ? "bg-[#111] text-white font-bold shadow-xs"
                             : hasEvent
                             ? "bg-[#f0f0f2] text-[#3a3a3c] font-semibold hover:bg-[#e4e4e7]"
                             : "text-[#454549] hover:bg-[#f7f7f9]"
                         }`}
-                        title={hasEvent ? `Dia com eventos (${day} Out)` : `${day} Out`}
+                        title={
+                          hasEvent
+                            ? `${dayEvents.length} evento(s) no dia ${day} de ${currentMonthName}`
+                            : `Dia ${day} de ${currentMonthName}`
+                        }
                       >
-                        {day}
+                        <span>{day}</span>
+                        {hasEvent && (
+                          <span
+                            className={`w-1 h-1 rounded-full absolute bottom-1 ${
+                              isSelected ? "bg-white" : "bg-[#007aff]"
+                            }`}
+                          />
+                        )}
                       </button>
                     );
                   })}
-                  <div></div>
                 </div>
 
                 {/* Selected Date Peek */}
                 <div className="mt-3.5 pt-3 border-t border-[#ececf0]">
-                  <div className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-wider mb-1.5">
-                    {selectedDay} de Outubro
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-wider">
+                      {selectedDay} de {currentMonthName}
+                    </div>
+                    <button
+                      onClick={() => handleCalendarDayClick(selectedDay)}
+                      className="text-[11px] text-[#007aff] hover:underline font-semibold cursor-pointer"
+                    >
+                      Ver detalhes →
+                    </button>
                   </div>
                   {eventsForSelectedDay.length > 0 ? (
                     <div className="space-y-1.5">
                       {eventsForSelectedDay.map((e) => (
-                        <div
+                        <Link
                           key={e.id}
-                          onClick={() => setActiveTab("events")}
-                          className="p-2 rounded-xl bg-[#f8f8fa] hover:bg-[#f0f0f5] cursor-pointer transition flex items-center justify-between text-xs"
+                          href={`/eventos/${e.id}`}
+                          className="p-2 rounded-xl bg-[#f8f8fa] hover:bg-[#f0f0f5] cursor-pointer transition flex items-center justify-between text-xs group"
                         >
-                          <div className="font-semibold truncate text-[#111]">
+                          <div className="font-semibold truncate text-[#111] group-hover:text-[#007aff]">
                             {e.name}
                           </div>
                           <span
@@ -594,12 +695,22 @@ export default function EventFlowApp({
                           >
                             {e.status}
                           </span>
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-[12px] text-[#8e8e93]">
-                      Sem eventos marcados para este dia.
+                    <div className="flex items-center justify-between text-[12px] text-[#8e8e93]">
+                      <span>Sem eventos marcados.</span>
+                      <button
+                        onClick={() => {
+                          const formattedIsoDate = `${currentCalendarYear}-${String(currentCalendarMonth + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}T10:00`;
+                          setEventWizardInitialDate(formattedIsoDate);
+                          setShowEventWizard(true);
+                        }}
+                        className="text-[11px] text-[#007aff] font-bold hover:underline cursor-pointer"
+                      >
+                        ＋ Criar
+                      </button>
                     </div>
                   )}
                 </div>
@@ -614,12 +725,12 @@ export default function EventFlowApp({
                   <h3 className="text-[18px] font-bold tracking-[-0.35px] text-[#111111]">
                     Inventário
                   </h3>
-                  <button
-                    onClick={() => setActiveTab("inventory")}
+                  <Link
+                    href="/inventario"
                     className="text-[12px] text-[#8e8e93] hover:text-[#007aff] cursor-pointer"
                   >
                     Abrir inventário ({filteredItems.length}) →
-                  </button>
+                  </Link>
                 </div>
 
                 <div className="divide-y divide-[#f0f0f3]">
@@ -716,23 +827,25 @@ export default function EventFlowApp({
 
                 <div className="space-y-2">
                   {/* Alert 1: Low stock */}
-                  <div
-                    onClick={() => setActiveTab("inventory")}
-                    className="cursor-pointer bg-[#ff9f0a]/[0.115] border border-[#ff9f0a]/[0.17] text-[#845000] rounded-[15px] p-3.5 flex items-center gap-3 transition hover:opacity-90"
+                  <Link
+                    href="/inventario"
+                    className="cursor-pointer bg-[#ff9f0a]/[0.115] border border-[#ff9f0a]/[0.17] text-[#845000] rounded-[15px] p-3.5 flex items-center gap-3 transition hover:opacity-90 block"
                   >
-                    <div className="w-[9px] h-[9px] rounded-full bg-[#ff9f0a] flex-shrink-0"></div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-bold text-[#845000]">
-                        Velas LED abaixo do mínimo
+                    <div className="flex items-center gap-3">
+                      <div className="w-[9px] h-[9px] rounded-full bg-[#ff9f0a] flex-shrink-0"></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-bold text-[#845000]">
+                          Velas LED abaixo do mínimo
+                        </div>
+                        <div className="text-[11px] text-[#845000]/70 mt-0.5">
+                          8 disponíveis · mínimo 20
+                        </div>
                       </div>
-                      <div className="text-[11px] text-[#845000]/70 mt-0.5">
-                        8 disponíveis · mínimo 20
-                      </div>
+                      <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full bg-white/70 text-[#845000]">
+                        Stock
+                      </span>
                     </div>
-                    <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full bg-white/70 text-[#845000]">
-                      Stock
-                    </span>
-                  </div>
+                  </Link>
 
                   {/* Alert 2: Damaged item with instant triage */}
                   <div
@@ -760,23 +873,25 @@ export default function EventFlowApp({
                   </div>
 
                   {/* Alert 3: Event in prep */}
-                  <div
-                    onClick={() => setActiveTab("events")}
-                    className="cursor-pointer bg-[#ff9f0a]/[0.115] border border-[#ff9f0a]/[0.17] text-[#845000] rounded-[15px] p-3.5 flex items-center gap-3 transition hover:opacity-90"
+                  <Link
+                    href="/eventos"
+                    className="cursor-pointer bg-[#ff9f0a]/[0.115] border border-[#ff9f0a]/[0.17] text-[#845000] rounded-[15px] p-3.5 flex items-center gap-3 transition hover:opacity-90 block"
                   >
-                    <div className="w-[9px] h-[9px] rounded-full bg-[#ff9f0a] flex-shrink-0"></div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-bold text-[#845000]">
-                        Mastercard Gala em preparação
+                    <div className="flex items-center gap-3">
+                      <div className="w-[9px] h-[9px] rounded-full bg-[#ff9f0a] flex-shrink-0"></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] font-bold text-[#845000]">
+                          Mastercard Gala em preparação
+                        </div>
+                        <div className="text-[11px] text-[#845000]/70 mt-0.5">
+                          Material ainda não está 100% preparado
+                        </div>
                       </div>
-                      <div className="text-[11px] text-[#845000]/70 mt-0.5">
-                        Material ainda não está 100% preparado
-                      </div>
+                      <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full bg-white/70 text-[#845000]">
+                        Evento
+                      </span>
                     </div>
-                    <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full bg-white/70 text-[#845000]">
-                      Evento
-                    </span>
-                  </div>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -787,77 +902,191 @@ export default function EventFlowApp({
         {/* TAB 2: CALENDAR */}
         {/* ========================================================= */}
         {activeTab === "calendar" && (
-          <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs space-y-5">
+          <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-[22px] font-bold text-[#111111]">
-                  Calendário de Eventos & Produção
-                </h2>
-                <p className="text-xs text-[#8e8e93]">
-                  Agenda operacional Outubro 2026 · montagens, eventos e desmontagens
+                <div className="flex items-center gap-3">
+                  <h2 className="text-[24px] font-bold text-[#111111]">
+                    {currentMonthName} {currentCalendarYear}
+                  </h2>
+                  <div className="flex items-center gap-1 bg-[#f2f2f5] p-1 rounded-xl">
+                    <button
+                      onClick={handlePrevMonth}
+                      className="p-1 rounded-lg hover:bg-white text-[#636366] hover:text-[#111] transition cursor-pointer"
+                      title="Mês anterior"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={handleNextMonth}
+                      className="p-1 rounded-lg hover:bg-white text-[#636366] hover:text-[#111] transition cursor-pointer"
+                      title="Mês seguinte"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-[#8e8e93] mt-1">
+                  Clique em qualquer dia para ver o resumo dos eventos ou criar novos eventos.
                 </p>
               </div>
 
               <button
-                onClick={() => setShowEventWizard(true)}
-                className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold self-start sm:self-auto flex items-center gap-1.5 transition"
+                onClick={() => {
+                  setEventWizardInitialDate(null);
+                  setShowEventWizard(true);
+                }}
+                className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold self-start sm:self-auto flex items-center gap-1.5 transition cursor-pointer shadow-xs"
               >
                 <span>＋</span>
                 <span>Novo evento</span>
               </button>
             </div>
 
-            {/* Event Timeline List */}
-            <div className="divide-y divide-[#ececf0] border border-[#ececf0] rounded-[16px] overflow-hidden">
-              {eventsList.map((e) => {
-                const statusObj = getStatusStyle(e.status);
-                const startDate = new Date(e.startDate);
+            {/* Interactive Monthly Calendar Grid */}
+            <div className="border border-[#ececf0] rounded-[20px] overflow-hidden bg-white shadow-2xs">
+              <div className="grid grid-cols-7 border-b border-[#ececf0] bg-[#fafafc] text-center text-xs font-semibold text-[#8e8e93] py-2.5">
+                <div>Segunda</div>
+                <div>Terça</div>
+                <div>Quarta</div>
+                <div>Quinta</div>
+                <div>Sexta</div>
+                <div>Sábado</div>
+                <div>Domingo</div>
+              </div>
 
-                return (
-                  <div
-                    key={e.id}
-                    className="p-4 bg-white hover:bg-[#fafafa] flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition"
-                  >
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-12 h-12 rounded-[12px] bg-[#f2f2f7] border border-black/5 flex flex-col items-center justify-center flex-shrink-0">
-                        <span className="text-[9px] uppercase font-bold text-[#8e8e93]">
-                          OUT
+              <div className="grid grid-cols-7 divide-x divide-y divide-[#f0f0f3] bg-[#f9f9fb]">
+                {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+                  <div key={`cal-blank-${i}`} className="min-h-[96px] bg-[#f5f5f7]/40 p-2" />
+                ))}
+
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                  const day = i + 1;
+                  const dayEvents = getEventsForCalendarDay(day);
+                  const isSelected = selectedDay === day;
+                  const hasEvents = dayEvents.length > 0;
+
+                  return (
+                    <div
+                      key={`cal-day-${day}`}
+                      onClick={() => handleCalendarDayClick(day)}
+                      className={`min-h-[96px] p-2 transition cursor-pointer flex flex-col justify-between group ${
+                        isSelected
+                          ? "bg-[#007aff]/[0.04] ring-2 ring-inset ring-[#007aff]"
+                          : hasEvents
+                          ? "bg-white hover:bg-[#fafafc]"
+                          : "bg-white/80 hover:bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition ${
+                            isSelected
+                              ? "bg-[#007aff] text-white"
+                              : hasEvents
+                              ? "bg-[#111] text-white"
+                              : "text-[#48484a] group-hover:bg-[#f0f0f3]"
+                          }`}
+                        >
+                          {day}
                         </span>
-                        <span className="text-base font-extrabold text-[#111]">
-                          {startDate.getDate()}
-                        </span>
+
+                        {hasEvents && (
+                          <span className="text-[10px] font-bold text-[#24793a] bg-[#eaf8ee] px-1.5 py-0.5 rounded-full">
+                            {dayEvents.length} {dayEvents.length === 1 ? "evt" : "evts"}
+                          </span>
+                        )}
                       </div>
 
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Link href={`/eventos/${e.id}`} className="font-bold text-sm text-[#111] hover:text-[#007aff] transition">
-                            {e.name}
-                          </Link>
-                          <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0]">
-                            #{e.id}
-                          </span>
-                        </div>
-                        <div className="text-xs text-[#8e8e93] mt-0.5">
-                          {formatEventByline(e.startDate, e.venue)}
-                        </div>
-                        {e.notes && (
-                          <div className="text-[11px] text-[#6e6e73] mt-1 bg-[#f8f8fa] px-2 py-1 rounded-md inline-block">
-                            {e.notes}
+                      {/* Event pills preview */}
+                      <div className="space-y-1 my-1.5 flex-1 min-w-0">
+                        {dayEvents.slice(0, 2).map((evt) => {
+                          const statusObj = getStatusStyle(evt.status);
+                          return (
+                            <div
+                              key={evt.id}
+                              className={`px-1.5 py-0.5 rounded-[6px] text-[10px] font-semibold truncate border border-black/5 ${statusObj.bg} ${statusObj.text} flex items-center gap-1`}
+                              title={evt.name}
+                            >
+                              <span className="w-1 h-1 rounded-full bg-current flex-shrink-0" />
+                              <span className="truncate">{evt.name}</span>
+                            </div>
+                          );
+                        })}
+                        {dayEvents.length > 2 && (
+                          <div className="text-[9px] font-bold text-[#8e8e93] px-1">
+                            +{dayEvents.length - 2} mais...
                           </div>
                         )}
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold ${statusObj.bg} ${statusObj.text}`}
-                      >
-                        {statusObj.label}
-                      </span>
+                      <div className="text-[10px] text-[#8e8e93] opacity-0 group-hover:opacity-100 transition flex items-center justify-end font-semibold">
+                        {hasEvents ? "Ver resumo →" : "＋ Criar"}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Event Timeline List */}
+            <div className="pt-2">
+              <div className="text-[16px] font-bold text-[#111111] mb-3">
+                Cronograma de Eventos ({eventsList.length})
+              </div>
+              <div className="divide-y divide-[#ececf0] border border-[#ececf0] rounded-[18px] overflow-hidden bg-white shadow-xs">
+                {eventsList.map((e) => {
+                  const statusObj = getStatusStyle(e.status);
+                  const startDate = new Date(e.startDate);
+
+                  return (
+                    <div
+                      key={e.id}
+                      onClick={() => router.push(`/eventos/${e.id}`)}
+                      className="p-4 bg-white hover:bg-[#fafafa] flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="w-12 h-12 rounded-[12px] bg-[#f2f2f7] border border-black/5 flex flex-col items-center justify-center flex-shrink-0 group-hover:bg-[#111] group-hover:text-white transition duration-200">
+                          <span className="text-[9px] uppercase font-bold text-[#8e8e93] group-hover:text-white/80">
+                            {monthNames[startDate.getMonth()]?.slice(0, 3) || "OUT"}
+                          </span>
+                          <span className="text-base font-extrabold text-[#111] group-hover:text-white">
+                            {startDate.getDate()}
+                          </span>
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-[#111] group-hover:text-[#007aff] transition truncate">
+                              {e.name}
+                            </span>
+                            <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0] flex-shrink-0">
+                              #{e.id}
+                            </span>
+                          </div>
+                          <div className="text-xs text-[#8e8e93] mt-0.5 truncate">
+                            {formatEventByline(e.startDate, e.venue)}
+                          </div>
+                          {e.notes && (
+                            <div className="text-[11px] text-[#6e6e73] mt-1 bg-[#f8f8fa] px-2 py-0.5 rounded-md inline-block truncate max-w-md">
+                              {e.notes}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-semibold ${statusObj.bg} ${statusObj.text}`}
+                        >
+                          {statusObj.label}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-[#8e8e93] group-hover:text-[#111] group-hover:translate-x-0.5 transition" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </section>
         )}
@@ -895,7 +1124,8 @@ export default function EventFlowApp({
                 return (
                   <div
                     key={e.id}
-                    className="p-5 rounded-[18px] border border-[#ececf0] bg-[#fafafa] hover:bg-white transition flex flex-col md:flex-row md:items-center justify-between gap-4"
+                    onClick={() => router.push(`/eventos/${e.id}`)}
+                    className="p-5 rounded-[18px] border border-[#ececf0] bg-[#fafafa] hover:bg-white hover:border-[#d2d2d7] transition flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer group"
                   >
                     <div className="flex items-start sm:items-center gap-3.5 min-w-0">
                       <div
@@ -1442,7 +1672,8 @@ export default function EventFlowApp({
       <aside className="fixed bottom-0 left-0 right-0 z-40 bg-[rgba(249,249,251,0.96)] backdrop-blur-[24px] border-t border-[#ececf0] py-2 flex items-center justify-center">
         <div className="w-full max-w-[650px] flex items-center justify-around h-[52px]">
           {/* 1. Início */}
-          <button
+          <Link
+            href="/"
             onClick={() => setActiveTab("home")}
             className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
             style={{
@@ -1465,10 +1696,11 @@ export default function EventFlowApp({
               <path d="M5.35 9.25V20.2h13.3V9.25" />
               <path d="M9.25 20.2v-6.35h5.5v6.35" />
             </svg>
-          </button>
+          </Link>
 
           {/* 2. Calendário */}
-          <button
+          <Link
+            href="/calendario"
             onClick={() => setActiveTab("calendar")}
             className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
             style={{
@@ -1493,10 +1725,11 @@ export default function EventFlowApp({
               <path d="M7.45 3.2v4M16.55 3.2v4M3.25 9.4h17.5" />
               <path d="M7.2 13.1h2.15M11 13.1h2.15M14.8 13.1h2.15M7.2 16.8h2.15M11 16.8h2.15" />
             </svg>
-          </button>
+          </Link>
 
           {/* 3. Eventos */}
-          <button
+          <Link
+            href="/eventos"
             onClick={() => setActiveTab("events")}
             className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
             style={{
@@ -1524,10 +1757,11 @@ export default function EventFlowApp({
                 strokeDasharray="1.1 2.1"
               />
             </svg>
-          </button>
+          </Link>
 
           {/* 4. Stock */}
-          <button
+          <Link
+            href="/inventario"
             onClick={() => setActiveTab("inventory")}
             className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
             style={{
@@ -1552,10 +1786,11 @@ export default function EventFlowApp({
               <path d="M3.85 7.3 12 11.45l8.15-4.15M12 11.45v9.6" />
               <path d="m8.05 4.9 8.25 4.2" />
             </svg>
-          </button>
+          </Link>
 
           {/* 5. Mais */}
-          <button
+          <Link
+            href="/mais"
             onClick={() => setActiveTab("more")}
             className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
             style={{
@@ -1579,7 +1814,7 @@ export default function EventFlowApp({
               <rect x="3.6" y="13.8" width="6.6" height="6.6" rx="1.85" />
               <rect x="13.8" y="13.8" width="6.6" height="6.6" rx="1.85" />
             </svg>
-          </button>
+          </Link>
         </div>
       </aside>
 
@@ -1587,14 +1822,34 @@ export default function EventFlowApp({
       {/* MODALS */}
       {/* ========================================================= */}
 
+      {/* 0. CALENDAR DAY POPUP MODAL */}
+      {calendarPopupDate && (
+        <CalendarDayPopupModal
+          dateInfo={calendarPopupDate}
+          events={eventsForPopupDate}
+          clients={clientsList}
+          onClose={() => setCalendarPopupDate(null)}
+          onCreateEvent={(dateStr) => {
+            setEventWizardInitialDate(dateStr);
+            setCalendarPopupDate(null);
+            setShowEventWizard(true);
+          }}
+        />
+      )}
+
       {/* 1. EVENT WIZARD MODAL */}
       {showEventWizard && (
         <EventWizardModal
           clients={clientsList}
-          onClose={() => setShowEventWizard(false)}
+          initialDate={eventWizardInitialDate}
+          onClose={() => {
+            setShowEventWizard(false);
+            setEventWizardInitialDate(null);
+          }}
           onCreated={(newEvent) => {
             setEventsList((prev) => [newEvent, ...prev]);
             setShowEventWizard(false);
+            setEventWizardInitialDate(null);
           }}
         />
       )}
@@ -2653,13 +2908,16 @@ function NewUserModal({
 // -------------------------------------------------------------
 function EventWizardModal({
   clients,
+  initialDate,
   onClose,
   onCreated,
 }: {
   clients: any[];
+  initialDate?: string | null;
   onClose: () => void;
   onCreated: (event: any) => void;
 }) {
+  const baseDate = initialDate ? initialDate.split("T")[0] : "2026-10-15";
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [customId, setCustomId] = useState("");
@@ -2669,10 +2927,19 @@ function EventWizardModal({
   const [theme, setTheme] = useState("");
   const [customerPrice, setCustomerPrice] = useState("3850");
   const [specialNeeds, setSpecialNeeds] = useState("");
-  const [startDate, setStartDate] = useState("2026-10-15T18:00");
-  const [endDate, setEndDate] = useState("2026-10-15T23:59");
-  const [prepDate, setPrepDate] = useState("2026-10-14T09:00");
-  const [returnDate, setReturnDate] = useState("2026-10-16T12:00");
+  const [startDate, setStartDate] = useState(
+    initialDate
+      ? (initialDate.includes("T") ? initialDate : `${initialDate}T18:00`)
+      : "2026-10-15T18:00"
+  );
+  const [endDate, setEndDate] = useState(`${baseDate}T23:59`);
+  const [prepDate, setPrepDate] = useState(`${baseDate}T09:00`);
+  const [returnDate, setReturnDate] = useState(() => {
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() + 1);
+    const nextDay = d.toISOString().split("T")[0];
+    return `${nextDay}T12:00`;
+  });
   const [status, setStatus] = useState("planeamento");
   const [totalBudget, setTotalBudget] = useState("1800");
   const [notes, setNotes] = useState("");
@@ -3289,6 +3556,225 @@ function QuoteWizardModal({
             )}
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// CALENDAR DAY POPUP MODAL COMPONENT
+// -------------------------------------------------------------
+function CalendarDayPopupModal({
+  dateInfo,
+  events,
+  clients,
+  onClose,
+  onCreateEvent,
+}: {
+  dateInfo: { year: number; month: number; day: number };
+  events: any[];
+  clients: any[];
+  onClose: () => void;
+  onCreateEvent: (dateStr: string) => void;
+}) {
+  const router = useRouter();
+  const dateObj = new Date(dateInfo.year, dateInfo.month, dateInfo.day);
+  const weekdays = [
+    "Domingo",
+    "Segunda-feira",
+    "Terça-feira",
+    "Quarta-feira",
+    "Quinta-feira",
+    "Sexta-feira",
+    "Sábado",
+  ];
+  const months = [
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
+  ];
+  const weekdayName = weekdays[dateObj.getDay()] || "Dia";
+  const monthName = months[dateInfo.month] || "";
+  const dateFormatted = `${weekdayName}, ${dateInfo.day} de ${monthName} de ${dateInfo.year}`;
+
+  const formattedIsoDate = `${dateInfo.year}-${String(dateInfo.month + 1).padStart(2, "0")}-${String(dateInfo.day).padStart(2, "0")}`;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-[24px] w-full max-w-lg border border-[#ececf0] shadow-2xl overflow-hidden flex flex-col max-h-[88vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="p-5 border-b border-[#ececf0] flex items-center justify-between bg-[#fafafc]">
+          <div>
+            <div className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-wider">
+              Agenda Diária · {monthName} {dateInfo.year}
+            </div>
+            <h2 className="text-[18px] font-bold text-[#111111] mt-0.5">
+              {dateFormatted}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-full text-[#8e8e93] hover:text-[#111111] hover:bg-[#f2f2f5] transition cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content Body */}
+        <div className="p-5 overflow-y-auto space-y-4 flex-1">
+          {events.length > 0 ? (
+            <>
+              <div className="flex items-center justify-between text-xs text-[#8e8e93] font-medium px-1">
+                <span>
+                  {events.length === 1
+                    ? "1 evento agendado"
+                    : `${events.length} eventos agendados`}
+                </span>
+                <span className="text-[11px] text-[#24793a] bg-[#eaf8ee] px-2 py-0.5 rounded-full font-bold">
+                  Dia com Produção
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {events.map((evt) => {
+                  const statusObj = getStatusStyle(evt.status);
+                  const client = clients.find((c) => c.id === evt.clientId);
+
+                  return (
+                    <div
+                      key={evt.id}
+                      className="p-4 rounded-[18px] border border-[#ececf0] bg-[#fafafa] hover:bg-white hover:border-[#d2d2d7] transition shadow-xs space-y-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Cover Image Thumbnail */}
+                        <div
+                          className="w-14 h-14 rounded-[12px] bg-cover bg-center flex-shrink-0 border border-black/5 overflow-hidden"
+                          style={{
+                            backgroundImage: `url("${
+                              evt.coverImageUrl ||
+                              "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=600&q=80"
+                            }")`,
+                          }}
+                        />
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-[15px] text-[#111] truncate">
+                              {evt.name}
+                            </span>
+                            <span className="font-mono text-[10px] text-[#8e8e93] bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#e5e5ea]">
+                              #{evt.id}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusObj.bg} ${statusObj.text}`}
+                            >
+                              {statusObj.label}
+                            </span>
+                          </div>
+
+                          <div className="text-xs text-[#8e8e93] mt-1">
+                            {formatEventByline(evt.startDate, evt.venue)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Event Extra Details Summary */}
+                      <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-[#f0f0f3]">
+                        {client && (
+                          <div className="text-[#636366]">
+                            <span className="text-[#8e8e93] block text-[10px] uppercase font-semibold">Cliente</span>
+                            <span className="font-medium text-[#111] truncate block">{client.name}</span>
+                          </div>
+                        )}
+                        {evt.category && (
+                          <div className="text-[#636366]">
+                            <span className="text-[#8e8e93] block text-[10px] uppercase font-semibold">Categoria</span>
+                            <span className="font-medium text-[#111] truncate block">{evt.category}</span>
+                          </div>
+                        )}
+                        {evt.customerPrice && evt.customerPrice > 0 ? (
+                          <div className="text-[#636366]">
+                            <span className="text-[#8e8e93] block text-[10px] uppercase font-semibold">Valor Cobrado</span>
+                            <span className="font-bold text-[#137333]">€{evt.customerPrice.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        ) : null}
+                        {evt.totalBudget && evt.totalBudget > 0 ? (
+                          <div className="text-[#636366]">
+                            <span className="text-[#8e8e93] block text-[10px] uppercase font-semibold">Budget Produção</span>
+                            <span className="font-semibold text-[#111]">€{evt.totalBudget.toLocaleString("pt-PT")}</span>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {/* Action Button to Open Event Detail Page */}
+                      <Link
+                        href={`/eventos/${evt.id}`}
+                        onClick={onClose}
+                        className="w-full py-2.5 px-3 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer"
+                      >
+                        <span>Abrir Página do Evento</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Button to allow creating multiple events on the same day */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => onCreateEvent(`${formattedIsoDate}T10:00`)}
+                  className="w-full py-2.5 px-4 rounded-[14px] bg-[#f5f5f7] hover:bg-[#ebebed] text-[#111] text-xs font-bold border border-[#ececf0] flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 text-[#007aff]" />
+                  <span>Criar outro evento neste dia</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            /* Empty State: No events on this day */
+            <div className="py-8 text-center space-y-4">
+              <div className="w-14 h-14 rounded-full bg-[#f2f2f7] mx-auto flex items-center justify-center text-[#8e8e93]">
+                <CalendarIcon className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-[16px] font-bold text-[#111]">
+                  Nenhum evento agendado
+                </h3>
+                <p className="text-xs text-[#8e8e93] max-w-xs mx-auto">
+                  Não existem eventos, montagens ou desmontagens agendadas para o dia {dateInfo.day} de {monthName}.
+                </p>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => onCreateEvent(`${formattedIsoDate}T10:00`)}
+                  className="px-5 py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold inline-flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Criar evento para este dia</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
