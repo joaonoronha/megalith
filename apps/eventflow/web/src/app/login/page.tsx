@@ -6,8 +6,8 @@ import { loginAction } from "@/app/actions";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("admin@cfmeventos.pt");
-  const [password, setPassword] = useState("cfm2026");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 

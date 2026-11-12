@@ -26,7 +26,11 @@ export async function getCurrentUser() {
   };
 }
 
-export async function loginUser(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+export async function loginUser(email: string, password: string): Promise<{
+  success: boolean;
+  error?: string;
+  user?: { id: string; name: string; email: string; role: "admin" | "producer" | "warehouse" };
+}> {
   const cleanEmail = email.toLowerCase().trim();
   const user = await db.query.users.findFirst({
     where: eq(users.email, cleanEmail),
@@ -60,7 +64,15 @@ export async function loginUser(email: string, password: string): Promise<{ succ
     expires: new Date(expiresAt),
   });
 
-  return { success: true };
+  return {
+    success: true,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role as "admin" | "producer" | "warehouse",
+    },
+  };
 }
 
 export async function logoutUser() {

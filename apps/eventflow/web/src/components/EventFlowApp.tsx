@@ -53,6 +53,7 @@ import {
   loginAction,
   logoutAction,
   createUserAction,
+  updateUserAction,
   snoozeAlertAction,
   acknowledgeAlertAction,
   dismissAlertAction,
@@ -364,6 +365,7 @@ export default function EventFlowApp({
   const [triageItem, setTriageItem] = useState<any>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showNewUserModal, setShowNewUserModal] = useState(false);
+  const [editingTeamUser, setEditingTeamUser] = useState<any | null>(null);
   const [selectedEventForQuote, setSelectedEventForQuote] = useState<string>("");
   const [auditModal, setAuditModal] = useState<{
     isOpen: boolean;
@@ -499,6 +501,23 @@ export default function EventFlowApp({
     .reduce((sum, m) => sum + m.amount, 0);
 
   const resultadoLiquido = totalEntradas - totalSaidas - totalInvestido;
+
+  const totalFaturado = useMemo(() => {
+    const eventsTotal = eventsList.reduce((sum, e) => sum + (e.customerPrice || 0), 0);
+    if (eventsTotal > 0) return eventsTotal;
+    return quotesList.reduce((sum, q) => sum + (q.total || 0), 0);
+  }, [eventsList, quotesList]);
+
+  const totalAReceber = Math.max(0, totalFaturado - totalEntradas);
+
+  const margemOperacional = totalEntradas > 0
+    ? (((totalEntradas - totalSaidas) / totalEntradas) * 100).toFixed(1)
+    : "0.0";
+
+  const currentMonthSubtitle = useMemo(() => {
+    const formatted = new Date().toLocaleDateString("pt-PT", { month: "long", year: "numeric" });
+    return formatted.charAt(0).toUpperCase() + formatted.slice(1) + " · valores operacionais CFM";
+  }, []);
 
   // Change Event Status handler
   const handleStatusChange = async (eventId: string, newStatus: string) => {
@@ -741,7 +760,7 @@ export default function EventFlowApp({
                     Resumo financeiro
                   </div>
                   <div className="text-[12px] text-[#8e8e93]">
-                    Outubro 2026 · valores operacionais CFM
+                    {currentMonthSubtitle}
                   </div>
                 </div>
 
@@ -803,16 +822,19 @@ export default function EventFlowApp({
               {/* Footer */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-[#ececf0] pt-3.5 mt-3.5 text-[12px] text-[#8e8e93]">
                 <div>
-                  Faturado <strong className="text-[#111111] font-semibold">€15.650</strong> · A
-                  receber <strong className="text-[#111111] font-semibold">€3.200</strong>
+                  Faturado{" "}
+                  <strong className="text-[#111111] font-semibold">
+                    €{totalFaturado.toLocaleString("pt-PT")}
+                  </strong>{" "}
+                  · A receber{" "}
+                  <strong className="text-[#111111] font-semibold">
+                    €{totalAReceber.toLocaleString("pt-PT")}
+                  </strong>
                 </div>
                 <div>
                   Margem operacional{" "}
                   <strong className="text-[#111111] font-semibold">
-                    {totalEntradas > 0
-                      ? (((totalEntradas - totalSaidas) / totalEntradas) * 100).toFixed(1)
-                      : "47,6"}
-                    %
+                    {margemOperacional}%
                   </strong>
                 </div>
               </div>
@@ -2494,13 +2516,15 @@ export default function EventFlowApp({
                   </p>
                 </div>
 
-                <button
-                  onClick={() => setShowNewUserModal(true)}
-                  className="px-3.5 py-1.5 rounded-[10px] bg-[#111111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
-                >
-                  <span>＋</span>
-                  <span>Criar conta</span>
-                </button>
+                {user?.role === "admin" && (
+                  <button
+                    onClick={() => setShowNewUserModal(true)}
+                    className="px-3.5 py-1.5 rounded-[10px] bg-[#111111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <span>＋</span>
+                    <span>Criar conta</span>
+                  </button>
+                )}
               </div>
 
               <div className="divide-y divide-[#ececf0] border border-[#ececf0] rounded-[16px] overflow-hidden">
@@ -2538,6 +2562,14 @@ export default function EventFlowApp({
                       <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#eaf8ee] text-[#24793a] capitalize">
                         {u.role}
                       </span>
+                      {user?.role === "admin" && (
+                        <button
+                          onClick={() => setEditingTeamUser(u)}
+                          className="text-[11px] font-semibold text-[#007aff] hover:underline cursor-pointer"
+                        >
+                          Editar
+                        </button>
+                      )}
                       <Link
                         href={`/utilizadores/${u.id}`}
                         className="text-[11px] font-semibold text-[#8e8e93] hover:text-[#111] transition"
@@ -3068,6 +3100,23 @@ export default function EventFlowApp({
           onCreated={(newUser) => {
             setTeamUsers((prev: any[]) => [...prev, newUser]);
             setShowNewUserModal(false);
+          }}
+        />
+      )}
+
+      {/* 10. EDIT USER MODAL */}
+      {editingTeamUser && (
+        <EditUserModal
+          user={editingTeamUser}
+          onClose={() => setEditingTeamUser(null)}
+          onUpdated={(updated) => {
+            setTeamUsers((prev: any[]) =>
+              prev.map((u: any) => (u.id === updated.id ? { ...u, ...updated } : u))
+            );
+            if (user && user.id === updated.id) {
+              setUser((prev: any) => ({ ...prev, ...updated }));
+            }
+            setEditingTeamUser(null);
           }}
         />
       )}
@@ -4078,7 +4127,7 @@ function LoginModal({
   onClose: () => void;
   onSuccess: (user: any) => void;
 }) {
-  const [email, setEmail] = useState("admin@cfmeventos.pt");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -4094,14 +4143,18 @@ function LoginModal({
       formData.set("password", password);
 
       const res = await loginAction(formData);
-      if (res.success) {
+      if (res.success && "user" in res && res.user) {
+        onSuccess(res.user);
+        onClose();
+      } else if (res.success) {
         onSuccess({
           email,
-          name: "Administrador CFM",
+          name: email.split("@")[0],
           role: "admin",
         });
+        onClose();
       } else {
-        setError(res.error || "Erro ao iniciar sessão.");
+        setError(("error" in res && res.error) || "Erro ao iniciar sessão.");
       }
     } catch (err: any) {
       setError(err?.message || "Erro inesperado.");
@@ -4310,6 +4363,149 @@ function NewUserModal({
           >
             {isLoading ? "A guardar conta..." : "Criar Conta de Acesso"}
           </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// EDIT USER MODAL COMPONENT (EDIT TEAM ACCOUNT)
+// -------------------------------------------------------------
+function EditUserModal({
+  user,
+  onClose,
+  onUpdated,
+}: {
+  user: any;
+  onClose: () => void;
+  onUpdated: (user: any) => void;
+}) {
+  const [name, setName] = useState(user.name);
+  const [email, setEmail] = useState(user.email);
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState(user.role);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.set("userId", user.id);
+      formData.set("name", name);
+      formData.set("email", email);
+      if (password.trim()) formData.set("password", password.trim());
+      formData.set("role", role);
+
+      const res = await updateUserAction(formData);
+      if (res.success) {
+        onUpdated({
+          id: user.id,
+          name,
+          email,
+          role,
+        });
+      } else {
+        setError(res.error || "Erro ao atualizar utilizador.");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Erro inesperado.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-[22px] w-full max-w-sm border border-[#ececf0] shadow-xl overflow-y-auto max-h-[calc(100dvh-2rem)] p-5 sm:p-6 text-xs">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-[17px] font-bold text-[#111111]">Editar Conta de Equipa</h2>
+            <p className="text-[11px] text-[#8e8e93] font-mono mt-0.5">#{user.id}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-[12px] bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">Nome Completo *</label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">Email *</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">
+              Nova Palavra-passe (deixar em branco para manter)
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••••••"
+              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">Nível de Acesso</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            >
+              <option value="admin">Administrador (Total)</option>
+              <option value="producer">Gestor / Produtor de Eventos</option>
+              <option value="warehouse">Armazém / Logística</option>
+            </select>
+          </div>
+
+          <div className="pt-2 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-[12px] bg-[#f2f2f5] text-[#3a3a3c] font-semibold hover:bg-[#e5e5ea] cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-4 py-2 rounded-[12px] bg-[#111111] hover:bg-black text-white font-bold transition shadow-xs cursor-pointer disabled:opacity-60"
+            >
+              {isLoading ? "A guardar..." : "Guardar Alterações"}
+            </button>
+          </div>
         </form>
       </div>
     </div>
