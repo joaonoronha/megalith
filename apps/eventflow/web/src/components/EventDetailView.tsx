@@ -35,6 +35,11 @@ import {
   Image as ImageIcon,
   Lightbulb,
   ZoomIn,
+  UploadCloud,
+  Link2,
+  FileImage,
+  Layers,
+  Trash,
 } from "lucide-react";
 import AuditLogModal from "@/components/AuditLogModal";
 import { formatRelativeTime } from "@/lib/date-format";
@@ -49,6 +54,7 @@ import {
   toggleEventTaskAction,
   deleteEventTaskAction,
   addEventMediaAction,
+  addBatchEventMediaAction,
   deleteEventMediaAction,
 } from "@/app/actions";
 
@@ -152,6 +158,16 @@ export interface EventMediaItem {
   orderIndex: number | null;
   uploadedByName: string | null;
   createdAt: Date | string | null;
+}
+
+export interface StagedMediaItem {
+  id: string;
+  sourceType: "file" | "url" | "preset";
+  file?: File;
+  previewUrl: string;
+  title: string;
+  tag: string;
+  fileSizeFormatted?: string;
 }
 
 interface Props {
@@ -289,12 +305,19 @@ export default function EventDetailView({
   const [lightboxItem, setLightboxItem] = useState<EventMediaItem | null>(null);
   const [showAddMediaModal, setShowAddMediaModal] = useState(false);
 
-  // New media modal form state
+  // New media modal form state (interchangeable files & URLs)
   const [newMediaType, setNewMediaType] = useState<"idea_board" | "final_outcome">("idea_board");
   const [newMediaTitle, setNewMediaTitle] = useState("");
   const [newMediaTag, setNewMediaTag] = useState("Flores & Centros");
+  const [batchDescription, setBatchDescription] = useState("");
   const [newMediaUrl, setNewMediaUrl] = useState("");
   const [newMediaDescription, setNewMediaDescription] = useState("");
+  const [stagedMedia, setStagedMedia] = useState<StagedMediaItem[]>([]);
+  const [urlInputValue, setUrlInputValue] = useState("");
+  const [activeInputTab, setActiveInputTab] = useState<"upload" | "url" | "presets">("upload");
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Auto-save status: "saved" | "saving" | "error"
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
@@ -576,50 +599,161 @@ export default function EventDetailView({
     setTimeout(() => setCopiedQuoteId(null), 2500);
   };
 
-  // Media handlers
-  const handleAddMedia = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMediaUrl.trim()) return;
+  // Media handlers (Multiple files, URLs, and Presets interchangeably)
+  const handleFilesSelected = (files: FileList | File[]) => {
+    const newItems: StagedMediaItem[] = [];
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith("image/")) return;
+      const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+      const previewUrl = URL.createObjectURL(file);
+      const sizeKB = Math.round(file.size / 1024);
+      const sizeFormatted = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB} KB`;
 
-    const tempId = "temp-" + Date.now();
-    const optimisticMedia: EventMediaItem = {
-      id: tempId,
+      newItems.push({
+        id: "staged-f-" + Math.random().toString(36).slice(2, 9),
+        sourceType: "file",
+        file,
+        previewUrl,
+        title: cleanName,
+        tag: newMediaTag,
+        fileSizeFormatted: sizeFormatted,
+      });
+    });
+
+    if (newItems.length > 0) {
+      setStagedMedia((prev) => [...prev, ...newItems]);
+    }
+  };
+
+  const handleAddUrls = () => {
+    if (!urlInputValue.trim()) return;
+
+    const rawUrls = urlInputValue
+      .split(/[\n,]+/)
+      .map((u) => u.trim())
+      .filter((u) => u.startsWith("http://") || u.startsWith("https://") || u.startsWith("data:") || u.startsWith("/"));
+
+    if (rawUrls.length === 0) return;
+
+    const newItems: StagedMediaItem[] = rawUrls.map((url, idx) => {
+      return {
+        id: "staged-u-" + Math.random().toString(36).slice(2, 9),
+        sourceType: "url",
+        previewUrl: url,
+        title: newMediaTitle.trim() || (newMediaType === "idea_board" ? `Referência Visual ${stagedMedia.length + idx + 1}` : `Fotografia Real ${stagedMedia.length + idx + 1}`),
+        tag: newMediaTag,
+      };
+    });
+
+    setStagedMedia((prev) => [...prev, ...newItems]);
+    setUrlInputValue("");
+  };
+
+  const handleAddPreset = (preset: typeof MEDIA_INSPIRATION_PRESETS[0]) => {
+    setStagedMedia((prev) => [
+      ...prev,
+      {
+        id: "staged-p-" + Math.random().toString(36).slice(2, 9),
+        sourceType: "preset",
+        previewUrl: preset.url,
+        title: preset.title,
+        tag: preset.tag,
+      },
+    ]);
+  };
+
+  const handleRemoveStagedItem = (id: string) => {
+    setStagedMedia((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleUpdateStagedItem = (id: string, updates: Partial<StagedMediaItem>) => {
+    setStagedMedia((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
+    );
+  };
+
+  const handleAddMedia = (e?: React.FormEvent) => handleConfirmAddBatch(e);
+  const handleConfirmAddBatch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    // If user has uncommitted text in the URL input, automatically parse and include it
+    let currentQueue = [...stagedMedia];
+    if (urlInputValue.trim()) {
+      const rawUrls = urlInputValue
+        .split(/[\n,]+/)
+        .map((u) => u.trim())
+        .filter((u) => u.startsWith("http://") || u.startsWith("https://") || u.startsWith("data:") || u.startsWith("/"));
+
+      if (rawUrls.length > 0) {
+        const extraFromInput: StagedMediaItem[] = rawUrls.map((url, idx) => ({
+          id: "staged-u-" + Math.random().toString(36).slice(2, 9),
+          sourceType: "url",
+          previewUrl: url,
+          title: newMediaTitle.trim() || (newMediaType === "idea_board" ? `Referência Visual ${currentQueue.length + idx + 1}` : `Fotografia Real ${currentQueue.length + idx + 1}`),
+          tag: newMediaTag,
+        }));
+        currentQueue = [...currentQueue, ...extraFromInput];
+      }
+    }
+
+    if (currentQueue.length === 0) return;
+
+    setIsUploadingMedia(true);
+
+    // Optimistic additions in the UI
+    const optimisticItems: EventMediaItem[] = currentQueue.map((staged, idx) => ({
+      id: "temp-" + Date.now() + "-" + idx,
       eventId: event.id,
       type: newMediaType,
-      title: newMediaTitle.trim() || (newMediaType === "idea_board" ? "Ideia / Conceito" : "Foto Real do Evento"),
-      description: newMediaDescription.trim() || null,
-      imageUrl: newMediaUrl.trim(),
-      tag: newMediaTag.trim() || "Geral",
-      orderIndex: Date.now(),
+      title: staged.title || (newMediaType === "idea_board" ? "Ideia / Conceito" : "Foto Real do Evento"),
+      description: batchDescription.trim() || null,
+      imageUrl: staged.previewUrl,
+      tag: staged.tag || newMediaTag,
+      orderIndex: Date.now() + idx,
       uploadedByName: currentUser?.name || "Administrador CFM",
       createdAt: new Date(),
-    };
+    }));
 
-    setMediaList((prev) => [optimisticMedia, ...prev]);
+    setMediaList((prev) => [...optimisticItems, ...prev]);
     setShowAddMediaModal(false);
 
     const formData = new FormData();
     formData.append("eventId", event.id);
     formData.append("type", newMediaType);
-    formData.append("title", optimisticMedia.title);
-    formData.append("description", optimisticMedia.description || "");
-    formData.append("imageUrl", optimisticMedia.imageUrl);
-    formData.append("tag", optimisticMedia.tag || "");
+    formData.append("tag", newMediaTag);
+    formData.append("description", batchDescription.trim());
 
-    setNewMediaUrl("");
+    currentQueue.forEach((item) => {
+      if (item.sourceType === "file" && item.file) {
+        formData.append("files", item.file);
+        formData.append("fileTitles", item.title);
+        formData.append("fileTags", item.tag);
+      } else {
+        formData.append("urls", item.previewUrl);
+        formData.append("urlTitles", item.title);
+        formData.append("urlTags", item.tag);
+      }
+    });
+
+    // Reset modal state
+    setStagedMedia([]);
+    setUrlInputValue("");
+    setBatchDescription("");
     setNewMediaTitle("");
-    setNewMediaDescription("");
 
     startTransition(async () => {
       try {
-        const res = await addEventMediaAction(formData);
-        if (res.success && res.media) {
-          setMediaList((prev) =>
-            prev.map((m) => (m.id === tempId ? { ...m, id: res.media.id } : m))
-          );
+        const res = await addBatchEventMediaAction(formData);
+        if (res.success && Array.isArray(res.mediaList)) {
+          setMediaList((prev) => {
+            const nonTemps = prev.filter((m) => !m.id.startsWith("temp-"));
+            return [...res.mediaList, ...nonTemps];
+          });
         }
       } catch (err) {
-        console.error("Erro ao adicionar media:", err);
+        console.error("Erro no envio de imagens:", err);
+      } finally {
+        setIsUploadingMedia(false);
       }
     });
   };
@@ -911,31 +1045,52 @@ export default function EventDetailView({
               {/* Direct Color Pickers */}
               <div className="flex items-center gap-2 flex-wrap">
                 {currentColors.map((hex, idx) => (
-                  <label
+                  <div
                     key={idx}
-                    className="relative flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-[#ececf0] shadow-2xs cursor-pointer hover:border-[#d2d2d7] transition"
-                    title="Clique para escolher nova cor"
+                    className="group relative flex items-center pl-2.5 pr-1.5 py-1 rounded-full bg-white border border-[#ececf0] shadow-2xs hover:border-[#d2d2d7] transition"
                   >
-                    <span
-                      className="w-3.5 h-3.5 rounded-full shadow-inner border border-black/10 inline-block pointer-events-none"
-                      style={{ backgroundColor: hex }}
-                    />
-                    <span className="text-[11px] font-mono font-bold text-[#636366]">
-                      {hex.toUpperCase()}
-                    </span>
-                    <input
-                      type="color"
-                      value={hex}
-                      onChange={(e) => handleColorChange(idx, e.target.value)}
-                      className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
-                    />
-                  </label>
+                    <label
+                      className="relative flex items-center gap-1.5 cursor-pointer pr-1"
+                      title="Clique para escolher nova cor"
+                    >
+                      <span
+                        className="w-3.5 h-3.5 rounded-full shadow-inner border border-black/10 inline-block pointer-events-none"
+                        style={{ backgroundColor: hex }}
+                      />
+                      <span className="text-[11px] font-mono font-bold text-[#636366]">
+                        {hex.toUpperCase()}
+                      </span>
+                      <input
+                        type="color"
+                        value={hex}
+                        onChange={(e) => handleColorChange(idx, e.target.value)}
+                        className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveColor(idx);
+                      }}
+                      className="w-4 h-4 rounded-full flex items-center justify-center text-[#8e8e93] hover:text-[#d32f2f] hover:bg-[#fee2e2] transition cursor-pointer"
+                      title="Remover cor da paleta"
+                      aria-label={`Remover cor ${hex}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 ))}
+
+                {currentColors.length === 0 && (
+                  <span className="text-xs text-[#8e8e93] italic">Sem cores na paleta</span>
+                )}
 
                 <button
                   type="button"
                   onClick={handleAddColor}
-                  className="w-7 h-7 rounded-full bg-white border border-[#ececf0] hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] hover:text-[#111] transition shadow-2xs"
+                  className="w-7 h-7 rounded-full bg-white border border-[#ececf0] hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] hover:text-[#111] transition shadow-2xs cursor-pointer"
                   title="Adicionar cor à paleta"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -1264,7 +1419,7 @@ export default function EventDetailView({
                         </span>
                       </div>
                       <p className="text-xs text-[#8e8e93] mt-0.5">
-                        Moodboards de inspiração conceptual e fotografias reais do resultado do evento
+                        Moodboards de inspiração conceptual e fotografias reais do resultado do evento (upload de múltiplos ficheiros e URLs)
                       </p>
                     </div>
                   </div>
@@ -1275,8 +1430,8 @@ export default function EventDetailView({
                   onClick={() => setShowAddMediaModal(true)}
                   className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 transition self-start sm:self-auto shadow-xs cursor-pointer flex-shrink-0"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>Adicionar Imagem</span>
+                  <UploadCloud className="w-4 h-4" />
+                  <span>Adicionar Imagens</span>
                 </button>
               </div>
 
@@ -2009,25 +2164,34 @@ export default function EventDetailView({
         </div>
       )}
 
-      {/* Add Media Modal */}
+      {/* Add Media Modal (Multiple Files & URLs Interchangeably) */}
       {showAddMediaModal && (
         <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
-          onClick={() => setShowAddMediaModal(false)}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+          onClick={() => {
+            if (!isUploadingMedia) setShowAddMediaModal(false);
+          }}
         >
           <div
-            className="bg-white rounded-[24px] max-w-lg w-full p-6 shadow-2xl border border-[#ececf0] space-y-4 max-h-[92vh] overflow-y-auto"
+            className="bg-white rounded-[24px] max-w-2xl w-full p-5 sm:p-6 shadow-2xl border border-[#ececf0] space-y-4 max-h-[92vh] flex flex-col my-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-[#ececf0] pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-[#111] text-white flex items-center justify-center">
-                  <ImageIcon className="w-3.5 h-3.5" />
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-[#ececf0] pb-3 flex-shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-[#111] text-white flex items-center justify-center">
+                  <ImageIcon className="w-4 h-4" />
                 </div>
-                <h3 className="font-bold text-base text-[#111]">Adicionar Imagem ao Evento</h3>
+                <div>
+                  <h3 className="font-bold text-base text-[#111]">Adicionar Imagens ao Evento</h3>
+                  <p className="text-[11px] text-[#8e8e93]">
+                    Carregue múltiplos ficheiros, insira links da web ou combine ambos livremente
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
+                disabled={isUploadingMedia}
                 onClick={() => setShowAddMediaModal(false)}
                 className="p-1 rounded-full text-[#8e8e93] hover:text-[#111] hover:bg-[#f2f2f5] transition cursor-pointer"
               >
@@ -2035,172 +2199,418 @@ export default function EventDetailView({
               </button>
             </div>
 
-            {/* Type selector toggle */}
-            <div>
-              <label className="block text-xs font-bold text-[#111] mb-2">Tipo de Imagem</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewMediaType("idea_board");
-                    if (newMediaTag === "Resultado Real") setNewMediaTag("Flores & Centros");
-                  }}
-                  className={`p-3 rounded-[14px] border text-left transition cursor-pointer ${
-                    newMediaType === "idea_board"
-                      ? "bg-amber-50 border-amber-300 ring-2 ring-amber-400/30"
-                      : "bg-[#fafafc] border-[#ececf0] hover:border-[#d2d2d7]"
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 mb-0.5">
-                    <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Painel de Ideias / Moodboard</span>
-                  </div>
-                  <p className="text-[11px] text-amber-700/80">
-                    Conceito, inspiração e referências visuais pré-evento.
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewMediaType("final_outcome");
-                    setNewMediaTag("Resultado Real");
-                  }}
-                  className={`p-3 rounded-[14px] border text-left transition cursor-pointer ${
-                    newMediaType === "final_outcome"
-                      ? "bg-emerald-50 border-emerald-300 ring-2 ring-emerald-400/30"
-                      : "bg-[#fafafc] border-[#ececf0] hover:border-[#d2d2d7]"
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 mb-0.5">
-                    <Camera className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Resultado Final (Foto Real)</span>
-                  </div>
-                  <p className="text-[11px] text-emerald-700/80">
-                    Fotografias reais da montagem final e do evento realizado.
-                  </p>
-                </button>
-              </div>
-            </div>
-
-            {/* Presets Inspiration Picker */}
-            <div>
-              <label className="block text-xs font-bold text-[#111] mb-1.5 flex items-center justify-between">
-                <span>Sugestões Rápidas de Inspiração CFM</span>
-                <span className="text-[10px] text-[#8e8e93] font-normal">1-clique para aplicar</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
-                {MEDIA_INSPIRATION_PRESETS.filter((p) => p.type === newMediaType).map((preset, idx) => (
+            {/* Scrollable Modal Content */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {/* Target Type Selector */}
+              <div>
+                <label className="block text-xs font-bold text-[#111] mb-1.5">Destino das Imagens</label>
+                <div className="grid grid-cols-2 gap-2">
                   <button
-                    key={idx}
                     type="button"
                     onClick={() => {
-                      setNewMediaUrl(preset.url);
-                      setNewMediaTitle(preset.title);
-                      setNewMediaTag(preset.tag);
-                      setNewMediaDescription(preset.description);
+                      setNewMediaType("idea_board");
+                      if (newMediaTag === "Resultado Real") setNewMediaTag("Flores & Centros");
                     }}
-                    className={`p-2 rounded-[12px] border text-left flex items-center gap-2 transition cursor-pointer ${
-                      newMediaUrl === preset.url
-                        ? "bg-blue-50 border-blue-300 ring-1 ring-blue-400"
-                        : "bg-[#fafafc] border-[#ececf0] hover:bg-[#f2f2f5]"
+                    className={`p-3 rounded-[14px] border text-left transition cursor-pointer ${
+                      newMediaType === "idea_board"
+                        ? "bg-amber-50 border-amber-300 ring-2 ring-amber-400/30"
+                        : "bg-[#fafafc] border-[#ececf0] hover:border-[#d2d2d7]"
                     }`}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={preset.url}
-                      alt={preset.title}
-                      className="w-10 h-10 rounded-[8px] object-cover flex-shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <div className="text-[11px] font-bold text-[#111] truncate">{preset.title}</div>
-                      <div className="text-[10px] text-[#8e8e93] truncate">{preset.tag}</div>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 mb-0.5">
+                      <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Painel de Ideias / Moodboard</span>
                     </div>
+                    <p className="text-[11px] text-amber-700/80">
+                      Conceito, inspiração e referências visuais pré-evento.
+                    </p>
                   </button>
-                ))}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewMediaType("final_outcome");
+                      setNewMediaTag("Resultado Real");
+                    }}
+                    className={`p-3 rounded-[14px] border text-left transition cursor-pointer ${
+                      newMediaType === "final_outcome"
+                        ? "bg-emerald-50 border-emerald-300 ring-2 ring-emerald-400/30"
+                        : "bg-[#fafafc] border-[#ececf0] hover:border-[#d2d2d7]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 mb-0.5">
+                      <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Resultado Final (Fotos Reais)</span>
+                    </div>
+                    <p className="text-[11px] text-emerald-700/80">
+                      Fotografias reais da montagem e do evento executado.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Input Method Switcher Tabs */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold text-[#111]">
+                    Método de Adição (Combinável)
+                  </label>
+                  <span className="text-[10px] text-[#8e8e93]">
+                    Pode usar ficheiros e URLs na mesma lista
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#f2f2f5] rounded-[14px]">
+                  <button
+                    type="button"
+                    onClick={() => setActiveInputTab("upload")}
+                    className={`py-2 px-3 rounded-[10px] text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      activeInputTab === "upload"
+                        ? "bg-white text-[#111] shadow-xs"
+                        : "text-[#636366] hover:text-[#111]"
+                    }`}
+                  >
+                    <UploadCloud className="w-3.5 h-3.5 text-[#007aff]" />
+                    <span>Upload Ficheiros</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveInputTab("url")}
+                    className={`py-2 px-3 rounded-[10px] text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      activeInputTab === "url"
+                        ? "bg-white text-[#111] shadow-xs"
+                        : "text-[#636366] hover:text-[#111]"
+                    }`}
+                  >
+                    <Link2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Inserir URLs</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveInputTab("presets")}
+                    className={`py-2 px-3 rounded-[10px] text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      activeInputTab === "presets"
+                        ? "bg-white text-[#111] shadow-xs"
+                        : "text-[#636366] hover:text-[#111]"
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Sugestões CFM</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* TAB 1: File Upload (Drag and Drop / Multiple selection) */}
+              {activeInputTab === "upload" && (
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDraggingOver(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setIsDraggingOver(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDraggingOver(false);
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                      handleFilesSelected(e.dataTransfer.files);
+                    }
+                  }}
+                  className={`border-2 border-dashed rounded-[18px] p-6 text-center transition cursor-pointer ${
+                    isDraggingOver
+                      ? "border-[#007aff] bg-blue-50/50"
+                      : "border-[#d2d2d7] hover:border-[#8e8e93] bg-[#fafafc]"
+                  }`}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        handleFilesSelected(e.target.files);
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+
+                  <div className="w-12 h-12 rounded-full bg-white shadow-xs flex items-center justify-center mx-auto mb-3 text-[#007aff]">
+                    <UploadCloud className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-[#111]">
+                    Arraste imagens ou clique para procurar no computador
+                  </h4>
+                  <p className="text-xs text-[#8e8e93] mt-1 max-w-sm mx-auto">
+                    Pode carregar múltiplos ficheiros de uma só vez (PNG, JPG, WEBP, GIF, HEIC).
+                  </p>
+                  <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-white border border-[#ececf0] text-xs font-bold text-[#111] shadow-2xs hover:bg-[#f2f2f5]">
+                    <FileImage className="w-3.5 h-3.5 text-[#007aff]" />
+                    <span>Selecionar Ficheiros</span>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: Multiple URLs input */}
+              {activeInputTab === "url" && (
+                <div className="bg-[#fafafc] border border-[#ececf0] rounded-[18px] p-4 space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[#111] mb-1">
+                      Links de Imagens Web (um por linha ou separados por vírgula)
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={urlInputValue}
+                      onChange={(e) => setUrlInputValue(e.target.value)}
+                      placeholder="https://images.unsplash.com/photo-1...&#10;https://images.unsplash.com/photo-2..."
+                      className="w-full px-3.5 py-2.5 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff] resize-none font-mono"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-[#8e8e93]">
+                      Cole URLs públicos de Unsplash, Pinterest, CDN ou Dropbox direto
+                    </span>
+                    <button
+                      type="button"
+                      disabled={!urlInputValue.trim()}
+                      onClick={handleAddUrls}
+                      className="px-4 py-1.5 rounded-[10px] bg-[#111] hover:bg-black disabled:opacity-40 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Adicionar à Lista</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: Curated CFM Presets */}
+              {activeInputTab === "presets" && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-[#111]">
+                      Sugestões Rápidas de Inspiração CFM
+                    </label>
+                    <span className="text-[10px] text-[#8e8e93]">Clique para adicionar à lista</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                    {MEDIA_INSPIRATION_PRESETS.filter((p) => p.type === newMediaType).map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleAddPreset(preset)}
+                        className="p-2 rounded-[12px] border text-left flex items-center gap-2 transition cursor-pointer bg-[#fafafc] border-[#ececf0] hover:bg-blue-50/50 hover:border-blue-200 group"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={preset.url}
+                          alt={preset.title}
+                          className="w-10 h-10 rounded-[8px] object-cover flex-shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[11px] font-bold text-[#111] truncate group-hover:text-[#007aff]">
+                            {preset.title}
+                          </div>
+                          <div className="text-[10px] text-[#8e8e93] truncate">{preset.tag}</div>
+                        </div>
+                        <Plus className="w-4 h-4 text-[#8e8e93] group-hover:text-[#007aff] flex-shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* STAGED QUEUE: Preview list of items to be uploaded/added */}
+              <div className="border-t border-[#ececf0] pt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-[#111]" />
+                    <span className="text-xs font-bold text-[#111]">
+                      Fila de Imagens a Adicionar ({stagedMedia.length})
+                    </span>
+                  </div>
+                  {stagedMedia.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setStagedMedia([])}
+                      className="text-[11px] text-rose-600 hover:underline cursor-pointer"
+                    >
+                      Limpar lista
+                    </button>
+                  )}
+                </div>
+
+                {stagedMedia.length === 0 ? (
+                  <div className="p-4 rounded-[14px] bg-[#fafafc] border border-dashed border-[#ececf0] text-center text-xs text-[#8e8e93]">
+                    Nenhuma imagem na fila ainda. Selecione ficheiros, insira links de imagem ou clique nas sugestões acima.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {stagedMedia.map((item, idx) => (
+                      <div
+                        key={item.id}
+                        className="p-2 rounded-[12px] bg-white border border-[#ececf0] flex items-center justify-between gap-3 shadow-2xs hover:border-[#c7c7cc] transition"
+                      >
+                        {/* Thumbnail & Source */}
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={item.previewUrl}
+                            alt={item.title}
+                            className="w-12 h-12 rounded-[8px] object-cover bg-[#f2f2f5] flex-shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src =
+                                "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1200&q=80";
+                            }}
+                          />
+
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <input
+                              type="text"
+                              value={item.title}
+                              onChange={(e) => handleUpdateStagedItem(item.id, { title: e.target.value })}
+                              placeholder={`Título da imagem #${idx + 1}`}
+                              className="w-full text-xs font-semibold px-2 py-1 bg-[#fafafc] border border-[#ececf0] rounded-[8px] focus:outline-none focus:ring-1 focus:ring-[#007aff]"
+                            />
+
+                            <div className="flex items-center gap-2 text-[10px]">
+                              {item.sourceType === "file" ? (
+                                <span className="inline-flex items-center gap-1 text-[#007aff] font-semibold bg-blue-50 px-1.5 py-0.2 rounded-md">
+                                  <UploadCloud className="w-2.5 h-2.5" />
+                                  <span>Ficheiro ({item.fileSizeFormatted || "Local"})</span>
+                                </span>
+                              ) : item.sourceType === "preset" ? (
+                                <span className="inline-flex items-center gap-1 text-amber-800 font-semibold bg-amber-50 px-1.5 py-0.2 rounded-md">
+                                  <Sparkles className="w-2.5 h-2.5" />
+                                  <span>Sugestão CFM</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-emerald-800 font-semibold bg-emerald-50 px-1.5 py-0.2 rounded-md">
+                                  <Link2 className="w-2.5 h-2.5" />
+                                  <span>Link Web</span>
+                                </span>
+                              )}
+
+                              <span className="text-[#8e8e93]">•</span>
+                              <span className="text-[#636366] truncate">{item.tag}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Remove Action */}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveStagedItem(item.id)}
+                          className="p-1.5 text-[#8e8e93] hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer flex-shrink-0"
+                          title="Remover da lista"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Batch Defaults */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#ececf0]">
+                {/* Default Category */}
+                <div>
+                  <label className="block text-xs font-bold text-[#111] mb-1">Categoria Padrão</label>
+                  <select
+                    value={newMediaTag}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewMediaTag(val);
+                      // Update staged items that have the previous default tag
+                      setStagedMedia((prev) =>
+                        prev.map((item) => ({ ...item, tag: val }))
+                      );
+                    }}
+                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] text-[#111]"
+                  >
+                    <option value="Flores & Centros">Flores & Centros de Mesa</option>
+                    <option value="Iluminação & Ambiente">Iluminação & Ambiente</option>
+                    <option value="Cerimónia & Altar">Cerimónia & Altar</option>
+                    <option value="Lounge & Mobiliário">Lounge & Mobiliário</option>
+                    <option value="Mesa & Louça">Mesa, Toalhas & Louça</option>
+                    <option value="Palco & Som">Palco & Estruturas</option>
+                    <option value="Bolo & Doces">Bolo & Candy Bar</option>
+                    <option value="Zona de Fotos">Zona de Fotos / Backdrop</option>
+                    <option value="Resultado Real">Resultado Real Concluído</option>
+                    <option value="Geral">Geral</option>
+                  </select>
+                </div>
+
+                {/* Batch Description / Notes */}
+                <div>
+                  <label className="block text-xs font-bold text-[#111] mb-1">Notas do Lote (Opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Fornecedor Quinta, aprovado pelo cliente..."
+                    value={batchDescription}
+                    onChange={(e) => setBatchDescription(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleAddMedia} className="space-y-3 pt-2 border-t border-[#ececf0]">
-              {/* Image URL */}
-              <div>
-                <label className="block text-xs font-bold text-[#111] mb-1">
-                  URL da Imagem <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="url"
-                  required
-                  placeholder="https://images.unsplash.com/... ou URL direto"
-                  value={newMediaUrl}
-                  onChange={(e) => setNewMediaUrl(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs bg-[#fafafc] border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                />
-              </div>
+            {/* Modal Footer Actions */}
+            <div className="pt-3 border-t border-[#ececf0] flex items-center justify-between gap-3 flex-shrink-0">
+              <span className="text-xs text-[#8e8e93]">
+                {stagedMedia.length > 0 ? (
+                  <>
+                    <strong className="text-[#111]">{stagedMedia.length}</strong> imagem(ns) pronta(s)
+                  </>
+                ) : urlInputValue.trim() ? (
+                  "URL inserido pronto a processar"
+                ) : (
+                  "Selecione imagens ou insira URLs"
+                )}
+              </span>
 
-              {/* Title */}
-              <div>
-                <label className="block text-xs font-bold text-[#111] mb-1">Título / Nome</label>
-                <input
-                  type="text"
-                  placeholder={newMediaType === "idea_board" ? "Ex: Centros de mesa em Terracotta" : "Ex: Foto da zona de cocktail finalizada"}
-                  value={newMediaTitle}
-                  onChange={(e) => setNewMediaTitle(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                />
-              </div>
-
-              {/* Tag & Category */}
-              <div>
-                <label className="block text-xs font-bold text-[#111] mb-1">Etiqueta / Categoria</label>
-                <select
-                  value={newMediaTag}
-                  onChange={(e) => setNewMediaTag(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] text-[#111]"
-                >
-                  <option value="Flores & Centros">Flores & Centros de Mesa</option>
-                  <option value="Iluminação & Ambiente">Iluminação & Ambiente</option>
-                  <option value="Cerimónia & Altar">Cerimónia & Altar</option>
-                  <option value="Lounge & Mobiliário">Lounge & Mobiliário</option>
-                  <option value="Mesa & Louça">Mesa, Toalhas & Louça</option>
-                  <option value="Palco & Som">Palco & Estruturas</option>
-                  <option value="Bolo & Doces">Bolo & Candy Bar</option>
-                  <option value="Zona de Fotos">Zona de Fotos / Backdrop</option>
-                  <option value="Resultado Real">Resultado Real Concluído</option>
-                  <option value="Geral">Geral</option>
-                </select>
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-xs font-bold text-[#111] mb-1">Notas / Descrição (Opcional)</label>
-                <textarea
-                  rows={2}
-                  placeholder="Detalhes sobre materiais, fornecedor, posicionamento ou aprovação do cliente..."
-                  value={newMediaDescription}
-                  onChange={(e) => setNewMediaDescription(e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff] resize-none"
-                />
-              </div>
-
-              {/* Modal Actions */}
-              <div className="pt-2 border-t border-[#ececf0] flex items-center justify-end gap-2">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  disabled={isUploadingMedia}
                   onClick={() => setShowAddMediaModal(false)}
                   className="px-4 py-2 rounded-[12px] bg-[#f2f2f5] text-xs font-bold text-[#111] hover:bg-[#e5e5ea] transition cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
-                  type="submit"
-                  disabled={!newMediaUrl.trim()}
-                  className="px-5 py-2 rounded-[12px] bg-[#111] hover:bg-black disabled:opacity-50 text-white text-xs font-bold transition cursor-pointer"
+                  type="button"
+                  disabled={
+                    (stagedMedia.length === 0 && !urlInputValue.trim()) || isUploadingMedia
+                  }
+                  onClick={() => handleConfirmAddBatch()}
+                  className="px-5 py-2 rounded-[12px] bg-[#111] hover:bg-black disabled:opacity-40 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
-                  {newMediaType === "idea_board" ? "Adicionar ao Moodboard" : "Registar Foto Real"}
+                  {isUploadingMedia ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>A processar envio...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>
+                        Adicionar {stagedMedia.length > 0 ? `${stagedMedia.length} ` : ""}
+                        {newMediaType === "idea_board" ? "ao Moodboard" : "aos Resultados"}
+                      </span>
+                    </>
+                  )}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}

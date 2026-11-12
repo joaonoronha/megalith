@@ -15,6 +15,7 @@ export type EntityPrefix =
   | "med"  // Media items / Photos
   | "alt"  // Alerts
   | "loc"  // Storage Locations
+  | "f"    // Uploaded Files
   | "log"; // Audit Logs
 
 /**

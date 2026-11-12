@@ -17,6 +17,7 @@ export default async function InventoryPage() {
       initialMovements={data.allMovements}
       initialTemplate={data.template}
       initialAlerts={data.allAlerts}
+      initialLocations={data.allLocations}
       initialTab="inventory"
     />
   );

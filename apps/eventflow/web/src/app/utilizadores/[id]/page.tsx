@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db/client";
-import { users, eventTasks, events } from "@/db/schema";
+import { users, eventTasks, events, storageLocations } from "@/db/schema";
 import { eq, or, desc, asc } from "drizzle-orm";
 import UserDetailView from "@/components/UserDetailView";
 
@@ -21,23 +21,29 @@ export default async function UserPage({ params }: PageProps) {
     notFound();
   }
 
-  // Get tasks assigned to this user (by ID or by name)
-  const tasks = await db
-    .select({
-      id: eventTasks.id,
-      title: eventTasks.title,
-      completed: eventTasks.completed,
-      priority: eventTasks.priority,
-      dueDate: eventTasks.dueDate,
-      eventId: events.id,
-      eventName: events.name,
-      eventVenue: events.venue,
-      eventStartDate: events.startDate,
-    })
-    .from(eventTasks)
-    .innerJoin(events, eq(eventTasks.eventId, events.id))
-    .where(or(eq(eventTasks.assignedTo, id), eq(eventTasks.assignedTo, user.name)))
-    .orderBy(asc(eventTasks.completed), desc(events.startDate));
+  // Get tasks assigned to this user and storage locations managed by this user
+  const [tasks, managedLocs] = await Promise.all([
+    db
+      .select({
+        id: eventTasks.id,
+        title: eventTasks.title,
+        completed: eventTasks.completed,
+        priority: eventTasks.priority,
+        dueDate: eventTasks.dueDate,
+        eventId: events.id,
+        eventName: events.name,
+        eventVenue: events.venue,
+        eventStartDate: events.startDate,
+      })
+      .from(eventTasks)
+      .innerJoin(events, eq(eventTasks.eventId, events.id))
+      .where(or(eq(eventTasks.assignedTo, id), eq(eventTasks.assignedTo, user.name)))
+      .orderBy(asc(eventTasks.completed), desc(events.startDate)),
+    db.query.storageLocations.findMany({
+      where: or(eq(storageLocations.managerUserId, id), eq(storageLocations.managerName, user.name)),
+      orderBy: [asc(storageLocations.name)],
+    }),
+  ]);
 
   return (
     <UserDetailView
@@ -49,6 +55,7 @@ export default async function UserPage({ params }: PageProps) {
         createdAt: user.createdAt,
       }}
       assignedTasks={tasks}
+      managedLocations={managedLocs}
     />
   );
 }
