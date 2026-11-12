@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition, useRef, useMemo } from "react";
+import React, { useState, useTransition, useRef, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Calendar,
@@ -44,9 +44,16 @@ import {
   ChevronRight,
   Video,
   UserPlus,
+  Info,
+  Send,
+  Paperclip,
+  Tag,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import AuditLogModal from "@/components/AuditLogModal";
-import { formatRelativeTime } from "@/lib/date-format";
+import EventQuoteModal from "@/components/EventQuoteModal";
+import { formatRelativeTime, formatUpcomingTime, formatMeetingRange } from "@/lib/date-format";
+import { isMeetingEvent } from "@/lib/events";
 import {
   updateEventPatchAction,
   updateEventStatusAction,
@@ -61,8 +68,54 @@ import {
   addBatchEventMediaAction,
   deleteMediaImageAction,
   deleteEventMediaAction,
+  addMoodboardCommentAction,
+  deleteMoodboardCommentAction,
   createClientAction,
+  createEventMeetingAction,
+  linkMeetingToEventAction,
+  updateEventMeetingAction,
+  unlinkEventMeetingAction,
+  deleteEventMeetingAction,
 } from "@/app/actions";
+
+export interface EventMeeting {
+  id: string;
+  eventId: string | null;
+  clientId: string | null;
+  title: string;
+  type: "google_meet" | "presencial" | "outro";
+  status: "agendada" | "realizada" | "cancelada";
+  startDate: Date | string;
+  endDate?: Date | string | null;
+  location?: string | null;
+  meetUrl?: string | null;
+  notes?: string | null;
+  hostUserId?: string | null;
+  hostName?: string | null;
+  clientContactName?: string | null;
+  clientContactEmail?: string | null;
+  clientContactPhone?: string | null;
+  source?: string | null;
+  calendlyUri?: string | null;
+  linkedEventRowId?: string | null;
+  createdAt?: Date | string | null;
+  updatedAt?: Date | string | null;
+}
+
+export interface AvailableMeetingToLink {
+  id: string;
+  meetingId?: string;
+  existingEventId?: string;
+  title: string;
+  type: "google_meet" | "presencial" | "outro";
+  startDate: Date | string;
+  endDate?: Date | string | null;
+  location?: string | null;
+  meetUrl?: string | null;
+  notes?: string | null;
+  source?: string | null;
+  clientName?: string | null;
+}
 
 interface Client {
   id: string;
@@ -161,6 +214,21 @@ export interface MediaImageItem {
   tag?: string;
 }
 
+export interface MoodboardCommentItem {
+  id: string;
+  mediaId: string;
+  eventId: string;
+  userId?: string | null;
+  authorName: string;
+  content: string;
+  photoId?: string | null;
+  photoIndex?: number | null;
+  photoLabel?: string | null;
+  photoUrl?: string | null;
+  imageUrl?: string | null;
+  createdAt: Date | string;
+}
+
 export interface EventMediaItem {
   id: string;
   eventId: string;
@@ -169,6 +237,7 @@ export interface EventMediaItem {
   description: string | null;
   imageUrl: string;
   images?: string | null | MediaImageItem[];
+  comments?: string | null | MoodboardCommentItem[];
   tag: string | null;
   orderIndex: number | null;
   uploadedByName: string | null;
@@ -199,21 +268,63 @@ export function parseMediaImages(item: EventMediaItem): MediaImageItem[] {
   ];
 }
 
+export function parseMediaComments(item: EventMediaItem): MoodboardCommentItem[] {
+  if (Array.isArray(item.comments)) {
+    return item.comments;
+  }
+  if (typeof item.comments === "string") {
+    try {
+      const parsed = JSON.parse(item.comments);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+  }
+  return [];
+}
+
 function MoodboardCard({
   board,
+  currentUser,
   onOpenLightbox,
   onAddMorePhotos,
   onDeleteImage,
   onDeleteBoard,
+  onAddComment,
+  onDeleteComment,
 }: {
   board: EventMediaItem;
+  currentUser?: any;
   onOpenLightbox: (board: EventMediaItem, index: number) => void;
   onAddMorePhotos: (board: EventMediaItem) => void;
   onDeleteImage: (boardId: string, imageId: string) => void;
   onDeleteBoard: (boardId: string) => void;
+  onAddComment: (args: {
+    mediaId: string;
+    content: string;
+    photoId?: string | null;
+    photoIndex?: number | null;
+    photoLabel?: string | null;
+    photoUrl?: string | null;
+    imageFile?: File | null;
+    imageUrl?: string | null;
+  }) => Promise<void>;
+  onDeleteComment: (commentId: string, mediaId: string) => Promise<void>;
 }) {
   const images = useMemo(() => parseMediaImages(board), [board]);
+  const comments = useMemo(() => parseMediaComments(board), [board]);
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Comments state
+  const [showComments, setShowComments] = useState(false);
+  const [commentFilter, setCommentFilter] = useState<"all" | "current_photo">("all");
+  const [commentText, setCommentText] = useState("");
+  // "current" = current slide in carousel, "general" = general moodboard, or specific number
+  const [targetChoice, setTargetChoice] = useState<"current" | "general" | number>("current");
+  const [commentImageFile, setCommentImageFile] = useState<File | null>(null);
+  const [commentImagePreview, setCommentImagePreview] = useState<string | null>(null);
+  const [commentUrlInput, setCommentUrlInput] = useState("");
+  const [showUrlField, setShowUrlField] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const commentFileInputRef = useRef<HTMLInputElement>(null);
 
   // Keep active index strictly in bounds
   const activeIndex = images.length > 0 ? Math.min(Math.max(0, currentIndex), images.length - 1) : 0;
@@ -228,6 +339,87 @@ function MoodboardCard({
     e?.stopPropagation();
     setCurrentIndex((prev) => (prev >= images.length - 1 ? 0 : prev + 1));
   };
+
+  // Determine current target photo payload
+  const currentTargetInfo = useMemo(() => {
+    if (targetChoice === "general") {
+      return {
+        id: null,
+        index: null,
+        label: "Geral (Todo o Moodboard)",
+        url: null,
+      };
+    }
+    const idx = targetChoice === "current" ? activeIndex : targetChoice;
+    const img = images[idx] || currentImage;
+    return {
+      id: img.id,
+      index: idx,
+      label: `Foto ${idx + 1}${img.title ? `: ${img.title}` : ""}`,
+      url: img.url,
+    };
+  }, [targetChoice, activeIndex, images, currentImage]);
+
+  const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCommentImageFile(file);
+      setCommentImagePreview(URL.createObjectURL(file));
+      setCommentUrlInput("");
+      setShowUrlField(false);
+    }
+  };
+
+  const handleClearAttachedImage = () => {
+    setCommentImageFile(null);
+    setCommentImagePreview(null);
+    setCommentUrlInput("");
+    setShowUrlField(false);
+    if (commentFileInputRef.current) {
+      commentFileInputRef.current.value = "";
+    }
+  };
+
+  const handleSubmitComment = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!commentText.trim() && !commentImageFile && !commentUrlInput.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      await onAddComment({
+        mediaId: board.id,
+        content: commentText.trim(),
+        photoId: currentTargetInfo.id,
+        photoIndex: currentTargetInfo.index,
+        photoLabel: currentTargetInfo.label,
+        photoUrl: currentTargetInfo.url,
+        imageFile: commentImageFile,
+        imageUrl: commentUrlInput.trim() || undefined,
+      });
+
+      setCommentText("");
+      handleClearAttachedImage();
+      setShowComments(true);
+    } catch (err) {
+      console.error("Erro ao publicar comentário:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Filtered comments
+  const visibleComments = useMemo(() => {
+    if (commentFilter === "current_photo") {
+      return comments.filter(
+        (c) => c.photoIndex === activeIndex || c.photoId === currentImage.id
+      );
+    }
+    return comments;
+  }, [comments, commentFilter, activeIndex, currentImage]);
+
+  const photoSpecificCount = comments.filter(
+    (c) => c.photoIndex === activeIndex || c.photoId === currentImage.id
+  ).length;
 
   return (
     <div className="bg-white rounded-[22px] border border-[#ececf0] overflow-hidden hover:border-[#c7c7cc] hover:shadow-lg transition-all flex flex-col group">
@@ -271,7 +463,9 @@ function MoodboardCard({
         <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10 pointer-events-none">
           <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-black/70 backdrop-blur-md text-white shadow-xs flex items-center gap-1">
             <ImageIcon className="w-3 h-3" />
-            <span>{activeIndex + 1} / {images.length}</span>
+            <span>
+              {activeIndex + 1} / {images.length}
+            </span>
           </span>
         </div>
 
@@ -320,7 +514,9 @@ function MoodboardCard({
                 />
               ))}
             </div>
-          ) : <div />}
+          ) : (
+            <div />
+          )}
 
           {/* Quick Actions (Zoom & Delete Photo) */}
           <div className="flex items-center gap-1.5 pointer-events-auto">
@@ -350,7 +546,7 @@ function MoodboardCard({
         </div>
       </div>
 
-      {/* Horizontal Thumbnail Strip for Quick Scrolling through the Carousel */}
+      {/* Horizontal Thumbnail Strip */}
       {images.length > 1 && (
         <div className="px-3 py-2 bg-[#fafafc] border-b border-[#ececf0] flex items-center gap-1.5 overflow-x-auto scrollbar-thin">
           {images.map((img: MediaImageItem, idx: number) => (
@@ -401,10 +597,10 @@ function MoodboardCard({
           )}
         </div>
 
-        {/* Footer actions */}
-        <div className="mt-4 pt-3 border-t border-[#f2f2f5] flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1.5 text-[11px] text-[#8e8e93]">
-            <span>{board.uploadedByName || "Equipa CFM"}</span>
+        {/* Footer actions with Comment Counter */}
+        <div className="mt-4 pt-3 border-t border-[#f2f2f5] flex items-center justify-between text-xs gap-2">
+          <div className="flex items-center gap-1.5 text-[11px] text-[#8e8e93] truncate">
+            <span className="truncate">{board.uploadedByName || "Equipa CFM"}</span>
             {board.createdAt && (
               <>
                 <span>•</span>
@@ -413,27 +609,690 @@ function MoodboardCard({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Toggle Comments Button */}
+            <button
+              type="button"
+              onClick={() => setShowComments(!showComments)}
+              className={`px-2.5 py-1 rounded-lg font-semibold text-[11px] inline-flex items-center gap-1.5 transition cursor-pointer ${
+                showComments || comments.length > 0
+                  ? "bg-[#e8f2ff] text-[#007aff] hover:bg-[#d0e5ff]"
+                  : "bg-[#f2f2f5] text-[#111] hover:bg-[#e5e5ea]"
+              }`}
+              title="Abrir discussão e feedback deste moodboard"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>
+                Ideias & Notas{" "}
+                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-[#007aff] text-white">
+                  {comments.length}
+                </span>
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={() => onAddMorePhotos(board)}
               className="px-2.5 py-1 rounded-lg bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#111] font-semibold text-[11px] inline-flex items-center gap-1 transition cursor-pointer"
             >
               <Plus className="w-3 h-3" />
-              <span>Adicionar fotos</span>
+              <span className="hidden sm:inline">Adicionar fotos</span>
             </button>
 
             <button
               type="button"
               onClick={() => onDeleteBoard(board.id)}
-              className="p-1 rounded-lg text-[#8e8e93] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+              className="p-1.5 rounded-lg text-[#8e8e93] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
               title="Eliminar moodboard completo"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
+
+        {/* ------------------------------------------------------------- */}
+        {/* COLLABORATIVE COMMENTS & FEEDBACK SECTION                     */}
+        {/* ------------------------------------------------------------- */}
+        {showComments && (
+          <div className="mt-4 pt-3.5 border-t border-[#ececf0] flex flex-col gap-3">
+            {/* Filter chips & Section Header */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-[#111] flex items-center gap-1">
+                  <MessageSquare className="w-3.5 h-3.5 text-[#007aff]" />
+                  <span>Discussão ({comments.length})</span>
+                </span>
+                {images.length > 1 && (
+                  <div className="flex items-center gap-1 ml-2">
+                    <button
+                      type="button"
+                      onClick={() => setCommentFilter("all")}
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition cursor-pointer ${
+                        commentFilter === "all"
+                          ? "bg-[#111] text-white"
+                          : "bg-[#f2f2f5] text-[#636366] hover:bg-[#e5e5ea]"
+                      }`}
+                    >
+                      Todas ({comments.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCommentFilter("current_photo")}
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition cursor-pointer ${
+                        commentFilter === "current_photo"
+                          ? "bg-[#007aff] text-white"
+                          : "bg-[#f2f2f5] text-[#636366] hover:bg-[#e5e5ea]"
+                      }`}
+                    >
+                      Foto atual ({photoSpecificCount})
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowComments(false)}
+                className="text-[11px] text-[#8e8e93] hover:text-[#111] transition cursor-pointer"
+              >
+                Ocultar
+              </button>
+            </div>
+
+            {/* Comments List */}
+            <div className="flex flex-col gap-2.5 max-h-[320px] overflow-y-auto pr-1 scrollbar-thin">
+              {visibleComments.length === 0 ? (
+                <div className="p-3.5 rounded-xl bg-[#f9f9fb] border border-dashed border-[#ececf0] text-center text-xs text-[#8e8e93]">
+                  {commentFilter === "current_photo"
+                    ? "Nenhuma nota específica para a foto atual. Partilhe a sua ideia abaixo!"
+                    : "Ainda não existem notas neste moodboard. Seja o primeiro a partilhar uma ideia!"}
+                </div>
+              ) : (
+                visibleComments.map((comment) => {
+                  const initials = (comment.authorName || "CFM")
+                    .split(" ")
+                    .map((n) => n[0])
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase();
+
+                  const isPhotoTarget = comment.photoIndex !== null && comment.photoIndex !== undefined;
+
+                  return (
+                    <div
+                      key={comment.id}
+                      className="p-3 rounded-xl bg-[#f9f9fb] border border-[#ececf0] flex flex-col gap-1.5 hover:border-[#c7c7cc] transition"
+                    >
+                      {/* Comment Top Info */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-[#007aff] to-[#5856d6] text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0">
+                            {initials}
+                          </div>
+                          <span className="text-xs font-bold text-[#111]">
+                            {comment.authorName}
+                          </span>
+                          <span className="text-[10px] text-[#8e8e93]">
+                            {formatRelativeTime(comment.createdAt)}
+                          </span>
+                        </div>
+
+                        {/* Delete comment */}
+                        <button
+                          type="button"
+                          onClick={() => onDeleteComment(comment.id, board.id)}
+                          className="p-1 text-[#8e8e93] hover:text-rose-600 rounded transition cursor-pointer"
+                          title="Eliminar nota"
+                        >
+                          <Trash className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      {/* Photo Target Label Badge with Mini-Thumbnail */}
+                      {comment.photoLabel && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (typeof comment.photoIndex === "number" && comment.photoIndex >= 0 && comment.photoIndex < images.length) {
+                                setCurrentIndex(comment.photoIndex);
+                              }
+                            }}
+                            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold transition cursor-pointer ${
+                              isPhotoTarget
+                                ? "bg-[#e8f2ff] text-[#007aff] hover:bg-[#d0e5ff]"
+                                : "bg-[#f2f2f5] text-[#636366]"
+                            }`}
+                            title="Clique para ver esta foto no carousel"
+                          >
+                            {comment.photoUrl && (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img
+                                src={comment.photoUrl}
+                                alt=""
+                                className="w-3.5 h-3.5 rounded-full object-cover flex-shrink-0"
+                              />
+                            )}
+                            <Tag className="w-2.5 h-2.5" />
+                            <span>{comment.photoLabel}</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Comment text */}
+                      {comment.content && (
+                        <p className="text-xs text-[#2c2c2e] leading-relaxed whitespace-pre-line">
+                          {comment.content}
+                        </p>
+                      )}
+
+                      {/* Attached Image in Comment */}
+                      {comment.imageUrl && (
+                        <div className="mt-1 relative rounded-lg overflow-hidden border border-[#e5e5ea] max-w-[220px]">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={comment.imageUrl}
+                            alt="Anexo da nota"
+                            className="w-full max-h-36 object-cover cursor-pointer hover:opacity-90 transition"
+                            onClick={() => window.open(comment.imageUrl!, "_blank")}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Comment Composer Form */}
+            <form
+              onSubmit={handleSubmitComment}
+              className="mt-1 p-2.5 rounded-xl bg-[#f2f2f5] flex flex-col gap-2"
+            >
+              {/* Photo Selector Header */}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-semibold text-[#636366] flex items-center gap-1">
+                    <Tag className="w-3 h-3 text-[#007aff]" />
+                    <span>Referente a:</span>
+                  </span>
+                  <select
+                    value={
+                      targetChoice === "general"
+                        ? "general"
+                        : targetChoice === "current"
+                        ? `photo-${activeIndex}`
+                        : `photo-${targetChoice}`
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "general") {
+                        setTargetChoice("general");
+                      } else if (val.startsWith("photo-")) {
+                        const idx = parseInt(val.replace("photo-", ""), 10);
+                        setTargetChoice(idx);
+                        setCurrentIndex(idx);
+                      }
+                    }}
+                    className="bg-white text-[#111] text-[11px] font-semibold py-1 px-2 rounded-lg border border-[#d1d1d6] cursor-pointer shadow-2xs focus:outline-hidden focus:ring-1 focus:ring-[#007aff]"
+                  >
+                    <option value={`photo-${activeIndex}`}>
+                      🖼️ Foto {activeIndex + 1} ({currentImage.title || "Foto atual"})
+                    </option>
+                    <option value="general">📌 Geral (Todo o Moodboard)</option>
+                    {images.map((img, idx) => (
+                      <option key={img.id || idx} value={`photo-${idx}`}>
+                        Foto {idx + 1}: {img.title || `Imagem ${idx + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Attach image trigger */}
+                <div className="flex items-center gap-1">
+                  <input
+                    type="file"
+                    ref={commentFileInputRef}
+                    onChange={handleFileAttach}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => commentFileInputRef.current?.click()}
+                    className="px-2 py-0.5 rounded-md bg-white hover:bg-[#e5e5ea] text-[#111] text-[11px] font-medium border border-[#d1d1d6] inline-flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                    title="Anexar ficheiro de imagem"
+                  >
+                    <Paperclip className="w-3 h-3 text-[#007aff]" />
+                    <span>Foto</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowUrlField(!showUrlField)}
+                    className="px-2 py-0.5 rounded-md bg-white hover:bg-[#e5e5ea] text-[#111] text-[11px] font-medium border border-[#d1d1d6] inline-flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                    title="Anexar link web de imagem"
+                  >
+                    <Link2 className="w-3 h-3 text-[#007aff]" />
+                    <span>Link</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* URL Input field if toggled */}
+              {showUrlField && (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="url"
+                    value={commentUrlInput}
+                    onChange={(e) => setCommentUrlInput(e.target.value)}
+                    placeholder="https://... (URL da imagem)"
+                    className="flex-1 bg-white text-xs px-2.5 py-1 rounded-lg border border-[#d1d1d6] focus:outline-hidden focus:ring-1 focus:ring-[#007aff]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowUrlField(false)}
+                    className="p-1 text-[#8e8e93] hover:text-[#111]"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Staged Image Preview before submitting */}
+              {(commentImagePreview || commentUrlInput) && (
+                <div className="relative inline-flex items-center gap-2 p-1.5 rounded-lg bg-white border border-[#d1d1d6] self-start max-w-full">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={commentImagePreview || commentUrlInput}
+                    alt="Pré-visualização do anexo"
+                    className="w-10 h-10 rounded-md object-cover flex-shrink-0"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=400&q=80";
+                    }}
+                  />
+                  <div className="text-[11px] truncate max-w-[180px]">
+                    <span className="font-semibold text-[#111] block truncate">
+                      {commentImageFile?.name || "Imagem da Web"}
+                    </span>
+                    <span className="text-[#8e8e93]">Anexo pronto a enviar</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClearAttachedImage}
+                    className="p-1 rounded-full text-[#8e8e93] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                    title="Remover anexo"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Textarea + Submit button */}
+              <div className="flex items-end gap-2">
+                <textarea
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmitComment();
+                    }
+                  }}
+                  placeholder="Escreva uma sugestão, nota ou ideia... (Enter para enviar)"
+                  rows={2}
+                  className="flex-1 bg-white text-xs px-3 py-2 rounded-xl border border-[#d1d1d6] focus:outline-hidden focus:ring-2 focus:ring-[#007aff] resize-none"
+                />
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting || (!commentText.trim() && !commentImageFile && !commentUrlInput.trim())}
+                  className="px-3.5 py-2 rounded-xl bg-[#007aff] hover:bg-[#0062cc] disabled:opacity-40 disabled:hover:bg-[#007aff] text-white text-xs font-bold inline-flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
+                  <span>Enviar</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function LightboxCommentsDrawer({
+  board,
+  activeIdx,
+  activeImg,
+  currentUser,
+  onAddComment,
+  onDeleteComment,
+  onSelectPhoto,
+  onClose,
+}: {
+  board: EventMediaItem;
+  activeIdx: number;
+  activeImg: MediaImageItem;
+  currentUser?: any;
+  onAddComment: (args: {
+    mediaId: string;
+    content: string;
+    photoId?: string | null;
+    photoIndex?: number | null;
+    photoLabel?: string | null;
+    photoUrl?: string | null;
+    imageFile?: File | null;
+    imageUrl?: string | null;
+  }) => Promise<void>;
+  onDeleteComment: (commentId: string, mediaId: string) => Promise<void>;
+  onSelectPhoto: (index: number) => void;
+  onClose: () => void;
+}) {
+  const images = useMemo(() => parseMediaImages(board), [board]);
+  const comments = useMemo(() => parseMediaComments(board), [board]);
+  const [filter, setFilter] = useState<"all" | "current_photo">("all");
+  const [text, setText] = useState("");
+  const [targetChoice, setTargetChoice] = useState<"current" | "general" | number>("current");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [urlInput, setUrlInput] = useState("");
+  const [showUrlField, setShowUrlField] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const targetInfo = useMemo(() => {
+    if (targetChoice === "general") {
+      return { id: null, index: null, label: "Geral (Todo o Moodboard)", url: null };
+    }
+    const idx = targetChoice === "current" ? activeIdx : targetChoice;
+    const img = images[idx] || activeImg;
+    return {
+      id: img.id,
+      index: idx,
+      label: `Foto ${idx + 1}${img.title ? `: ${img.title}` : ""}`,
+      url: img.url,
+    };
+  }, [targetChoice, activeIdx, images, activeImg]);
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+      setUrlInput("");
+      setShowUrlField(false);
+    }
+  };
+
+  const handleClearImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setUrlInput("");
+    setShowUrlField(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!text.trim() && !imageFile && !urlInput.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      await onAddComment({
+        mediaId: board.id,
+        content: text.trim(),
+        photoId: targetInfo.id,
+        photoIndex: targetInfo.index,
+        photoLabel: targetInfo.label,
+        photoUrl: targetInfo.url,
+        imageFile,
+        imageUrl: urlInput.trim() || undefined,
+      });
+      setText("");
+      handleClearImage();
+    } catch (err) {
+      console.error("Erro no lightbox comment:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const visible = useMemo(() => {
+    if (filter === "current_photo") {
+      return comments.filter((c) => c.photoIndex === activeIdx || c.photoId === activeImg.id);
+    }
+    return comments;
+  }, [comments, filter, activeIdx, activeImg]);
+
+  const photoCount = comments.filter((c) => c.photoIndex === activeIdx || c.photoId === activeImg.id).length;
+
+  return (
+    <div className="w-full md:w-80 lg:w-96 border-t md:border-t-0 md:border-l border-white/10 bg-[#161618] flex flex-col flex-shrink-0 h-[45vh] md:h-auto overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between bg-black/30 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-4 h-4 text-[#007aff]" />
+          <span className="text-xs font-bold text-white">Notas & Ideias ({comments.length})</span>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-1 rounded-md text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="px-3 py-2 bg-black/20 border-b border-white/5 flex items-center gap-1.5 flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => setFilter("all")}
+          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer ${
+            filter === "all" ? "bg-white text-black" : "bg-white/10 text-white/70 hover:bg-white/15"
+          }`}
+        >
+          Todas ({comments.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilter("current_photo")}
+          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer ${
+            filter === "current_photo" ? "bg-[#007aff] text-white" : "bg-white/10 text-white/70 hover:bg-white/15"
+          }`}
+        >
+          Foto atual ({photoCount})
+        </button>
+      </div>
+
+      {/* Comment List */}
+      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2.5 scrollbar-thin">
+        {visible.length === 0 ? (
+          <div className="p-4 rounded-xl bg-white/5 border border-dashed border-white/10 text-center text-xs text-white/50 my-auto">
+            {filter === "current_photo"
+              ? "Nenhuma nota associada a esta fotografia."
+              : "Ainda não existem notas neste moodboard. Escreva a primeira ideia abaixo!"}
+          </div>
+        ) : (
+          visible.map((c) => {
+            const initials = (c.authorName || "CFM")
+              .split(" ")
+              .map((n) => n[0])
+              .slice(0, 2)
+              .join("")
+              .toUpperCase();
+
+            return (
+              <div
+                key={c.id}
+                className="p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-1.5 text-white hover:border-white/20 transition"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-[#007aff] to-[#5856d6] text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0">
+                      {initials}
+                    </div>
+                    <span className="text-xs font-bold text-white truncate max-w-[120px]">{c.authorName}</span>
+                    <span className="text-[10px] text-white/40">{formatRelativeTime(c.createdAt)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteComment(c.id, board.id)}
+                    className="p-1 text-white/40 hover:text-rose-400 transition cursor-pointer"
+                    title="Eliminar"
+                  >
+                    <Trash className="w-3 h-3" />
+                  </button>
+                </div>
+
+                {c.photoLabel && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof c.photoIndex === "number" && c.photoIndex >= 0 && c.photoIndex < images.length) {
+                        onSelectPhoto(c.photoIndex);
+                      }
+                    }}
+                    className="self-start inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#007aff]/20 text-[#60a5fa] hover:bg-[#007aff]/30 transition cursor-pointer"
+                  >
+                    {c.photoUrl && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={c.photoUrl} alt="" className="w-3.5 h-3.5 rounded-full object-cover flex-shrink-0" />
+                    )}
+                    <Tag className="w-2.5 h-2.5" />
+                    <span className="truncate max-w-[170px]">{c.photoLabel}</span>
+                  </button>
+                )}
+
+                <p className="text-xs text-white/90 leading-relaxed whitespace-pre-line">{c.content}</p>
+
+                {c.imageUrl && (
+                  <div className="mt-1 rounded-lg overflow-hidden border border-white/15 max-w-[200px]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={c.imageUrl}
+                      alt="Anexo"
+                      className="w-full max-h-32 object-cover cursor-pointer hover:opacity-90 transition"
+                      onClick={() => window.open(c.imageUrl!, "_blank")}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Composer */}
+      <form onSubmit={handleSubmit} className="p-3 border-t border-white/10 bg-black/40 flex flex-col gap-2 flex-shrink-0">
+        <div className="flex items-center justify-between gap-1.5 text-[11px] text-white/70">
+          <span className="flex items-center gap-1 truncate">
+            <Tag className="w-3 h-3 text-[#007aff]" />
+            <span>Referente a:</span>
+          </span>
+          <select
+            value={
+              targetChoice === "general"
+                ? "general"
+                : targetChoice === "current"
+                ? `photo-${activeIdx}`
+                : `photo-${targetChoice}`
+            }
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "general") setTargetChoice("general");
+              else if (val.startsWith("photo-")) {
+                const idx = parseInt(val.replace("photo-", ""), 10);
+                setTargetChoice(idx);
+                onSelectPhoto(idx);
+              }
+            }}
+            className="bg-white/10 text-white text-[11px] font-medium py-0.5 px-2 rounded-md border border-white/20 focus:outline-hidden"
+          >
+            <option value={`photo-${activeIdx}`} className="bg-[#1c1c1e] text-white">
+              Foto {activeIdx + 1} (atual)
+            </option>
+            <option value="general" className="bg-[#1c1c1e] text-white">
+              Geral (Moodboard)
+            </option>
+            {images.map((img, idx) => (
+              <option key={img.id || idx} value={`photo-${idx}`} className="bg-[#1c1c1e] text-white">
+                Foto {idx + 1}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Attachment preview if staged */}
+        {(imagePreview || urlInput) && (
+          <div className="relative inline-flex items-center gap-2 p-1.5 rounded-lg bg-white/10 border border-white/20 self-start max-w-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={imagePreview || urlInput} alt="Anexo" className="w-8 h-8 rounded-md object-cover flex-shrink-0" />
+            <span className="text-[10px] text-white/80 truncate max-w-[120px]">{imageFile?.name || "Imagem URL"}</span>
+            <button type="button" onClick={handleClearImage} className="p-1 text-white/60 hover:text-white">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+
+        {/* URL Input */}
+        {showUrlField && (
+          <div className="flex items-center gap-1">
+            <input
+              type="url"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder="https://... URL da imagem"
+              className="flex-1 bg-white/10 text-white text-xs px-2 py-1 rounded border border-white/20 focus:outline-hidden"
+            />
+            <button type="button" onClick={() => setShowUrlField(false)} className="p-1 text-white/60 hover:text-white">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-end gap-1.5">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            placeholder="Escreva uma ideia... (Enter para enviar)"
+            rows={2}
+            className="flex-1 bg-white/10 text-white text-xs px-2.5 py-1.5 rounded-xl border border-white/20 focus:outline-hidden focus:border-[#007aff] resize-none placeholder:text-white/40"
+          />
+
+          <input type="file" ref={fileInputRef} onChange={handleFile} accept="image/*" className="hidden" />
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+            title="Anexar imagem"
+          >
+            <Paperclip className="w-3.5 h-3.5 text-[#007aff]" />
+          </button>
+
+          <button
+            type="submit"
+            disabled={isSubmitting || (!text.trim() && !imageFile && !urlInput.trim())}
+            className="p-2 rounded-xl bg-[#007aff] hover:bg-[#0062cc] disabled:opacity-40 text-white transition cursor-pointer"
+            title="Enviar"
+          >
+            {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -456,6 +1315,9 @@ interface Props {
   initialAllocations: Allocation[];
   initialTasks: Task[];
   initialMedia?: EventMediaItem[];
+  initialMeetings?: EventMeeting[];
+  availableMeetingsToLink?: AvailableMeetingToLink[];
+  teamUsers?: Array<{ id: string; name: string; email: string; role: string }>;
   quotes: Quote[];
   currentUser: any;
 }
@@ -567,20 +1429,299 @@ export default function EventDetailView({
   initialAllocations,
   initialTasks,
   initialMedia = [],
+  initialMeetings = [],
+  availableMeetingsToLink = [],
+  teamUsers = [],
   quotes,
   currentUser,
 }: Props) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const [event, setEvent] = useState(initialEvent);
   const [clientsList, setClientsList] = useState<Client[]>(allClients);
   const [client, setClient] = useState(initialClient);
   const [showCreateClientModal, setShowCreateClientModal] = useState(false);
+  const [currentUserState, setCurrentUserState] = useState(currentUser);
+
+  useEffect(() => {
+    setCurrentUserState(currentUser);
+  }, [currentUser]);
+
+  useEffect(() => {
+    const handleUserUpdated = (e: CustomEvent<any>) => {
+      const updated = e.detail;
+      if (!updated || !updated.id) return;
+      if (currentUserState && currentUserState.id === updated.id) {
+        setCurrentUserState((prev: any) => ({ ...prev, ...updated }));
+      }
+    };
+    window.addEventListener("eventflow:user-updated", handleUserUpdated as EventListener);
+    return () => {
+      window.removeEventListener("eventflow:user-updated", handleUserUpdated as EventListener);
+    };
+  }, [currentUserState]);
+
   const [allocations, setAllocations] = useState(initialAllocations);
   const [tasks, setTasks] = useState(initialTasks);
 
+  // Meetings state (Upcoming meetings with person / Google Meet or Presencial)
+  const [meetings, setMeetings] = useState<EventMeeting[]>(initialMeetings || []);
+  const [linkableMeetings, setLinkableMeetings] = useState<AvailableMeetingToLink[]>(availableMeetingsToLink || []);
+  const [showCreateMeetingModal, setShowCreateMeetingModal] = useState(false);
+  const [showLinkMeetingModal, setShowLinkMeetingModal] = useState(false);
+  const [editingMeeting, setEditingMeeting] = useState<EventMeeting | null>(null);
+  const [meetingTabFilter, setMeetingTabFilter] = useState<"upcoming" | "all" | "completed">("upcoming");
+  const [copiedMeetLink, setCopiedMeetLink] = useState<string | null>(null);
+  const [isSubmittingMeeting, setIsSubmittingMeeting] = useState(false);
+
+  // Helper to get tomorrow at 10:00 as initial datetime-local string
+  const getInitialMeetingDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(10, 0, 0, 0);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  // Create meeting form state
+  const [meetingFormTitle, setMeetingFormTitle] = useState("Briefing de Decoração & Alinhamento");
+  const [meetingFormType, setMeetingFormType] = useState<"google_meet" | "presencial">("google_meet");
+  const [meetingFormStartDate, setMeetingFormStartDate] = useState(getInitialMeetingDate);
+  const [meetingFormDuration, setMeetingFormDuration] = useState(45); // in minutes
+  const [meetingFormMeetUrl, setMeetingFormMeetUrl] = useState("");
+  const [meetingFormLocation, setMeetingFormLocation] = useState(event.venue || "Atelier CFM Loures");
+  const [meetingFormNotes, setMeetingFormNotes] = useState("");
+  const [meetingFormHostName, setMeetingFormHostName] = useState(currentUser?.name || "Produtora CFM");
+
+  // Link meeting modal form state
+  const [selectedMeetingToLink, setSelectedMeetingToLink] = useState<string>("");
+  const [linkModalTab, setLinkModalTab] = useState<"existing" | "url">("existing");
+  const [externalMeetUrl, setExternalMeetUrl] = useState("");
+  const [externalMeetTitle, setExternalMeetTitle] = useState("");
+  const [externalMeetDate, setExternalMeetDate] = useState(getInitialMeetingDate);
+  const [externalMeetNotes, setExternalMeetNotes] = useState("");
+
+  // Helper to generate realistic Google Meet codes
+  const generateMeetUrl = () => {
+    const chars = "abcdefghijklmnopqrstuvwxyz";
+    const randPart = (len: number) => Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    return `https://meet.google.com/cfm-${randPart(3)}-${randPart(4)}`;
+  };
+
+  // Upcoming meetings calculations
+  const upcomingMeetings = useMemo(() => {
+    const now = new Date().getTime();
+    return [...meetings]
+      .filter((m) => m.status === "agendada" && new Date(m.startDate).getTime() >= now - 60 * 60 * 1000)
+      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+  }, [meetings]);
+
+  const upcomingMeeting = upcomingMeetings[0] || null;
+
+  const completedMeetings = useMemo(() => {
+    return meetings.filter((m) => m.status === "realizada");
+  }, [meetings]);
+
+  const filteredMeetings = useMemo(() => {
+    if (meetingTabFilter === "upcoming") return upcomingMeetings;
+    if (meetingTabFilter === "completed") return completedMeetings;
+    return [...meetings].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+  }, [meetings, meetingTabFilter, upcomingMeetings, completedMeetings]);
+
+  const handleOpenCreateMeeting = () => {
+    setMeetingFormTitle("Briefing de Decoração & Alinhamento");
+    setMeetingFormType("google_meet");
+    setMeetingFormStartDate(getInitialMeetingDate());
+    setMeetingFormDuration(45);
+    setMeetingFormMeetUrl(generateMeetUrl());
+    setMeetingFormLocation(event.venue || "Atelier CFM Loures");
+    setMeetingFormNotes("");
+    setMeetingFormHostName(currentUser?.name || "Produtora CFM");
+    setEditingMeeting(null);
+    setShowCreateMeetingModal(true);
+  };
+
+  const handleOpenEditMeeting = (m: EventMeeting) => {
+    setEditingMeeting(m);
+    setMeetingFormTitle(m.title);
+    setMeetingFormType(m.type === "presencial" ? "presencial" : "google_meet");
+    const d = new Date(m.startDate);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setMeetingFormStartDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+    const duration = m.endDate ? Math.round((new Date(m.endDate).getTime() - new Date(m.startDate).getTime()) / 60000) : 45;
+    setMeetingFormDuration(duration > 0 ? duration : 45);
+    setMeetingFormMeetUrl(m.meetUrl || generateMeetUrl());
+    setMeetingFormLocation(m.location || event.venue || "Atelier CFM Loures");
+    setMeetingFormNotes(m.notes || "");
+    setMeetingFormHostName(m.hostName || currentUser?.name || "Produtora CFM");
+    setShowCreateMeetingModal(true);
+  };
+
+  const handleSaveMeeting = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!meetingFormTitle.trim() || !meetingFormStartDate) return;
+
+    setIsSubmittingMeeting(true);
+    try {
+      const start = new Date(meetingFormStartDate);
+      const end = new Date(start.getTime() + meetingFormDuration * 60 * 1000);
+
+      if (editingMeeting) {
+        await updateEventMeetingAction({
+          meetingId: editingMeeting.id,
+          eventId: event.id,
+          title: meetingFormTitle,
+          type: meetingFormType,
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+          location: meetingFormType === "presencial" ? meetingFormLocation : "Google Meet (Online)",
+          meetUrl: meetingFormType === "google_meet" ? meetingFormMeetUrl : undefined,
+          notes: meetingFormNotes,
+          hostName: meetingFormHostName,
+        });
+
+        setMeetings((prev) =>
+          prev.map((m) =>
+            m.id === editingMeeting.id
+              ? {
+                  ...m,
+                  title: meetingFormTitle,
+                  type: meetingFormType,
+                  startDate: start,
+                  endDate: end,
+                  location: meetingFormType === "presencial" ? meetingFormLocation : "Google Meet (Online)",
+                  meetUrl: meetingFormType === "google_meet" ? meetingFormMeetUrl : null,
+                  notes: meetingFormNotes,
+                  hostName: meetingFormHostName,
+                }
+              : m
+          )
+        );
+      } else {
+        const res = await createEventMeetingAction({
+          eventId: event.id,
+          title: meetingFormTitle,
+          type: meetingFormType,
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+          location: meetingFormType === "presencial" ? meetingFormLocation : "Google Meet (Online)",
+          meetUrl: meetingFormType === "google_meet" ? meetingFormMeetUrl : undefined,
+          notes: meetingFormNotes,
+          hostName: meetingFormHostName,
+          clientContactName: client?.contactName || client?.name,
+          clientContactEmail: client?.email || undefined,
+          clientContactPhone: client?.phone || undefined,
+        });
+
+        if (res.success && res.meeting) {
+          setMeetings((prev) => [...prev, res.meeting as EventMeeting]);
+        }
+      }
+
+      setShowCreateMeetingModal(false);
+      setEditingMeeting(null);
+    } catch (err) {
+      console.error("Erro ao gravar reunião:", err);
+      alert("Ocorreu um erro ao gravar a reunião. Por favor tente novamente.");
+    } finally {
+      setIsSubmittingMeeting(false);
+    }
+  };
+
+  const handleLinkSelectedMeeting = async (item: AvailableMeetingToLink) => {
+    setIsSubmittingMeeting(true);
+    try {
+      const res = await linkMeetingToEventAction({
+        eventId: event.id,
+        meetingId: item.meetingId,
+        existingEventId: item.existingEventId,
+      });
+
+      if (res.success && res.meeting) {
+        setMeetings((prev) => [...prev, res.meeting as EventMeeting]);
+        setLinkableMeetings((prev) => prev.filter((lm) => lm.id !== item.id));
+      }
+      setShowLinkMeetingModal(false);
+    } catch (err) {
+      console.error("Erro ao vincular reunião:", err);
+      alert("Ocorreu um erro ao vincular a reunião.");
+    } finally {
+      setIsSubmittingMeeting(false);
+    }
+  };
+
+  const handleLinkExternalMeeting = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!externalMeetUrl.trim() && !externalMeetTitle.trim()) return;
+
+    setIsSubmittingMeeting(true);
+    try {
+      const res = await linkMeetingToEventAction({
+        eventId: event.id,
+        externalMeetUrl: externalMeetUrl.trim(),
+        title: externalMeetTitle.trim() || "Reunião de Alinhamento",
+        startDate: externalMeetDate ? new Date(externalMeetDate).toISOString() : new Date().toISOString(),
+        notes: externalMeetNotes.trim(),
+        type: externalMeetUrl.toLowerCase().includes("meet") ? "google_meet" : "presencial",
+      });
+
+      if (res.success && res.meeting) {
+        setMeetings((prev) => [...prev, res.meeting as EventMeeting]);
+      }
+      setShowLinkMeetingModal(false);
+      setExternalMeetUrl("");
+      setExternalMeetTitle("");
+    } catch (err) {
+      console.error("Erro ao vincular link externo:", err);
+      alert("Ocorreu um erro ao vincular a reunião.");
+    } finally {
+      setIsSubmittingMeeting(false);
+    }
+  };
+
+  const handleToggleMeetingStatus = async (m: EventMeeting) => {
+    const nextStatus = m.status === "realizada" ? "agendada" : "realizada";
+    setMeetings((prev) =>
+      prev.map((item) => (item.id === m.id ? { ...item, status: nextStatus } : item))
+    );
+    try {
+      await updateEventMeetingAction({
+        meetingId: m.id,
+        eventId: event.id,
+        status: nextStatus,
+      });
+    } catch (err) {
+      console.error("Erro ao alterar estado da reunião:", err);
+    }
+  };
+
+  const handleDeleteMeeting = async (meetingId: string) => {
+    if (!confirm("Tem a certeza que deseja desvincular ou eliminar esta reunião deste evento?")) return;
+    setMeetings((prev) => prev.filter((m) => m.id !== meetingId));
+    try {
+      await deleteEventMeetingAction(meetingId, event.id);
+    } catch (err) {
+      console.error("Erro ao eliminar reunião:", err);
+    }
+  };
+
+  const handleCopyMeetingMeetUrl = (url: string, id: string) => {
+    navigator.clipboard.writeText(url);
+    setCopiedMeetLink(id);
+    setTimeout(() => setCopiedMeetLink(null), 2500);
+  };
+
   // Media state: Idea Boards & Final Outcomes
   const [mediaList, setMediaList] = useState<EventMediaItem[]>(initialMedia || []);
+  const [showLightboxComments, setShowLightboxComments] = useState(false);
+
+  useEffect(() => {
+    if (initialMedia) {
+      setMediaList(initialMedia);
+    }
+  }, [initialMedia]);
+
   const [mediaFilter, setMediaFilter] = useState<"all" | "idea_board" | "final_outcome">("all");
   const [lightboxState, setLightboxState] = useState<{ board: EventMediaItem; imageIndex: number } | null>(null);
   const [lightboxItem, setLightboxItem] = useState<EventMediaItem | null>(null);
@@ -624,6 +1765,20 @@ export default function EventDetailView({
   // Copied proposal link & event ID
   const [copiedQuoteId, setCopiedQuoteId] = useState<string | null>(null);
   const [copiedEventId, setCopiedEventId] = useState(false);
+
+  // Quote & Proposal Configuration (Meetings cannot get quotas, only events get quotas)
+  const isMeeting = isMeetingEvent(event);
+  const [quotesList, setQuotesList] = useState<Quote[]>(quotes);
+  const [showQuoteWizard, setShowQuoteWizard] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && !isMeeting) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("action") === "novo-orcamento" || params.get("action") === "orcamento") {
+        setShowQuoteWizard(true);
+      }
+    }
+  }, [isMeeting]);
 
   // Parse Vibe Colors helper
   const parseVibeColors = (raw: string | null): string[] => {
@@ -1095,8 +2250,13 @@ export default function EventDetailView({
             const nonTemps = prev.filter((m) => !m.id.startsWith("temp-"));
             return [updatedRecord, ...nonTemps];
           });
+          router.refresh();
+        } else {
+          setMediaList((prev) => prev.filter((m) => !m.id.startsWith("temp-")));
+          alert(res.error || "Erro ao guardar o moodboard.");
         }
       } catch (err) {
+        setMediaList((prev) => prev.filter((m) => !m.id.startsWith("temp-")));
         console.error("Erro no envio de imagens:", err);
       } finally {
         setIsUploadingMedia(false);
@@ -1129,6 +2289,7 @@ export default function EventDetailView({
       if (res.boardDeleted) {
         setMediaList((prev) => prev.filter((b) => b.id !== boardId));
       }
+      router.refresh();
     } catch (err) {
       console.error("Erro ao eliminar foto:", err);
     }
@@ -1145,10 +2306,159 @@ export default function EventDetailView({
     startTransition(async () => {
       try {
         await deleteEventMediaAction(mediaId, event.id);
+        router.refresh();
       } catch (err) {
         console.error("Erro ao eliminar media:", err);
       }
     });
+  };
+
+  const handleAddMoodboardComment = async ({
+    mediaId,
+    content,
+    photoId,
+    photoIndex,
+    photoLabel,
+    photoUrl,
+    imageFile,
+    imageUrl,
+  }: {
+    mediaId: string;
+    content: string;
+    photoId?: string | null;
+    photoIndex?: number | null;
+    photoLabel?: string | null;
+    photoUrl?: string | null;
+    imageFile?: File | null;
+    imageUrl?: string | null;
+  }) => {
+    const tempId = `temp-cmt-${Date.now()}`;
+    const optimisticComment: MoodboardCommentItem = {
+      id: tempId,
+      mediaId,
+      eventId: event.id,
+      authorName: currentUser?.name || "Administrador CFM",
+      content,
+      photoId,
+      photoIndex,
+      photoLabel,
+      photoUrl,
+      imageUrl: imageFile ? URL.createObjectURL(imageFile) : imageUrl,
+      createdAt: new Date().toISOString(),
+    };
+
+    setMediaList((prev) =>
+      prev.map((m) => {
+        if (m.id !== mediaId) return m;
+        const existing = parseMediaComments(m);
+        return {
+          ...m,
+          comments: [...existing, optimisticComment],
+        };
+      })
+    );
+
+    setLightboxState((prev) => {
+      if (!prev || prev.board.id !== mediaId) return prev;
+      const existing = parseMediaComments(prev.board);
+      return {
+        ...prev,
+        board: {
+          ...prev.board,
+          comments: [...existing, optimisticComment],
+        },
+      };
+    });
+
+    const formData = new FormData();
+    formData.append("mediaId", mediaId);
+    formData.append("eventId", event.id);
+    formData.append("content", content);
+    if (photoId) formData.append("photoId", photoId);
+    if (photoIndex !== undefined && photoIndex !== null) {
+      formData.append("photoIndex", String(photoIndex));
+    }
+    if (photoLabel) formData.append("photoLabel", photoLabel);
+    if (photoUrl) formData.append("photoUrl", photoUrl);
+    if (imageFile) formData.append("imageFile", imageFile);
+    if (imageUrl) formData.append("imageUrl", imageUrl);
+
+    try {
+      const res = await addMoodboardCommentAction(formData);
+      if (res.success && res.comment) {
+        const savedComment = res.comment as MoodboardCommentItem;
+        setMediaList((prev) =>
+          prev.map((m) => {
+            if (m.id !== mediaId) return m;
+            const existing = parseMediaComments(m);
+            return {
+              ...m,
+              comments: existing.map((c) => (c.id === tempId ? savedComment : c)),
+            };
+          })
+        );
+        setLightboxState((prev) => {
+          if (!prev || prev.board.id !== mediaId) return prev;
+          const existing = parseMediaComments(prev.board);
+          return {
+            ...prev,
+            board: {
+              ...prev.board,
+              comments: existing.map((c) => (c.id === tempId ? savedComment : c)),
+            },
+          };
+        });
+        router.refresh();
+      } else {
+        setMediaList((prev) =>
+          prev.map((m) => {
+            if (m.id !== mediaId) return m;
+            const existing = parseMediaComments(m);
+            return {
+              ...m,
+              comments: existing.filter((c) => c.id !== tempId),
+            };
+          })
+        );
+        alert(res.error || "Erro ao adicionar comentário.");
+      }
+    } catch (err) {
+      console.error("Erro ao enviar comentário:", err);
+    }
+  };
+
+  const handleDeleteMoodboardComment = async (commentId: string, mediaId: string) => {
+    if (!confirm("Tem a certeza que deseja eliminar esta nota?")) return;
+
+    setMediaList((prev) =>
+      prev.map((m) => {
+        if (m.id !== mediaId) return m;
+        const existing = parseMediaComments(m);
+        return {
+          ...m,
+          comments: existing.filter((c) => c.id !== commentId),
+        };
+      })
+    );
+
+    setLightboxState((prev) => {
+      if (!prev || prev.board.id !== mediaId) return prev;
+      const existing = parseMediaComments(prev.board);
+      return {
+        ...prev,
+        board: {
+          ...prev.board,
+          comments: existing.filter((c) => c.id !== commentId),
+        },
+      };
+    });
+
+    try {
+      await deleteMoodboardCommentAction(commentId, mediaId, event.id);
+      router.refresh();
+    } catch (err) {
+      console.error("Erro ao eliminar comentário:", err);
+    }
   };
 
   // Calculations
@@ -1252,6 +2562,18 @@ export default function EventDetailView({
                 <span className="hidden sm:inline">Histórico</span>
               </button>
             </div>
+
+            {currentUserState && (
+              <div
+                className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold shadow-2xs flex-shrink-0"
+                title={`${currentUserState.name} (${currentUserState.email}) · Acesso ${currentUserState.role}`}
+              >
+                <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold">
+                  {currentUserState.name.charAt(0)}
+                </div>
+                <span className="text-[#111] hidden sm:inline">{currentUserState.name.split(" ")[0]}</span>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -1308,6 +2630,24 @@ export default function EventDetailView({
                     <Video className="w-3.5 h-3.5" />
                     <span>Reunião Calendly · Briefing</span>
                   </span>
+                )}
+
+                {/* Upcoming Meeting with the Person Pill */}
+                {upcomingMeeting && (
+                  <a
+                    href="#event-meetings-section"
+                    className="px-3 py-1 rounded-full text-xs font-bold bg-white/95 text-[#111] hover:bg-white flex items-center gap-1.5 shadow-md transition cursor-pointer"
+                    title={`Próxima reunião: ${upcomingMeeting.title} (${upcomingMeeting.type === "google_meet" ? "Google Meet" : "Presencial"})`}
+                  >
+                    {upcomingMeeting.type === "google_meet" ? (
+                      <Video className="w-3.5 h-3.5 text-indigo-600" />
+                    ) : (
+                      <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                    )}
+                    <span>
+                      Próxima Reunião: {formatUpcomingTime(upcomingMeeting.startDate)} ({upcomingMeeting.type === "google_meet" ? "Meet" : "Presencial"})
+                    </span>
+                  </a>
                 )}
 
                 {/* Event Unique ID Badge */}
@@ -1922,10 +3262,13 @@ export default function EventDetailView({
                     <MoodboardCard
                       key={item.id}
                       board={item}
+                      currentUser={currentUserState}
                       onOpenLightbox={(board, idx) => setLightboxState({ board, imageIndex: idx })}
                       onAddMorePhotos={(board) => handleOpenAddMediaModal(board)}
                       onDeleteImage={handleDeleteImage}
                       onDeleteBoard={handleDeleteMedia}
+                      onAddComment={handleAddMoodboardComment}
+                      onDeleteComment={handleDeleteMoodboardComment}
                     />
                   ))}
                 </div>
@@ -2316,23 +3659,395 @@ export default function EventDetailView({
             </section>
 
             {/* ----------------------------------------------------------------- */}
-            {/* DIGITAL PROPOSALS & QUOTES */}
+            {/* CLIENT MEETINGS (GOOGLE MEET & IN PERSON) */}
+            {/* ----------------------------------------------------------------- */}
+            <section id="event-meetings-section" className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200/60 flex items-center justify-center text-indigo-600">
+                    <Video className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-[#111]">Reuniões com o Cliente</h3>
+                    <p className="text-[11px] text-[#8e8e93]">Google Meet & Presencial com a pessoa</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowLinkMeetingModal(true)}
+                    className="px-2.5 py-1.5 rounded-[10px] border border-[#ececf0] hover:bg-[#f2f2f5] text-[11px] font-semibold text-[#111] flex items-center gap-1 transition cursor-pointer"
+                    title="Vincular uma reunião existente ou externa a este evento"
+                  >
+                    <Link2 className="w-3 h-3 text-[#636366]" />
+                    <span>Vincular</span>
+                    {linkableMeetings.length > 0 && (
+                      <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] font-bold flex items-center justify-center">
+                        {linkableMeetings.length}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenCreateMeeting}
+                    className="px-3 py-1.5 rounded-[10px] bg-[#111] hover:bg-black text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                    title="Criar nova reunião Google Meet ou Presencial"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Nova Reunião</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Filter Tabs if meetings exist */}
+              {meetings.length > 0 && (
+                <div className="flex items-center gap-1.5 border-b border-[#ececf0] pb-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setMeetingTabFilter("upcoming")}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer ${
+                      meetingTabFilter === "upcoming"
+                        ? "bg-[#111] text-white"
+                        : "text-[#636366] hover:bg-[#f2f2f5]"
+                    }`}
+                  >
+                    Próximas ({upcomingMeetings.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMeetingTabFilter("all")}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer ${
+                      meetingTabFilter === "all"
+                        ? "bg-[#111] text-white"
+                        : "text-[#636366] hover:bg-[#f2f2f5]"
+                    }`}
+                  >
+                    Todas ({meetings.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMeetingTabFilter("completed")}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer ${
+                      meetingTabFilter === "completed"
+                        ? "bg-[#111] text-white"
+                        : "text-[#636366] hover:bg-[#f2f2f5]"
+                    }`}
+                  >
+                    Realizadas ({completedMeetings.length})
+                  </button>
+                </div>
+              )}
+
+              {/* Meetings List */}
+              {filteredMeetings.length === 0 ? (
+                <div className="p-4 rounded-[16px] bg-[#fafafc] border border-dashed border-[#ececf0] text-center space-y-2.5">
+                  <div className="w-8 h-8 rounded-full bg-white border border-[#ececf0] flex items-center justify-center mx-auto text-indigo-500">
+                    <Video className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-[#111]">
+                      {meetingTabFilter === "upcoming"
+                        ? "Nenhuma reunião futura agendada"
+                        : meetingTabFilter === "completed"
+                        ? "Nenhuma reunião concluída ainda"
+                        : "Nenhuma reunião registada"}
+                    </div>
+                    <p className="text-[11px] text-[#8e8e93] mt-0.5 max-w-[280px] mx-auto leading-relaxed">
+                      Agende uma reunião Google Meet ou presencial com{" "}
+                      <strong className="text-[#111]">{client?.name || "a pessoa / cliente"}</strong> para alinhar detalhes do evento.
+                    </p>
+                  </div>
+                  <div className="pt-1 flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleOpenCreateMeeting}
+                      className="px-3 py-1.5 rounded-[10px] bg-[#111] hover:bg-black text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Agendar Reunião</span>
+                    </button>
+                    {linkableMeetings.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowLinkMeetingModal(true)}
+                        className="px-3 py-1.5 rounded-[10px] border border-[#ececf0] bg-white hover:bg-[#f2f2f5] text-[11px] font-semibold text-[#111] flex items-center gap-1 transition cursor-pointer"
+                      >
+                        <Link2 className="w-3 h-3" />
+                        <span>Vincular ({linkableMeetings.length})</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredMeetings.map((m) => {
+                    const isMeet = m.type === "google_meet";
+                    const isDone = m.status === "realizada";
+                    const isPast = new Date(m.startDate).getTime() < Date.now();
+
+                    return (
+                      <div
+                        key={m.id}
+                        className={`p-3.5 rounded-[16px] border transition shadow-2xs space-y-2.5 ${
+                          isDone
+                            ? "bg-[#fafafc] border-[#ececf0] opacity-80"
+                            : isMeet
+                            ? "bg-gradient-to-b from-[#faf9ff] to-white border-indigo-200/70 hover:border-indigo-300"
+                            : "bg-gradient-to-b from-[#f7fbf8] to-white border-emerald-200/70 hover:border-emerald-300"
+                        }`}
+                      >
+                        {/* Top mode & time badges */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5">
+                            {isMeet ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#eeeffe] text-[#4338ca] border border-indigo-200/60 flex items-center gap-1">
+                                <Video className="w-3 h-3 text-indigo-500" />
+                                <span>Google Meet</span>
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#e8f5e9] text-[#1b5e20] border border-emerald-200/60 flex items-center gap-1">
+                                <MapPin className="w-3 h-3 text-emerald-600" />
+                                <span>Presencial</span>
+                              </span>
+                            )}
+
+                            {m.status === "realizada" ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                                <Check className="w-2.5 h-2.5" />
+                                <span>Realizada</span>
+                              </span>
+                            ) : m.status === "cancelada" ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">
+                                Cancelada
+                              </span>
+                            ) : isPast ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                Passada
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                                Próxima
+                              </span>
+                            )}
+                          </div>
+
+                          <span className="text-[11px] font-bold text-[#8e8e93]">
+                            {formatUpcomingTime(m.startDate)}
+                          </span>
+                        </div>
+
+                        {/* Meeting Title */}
+                        <div>
+                          <h4 className="font-bold text-xs text-[#111] leading-snug">{m.title}</h4>
+                          <div className="flex items-center gap-1.5 text-[11px] text-[#636366] mt-1">
+                            <Clock className="w-3 h-3 text-[#8e8e93] flex-shrink-0" />
+                            <span>{formatMeetingRange(m.startDate, m.endDate)}</span>
+                          </div>
+                        </div>
+
+                        {/* Location / Google Meet Box */}
+                        {isMeet ? (
+                          <div className="p-2.5 rounded-[12px] bg-white border border-indigo-200/60 flex items-center justify-between gap-2 shadow-2xs">
+                            <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                              <Video className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+                              <a
+                                href={m.meetUrl || "#"}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs font-mono font-medium text-indigo-700 hover:underline truncate"
+                                title="Abrir chamada no Google Meet"
+                              >
+                                {m.meetUrl ? m.meetUrl.replace(/^https?:\/\//, "") : "meet.google.com/cfm-..."}
+                              </a>
+                            </div>
+
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {m.meetUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyMeetingMeetUrl(m.meetUrl!, m.id)}
+                                  className="p-1 px-2 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center gap-1 transition cursor-pointer"
+                                  title="Copiar link do Google Meet"
+                                >
+                                  {copiedMeetLink === m.id ? (
+                                    <>
+                                      <Check className="w-3 h-3 text-emerald-600" />
+                                      <span>Copiado</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="w-3 h-3" />
+                                      <span>Copiar</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
+
+                              {m.meetUrl && (
+                                <a
+                                  href={m.meetUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold flex items-center gap-1 transition shadow-2xs"
+                                  title="Entrar diretamente na reunião do Google Meet"
+                                >
+                                  <span>Entrar</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-2.5 rounded-[12px] bg-white border border-emerald-200/60 flex items-center justify-between gap-2 shadow-2xs">
+                            <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                              <span className="text-xs font-medium text-[#111] truncate">
+                                {m.location || event.venue || "Atelier CFM Loures"}
+                              </span>
+                            </div>
+
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                                m.location || event.venue || "Loures"
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-2 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-1 transition flex-shrink-0"
+                              title="Ver localização no mapa"
+                            >
+                              <span>Mapa</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        )}
+
+                        {/* People attending */}
+                        <div className="grid grid-cols-2 gap-2 text-[10px] text-[#636366] pt-1 border-t border-black/5">
+                          <div>
+                            <span className="text-[#8e8e93] block font-semibold uppercase">Pessoa / Cliente:</span>
+                            <span className="font-bold text-[#111] truncate block">
+                              {m.clientContactName || client?.name || "Cliente"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[#8e8e93] block font-semibold uppercase">Responsável CFM:</span>
+                            <span className="font-semibold text-[#111] truncate block">
+                              {m.hostName || "Equipa CFM"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Notes / Agenda */}
+                        {m.notes && (
+                          <div className="p-2.5 rounded-[10px] bg-white/80 border border-[#ececf0] text-[11px] text-[#48484a] leading-relaxed">
+                            <span className="text-[9px] uppercase font-bold text-[#8e8e93] block mb-0.5">
+                              Pauta / Notas da Reunião:
+                            </span>
+                            <p className="whitespace-pre-line text-[#333] font-normal">{m.notes}</p>
+                          </div>
+                        )}
+
+                        {/* Action buttons */}
+                        <div className="flex items-center justify-between pt-1 border-t border-black/5 text-[11px]">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleMeetingStatus(m)}
+                            className={`font-semibold flex items-center gap-1 transition cursor-pointer ${
+                              isDone
+                                ? "text-[#8e8e93] hover:text-[#111]"
+                                : "text-emerald-700 hover:text-emerald-800"
+                            }`}
+                          >
+                            {isDone ? (
+                              <>
+                                <Circle className="w-3.5 h-3.5" />
+                                <span>Reabrir</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Marcar como Realizada</span>
+                              </>
+                            )}
+                          </button>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditMeeting(m)}
+                              className="text-[#007aff] hover:underline font-semibold cursor-pointer"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteMeeting(m.id)}
+                              className="text-[#8e8e93] hover:text-rose-600 transition font-medium cursor-pointer"
+                              title="Remover reunião deste evento"
+                            >
+                              Desvincular
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            {/* ----------------------------------------------------------------- */}
+            {/* DIGITAL PROPOSALS & QUOTES (Meetings do not get quotas; only events get quotas) */}
             {/* ----------------------------------------------------------------- */}
             <section className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-[#111]" />
                   <h3 className="text-sm font-bold text-[#111]">Propostas & Orçamentos</h3>
+                  {!isMeeting && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#f2f2f5] text-[#48484a]">
+                      {quotesList.length}
+                    </span>
+                  )}
                 </div>
+                {!isMeeting && (
+                  <button
+                    type="button"
+                    onClick={() => setShowQuoteWizard(true)}
+                    className="px-3 py-1.5 rounded-[10px] bg-[#111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Gerar Orçamento</span>
+                  </button>
+                )}
               </div>
 
-              {quotes.length === 0 ? (
-                <div className="text-xs text-[#8e8e93] py-2">
-                  Nenhum orçamento emitido especificamente para este evento.
+              {isMeeting ? (
+                <div className="p-4 bg-[#f8f8fa] border border-[#ececf0] rounded-[14px] text-xs text-[#8e8e93] flex items-center gap-3">
+                  <Info className="w-4 h-4 text-[#007aff] shrink-0" />
+                  <span>
+                    Reuniões e briefings Calendly não recebem orçamentos. Apenas eventos de produção podem ter propostas comerciais associadas.
+                  </span>
+                </div>
+              ) : quotesList.length === 0 ? (
+                <div className="text-center py-6 px-4 border border-dashed border-[#e5e5ea] rounded-[16px] bg-[#fdfdfd] space-y-2">
+                  <p className="text-xs text-[#8e8e93]">
+                    Nenhum orçamento emitido especificamente para este evento.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuoteWizard(true)}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#007aff] hover:underline cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Gerar o primeiro orçamento para este evento</span>
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {quotes.map((q) => (
+                  {quotesList.map((q) => (
                     <div
                       key={q.id}
                       className="p-3 rounded-[14px] border border-[#ececf0] bg-[#fafafc] flex items-center justify-between gap-2"
@@ -2383,6 +4098,22 @@ export default function EventDetailView({
           </div>
         </div>
       </main>
+
+      {/* ===================================================================== */}
+      {/* MODAL: EVENT QUOTE GENERATOR (Generated inside event configuration) */}
+      {/* ===================================================================== */}
+      {showQuoteWizard && !isMeeting && (
+        <EventQuoteModal
+          event={event}
+          client={client}
+          allocations={allocations}
+          allItems={allItems}
+          onClose={() => setShowQuoteWizard(false)}
+          onCreated={(newQuote) => {
+            setQuotesList((prev) => [newQuote, ...prev]);
+          }}
+        />
+      )}
 
       {/* ===================================================================== */}
       {/* MODAL: ADD ALLOCATION (For selecting items from warehouse catalog) */}
@@ -2507,7 +4238,9 @@ export default function EventDetailView({
             onClick={() => setLightboxState(null)}
           >
             <div
-              className="relative max-w-5xl w-full max-h-[95vh] flex flex-col bg-[#1c1c1e] text-white rounded-[24px] overflow-hidden shadow-2xl border border-white/10"
+              className={`relative ${
+                showLightboxComments ? "max-w-6xl" : "max-w-5xl"
+              } w-full max-h-[95vh] flex flex-col bg-[#1c1c1e] text-white rounded-[24px] overflow-hidden shadow-2xl border border-white/10 transition-all`}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
@@ -2536,6 +4269,20 @@ export default function EventDetailView({
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowLightboxComments(!showLightboxComments)}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer ${
+                      showLightboxComments
+                        ? "bg-[#007aff] text-white shadow-xs"
+                        : "bg-white/10 hover:bg-white/20 text-white"
+                    }`}
+                    title="Ver discussão e notas da equipa"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Notas ({parseMediaComments(board).length})</span>
+                  </button>
+
                   <a
                     href={activeImg.url}
                     target="_blank"
@@ -2555,36 +4302,53 @@ export default function EventDetailView({
                 </div>
               </div>
 
-              {/* Main Image Stage with Carousel Arrows */}
-              <div className="relative flex-1 overflow-hidden flex items-center justify-center p-3 sm:p-6 bg-black min-h-[350px]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  key={activeImg.id || activeImg.url}
-                  src={activeImg.url}
-                  alt={activeImg.title || board.title}
-                  className="max-h-[62vh] max-w-full object-contain rounded-[14px] shadow-2xl transition-all duration-200"
-                />
+              {/* Main Content Area: Stage + Optional Comments Drawer */}
+              <div className="relative flex-1 overflow-hidden flex flex-col md:flex-row min-h-0">
+                {/* Left/Center Image Stage */}
+                <div className="relative flex-1 overflow-hidden flex items-center justify-center p-3 sm:p-6 bg-black min-h-[350px]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    key={activeImg.id || activeImg.url}
+                    src={activeImg.url}
+                    alt={activeImg.title || board.title}
+                    className="max-h-[62vh] max-w-full object-contain rounded-[14px] shadow-2xl transition-all duration-200"
+                  />
 
-                {images.length > 1 && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={prevLightbox}
-                      aria-label="Imagem anterior"
-                      className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/15 hover:bg-white/30 text-white backdrop-blur-md flex items-center justify-center transition cursor-pointer shadow-lg"
-                    >
-                      <ChevronLeft className="w-6 h-6" />
-                    </button>
+                  {images.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={prevLightbox}
+                        aria-label="Imagem anterior"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/15 hover:bg-white/30 text-white backdrop-blur-md flex items-center justify-center transition cursor-pointer shadow-lg"
+                      >
+                        <ChevronLeft className="w-6 h-6" />
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={nextLightbox}
-                      aria-label="Imagem seguinte"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/15 hover:bg-white/30 text-white backdrop-blur-md flex items-center justify-center transition cursor-pointer shadow-lg"
-                    >
-                      <ChevronRight className="w-6 h-6" />
-                    </button>
-                  </>
+                      <button
+                        type="button"
+                        onClick={nextLightbox}
+                        aria-label="Imagem seguinte"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/15 hover:bg-white/30 text-white backdrop-blur-md flex items-center justify-center transition cursor-pointer shadow-lg"
+                      >
+                        <ChevronRight className="w-6 h-6" />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Right Comments Drawer */}
+                {showLightboxComments && (
+                  <LightboxCommentsDrawer
+                    board={board}
+                    activeIdx={activeIdx}
+                    activeImg={activeImg}
+                    currentUser={currentUserState}
+                    onAddComment={handleAddMoodboardComment}
+                    onDeleteComment={handleDeleteMoodboardComment}
+                    onSelectPhoto={(idx) => setLightboxState({ board, imageIndex: idx })}
+                    onClose={() => setShowLightboxComments(false)}
+                  />
                 )}
               </div>
 
@@ -2624,6 +4388,19 @@ export default function EventDetailView({
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowLightboxComments(!showLightboxComments)}
+                    className={`px-3 py-1.5 rounded-[12px] font-semibold text-xs inline-flex items-center gap-1.5 transition cursor-pointer ${
+                      showLightboxComments
+                        ? "bg-[#007aff] text-white shadow-xs"
+                        : "bg-white/15 hover:bg-white/25 text-white"
+                    }`}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Discussão ({parseMediaComments(board).length})</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -3156,6 +4933,498 @@ export default function EventDetailView({
             setShowCreateClientModal(false);
           }}
         />
+      )}
+
+      {/* Create / Edit Meeting Modal (Google Meet & In Person) */}
+      {showCreateMeetingModal && (
+        <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-[24px] w-full max-w-lg border border-[#ececf0] shadow-2xl overflow-hidden p-6 space-y-4 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-[#ececf0]">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                    meetingFormType === "google_meet"
+                      ? "bg-indigo-50 text-indigo-600 border border-indigo-200/60"
+                      : "bg-emerald-50 text-emerald-600 border border-emerald-200/60"
+                  }`}
+                >
+                  {meetingFormType === "google_meet" ? <Video className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#111]">
+                    {editingMeeting ? "Editar Reunião com o Cliente" : "Agendar Reunião com o Cliente"}
+                  </h3>
+                  <p className="text-xs text-[#8e8e93]">
+                    {client?.name ? `Com: ${client.name}` : "Alinhamento operacional & produção"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreateMeetingModal(false);
+                  setEditingMeeting(null);
+                }}
+                className="text-[#8e8e93] hover:text-[#111] p-1 rounded-full cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveMeeting} className="space-y-4 text-xs">
+              {/* Meeting Type Selector Tabs */}
+              <div>
+                <label className="block font-bold text-[#111] mb-1.5">Tipo de Reunião</label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-[#f2f2f5] rounded-[14px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMeetingFormType("google_meet");
+                      if (!meetingFormMeetUrl) setMeetingFormMeetUrl(generateMeetUrl());
+                    }}
+                    className={`py-2 px-3 rounded-[10px] text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      meetingFormType === "google_meet"
+                        ? "bg-white text-indigo-700 shadow-xs"
+                        : "text-[#636366] hover:text-[#111]"
+                    }`}
+                  >
+                    <Video className="w-4 h-4" />
+                    <span>Google Meet (Vídeo)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMeetingFormType("presencial")}
+                    className={`py-2 px-3 rounded-[10px] text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      meetingFormType === "presencial"
+                        ? "bg-white text-emerald-700 shadow-xs"
+                        : "text-[#636366] hover:text-[#111]"
+                    }`}
+                  >
+                    <MapPin className="w-4 h-4" />
+                    <span>Presencial (No Local)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Title & Quick Chips */}
+              <div>
+                <label className="block font-bold text-[#111] mb-1">Título / Assunto da Reunião *</label>
+                <input
+                  type="text"
+                  required
+                  value={meetingFormTitle}
+                  onChange={(e) => setMeetingFormTitle(e.target.value)}
+                  placeholder="Ex: Briefing de Decoração e Centros de Mesa"
+                  className="w-full px-3 py-2 bg-[#fafafc] border border-[#ececf0] rounded-[12px] text-xs text-[#111] font-semibold outline-none focus:ring-2 focus:ring-[#007aff]"
+                />
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span className="text-[10px] text-[#8e8e93]">Sugestões:</span>
+                  {[
+                    "Briefing de Decoração & Flores",
+                    "Visita Técnica ao Espaço",
+                    "Apresentação da Proposta",
+                    "Alinhamento Final da Produção",
+                    "Prova de Montagem & Luzes",
+                  ].map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      onClick={() => setMeetingFormTitle(chip)}
+                      className="px-2 py-0.5 rounded-full bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[10px] text-[#48484a] font-medium transition cursor-pointer"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Date, Time & Duration */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-[#111] mb-1">Data e Hora de Início *</label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={meetingFormStartDate}
+                    onChange={(e) => setMeetingFormStartDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#fafafc] border border-[#ececf0] rounded-[12px] text-xs text-[#111] outline-none focus:ring-2 focus:ring-[#007aff]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#111] mb-1">Duração Prevista</label>
+                  <select
+                    value={meetingFormDuration}
+                    onChange={(e) => setMeetingFormDuration(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-[#fafafc] border border-[#ececf0] rounded-[12px] text-xs text-[#111] font-semibold outline-none focus:ring-2 focus:ring-[#007aff] cursor-pointer"
+                  >
+                    <option value={30}>30 minutos</option>
+                    <option value={45}>45 minutos (Padrão)</option>
+                    <option value={60}>1 hora (60 min)</option>
+                    <option value={90}>1 hora e 30 min (90 min)</option>
+                    <option value={120}>2 horas (120 min)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Conditional: Google Meet Link or In-Person Location */}
+              {meetingFormType === "google_meet" ? (
+                <div className="p-3 rounded-[14px] bg-indigo-50/60 border border-indigo-100 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block font-bold text-indigo-950 text-xs flex items-center gap-1.5">
+                      <Video className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Link da Chamada Google Meet</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setMeetingFormMeetUrl(generateMeetUrl())}
+                      className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Gerar Novo Link</span>
+                    </button>
+                  </div>
+                  <input
+                    type="url"
+                    value={meetingFormMeetUrl}
+                    onChange={(e) => setMeetingFormMeetUrl(e.target.value)}
+                    placeholder="https://meet.google.com/cfm-xxx-yyy"
+                    className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-[10px] text-xs font-mono text-indigo-900 outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                  <p className="text-[10px] text-indigo-800/80">
+                    Link de chamada direta do Google Meet gerado automaticamente pela CFM Events.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 rounded-[14px] bg-emerald-50/60 border border-emerald-100 space-y-2">
+                  <label className="block font-bold text-emerald-950 text-xs flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Localização / Morada Presencial</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={meetingFormLocation}
+                    onChange={(e) => setMeetingFormLocation(e.target.value)}
+                    placeholder="Ex: Quinta da Regaleira, Sintra ou Atelier CFM Loures"
+                    className="w-full px-3 py-2 bg-white border border-emerald-200 rounded-[10px] text-xs text-emerald-950 outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10px] text-emerald-800 font-medium">Preencher com:</span>
+                    {event.venue && (
+                      <button
+                        type="button"
+                        onClick={() => setMeetingFormLocation(event.venue!)}
+                        className="px-2 py-0.5 rounded-full bg-white border border-emerald-200 text-[10px] text-emerald-800 font-semibold hover:bg-emerald-100 transition cursor-pointer"
+                      >
+                        Local do Evento ({event.venue})
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setMeetingFormLocation("Atelier CFM · Rua da Indústria 12, Loures")}
+                      className="px-2 py-0.5 rounded-full bg-white border border-emerald-200 text-[10px] text-emerald-800 font-semibold hover:bg-emerald-100 transition cursor-pointer"
+                    >
+                      Atelier CFM Loures
+                    </button>
+                    {client?.address && (
+                      <button
+                        type="button"
+                        onClick={() => setMeetingFormLocation(client.address!)}
+                        className="px-2 py-0.5 rounded-full bg-white border border-emerald-200 text-[10px] text-emerald-800 font-semibold hover:bg-emerald-100 transition cursor-pointer"
+                      >
+                        Morada do Cliente
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Host / Producer Responsável */}
+              <div>
+                <label className="block font-bold text-[#111] mb-1">Responsável CFM</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={meetingFormHostName}
+                    onChange={(e) => setMeetingFormHostName(e.target.value)}
+                    placeholder="Nome do produtor / coordenador"
+                    className="w-full px-3 py-2 bg-[#fafafc] border border-[#ececf0] rounded-[12px] text-xs text-[#111] outline-none focus:ring-2 focus:ring-[#007aff]"
+                  />
+                  {teamUsers.length > 0 && (
+                    <select
+                      onChange={(e) => {
+                        if (e.target.value) setMeetingFormHostName(e.target.value);
+                      }}
+                      className="text-xs bg-[#fafafc] border border-[#ececf0] rounded-[12px] px-2.5 py-2 text-[#636366] cursor-pointer outline-none"
+                    >
+                      <option value="">Equipa...</option>
+                      {teamUsers.map((u) => (
+                        <option key={u.id} value={u.name}>
+                          {u.name} ({u.role})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              {/* Notes / Agenda */}
+              <div>
+                <label className="block font-bold text-[#111] mb-1">Pauta / Tópicos a Discutir (Notas)</label>
+                <textarea
+                  rows={3}
+                  value={meetingFormNotes}
+                  onChange={(e) => setMeetingFormNotes(e.target.value)}
+                  placeholder="Ex: Rever centros de mesa e paleta terracotta; validar se as carrinhas de transporte entram pelo portão lateral da quinta..."
+                  className="w-full p-3 bg-[#fafafc] border border-[#ececf0] rounded-[12px] text-xs text-[#111] placeholder:text-[#8e8e93] outline-none focus:ring-2 focus:ring-[#007aff]"
+                />
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-[#ececf0]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateMeetingModal(false);
+                    setEditingMeeting(null);
+                  }}
+                  className="px-4 py-2 rounded-[12px] text-xs font-semibold text-[#636366] hover:bg-[#f2f2f5] transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingMeeting || !meetingFormTitle.trim() || !meetingFormStartDate}
+                  className="px-5 py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  {isSubmittingMeeting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>A guardar reunião...</span>
+                    </>
+                  ) : (
+                    <>
+                      {editingMeeting ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                      <span>{editingMeeting ? "Guardar Alterações" : "Agendar Reunião"}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Link Meeting Modal */}
+      {showLinkMeetingModal && (
+        <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-[24px] w-full max-w-lg border border-[#ececf0] shadow-2xl overflow-hidden p-6 space-y-4 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-[#ececf0]">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200/60 flex items-center justify-center text-indigo-600">
+                  <Link2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#111]">Vincular Reunião ao Evento</h3>
+                  <p className="text-xs text-[#8e8e93]">
+                    Associe uma reunião existente (ex: Calendly) ou link externo
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLinkMeetingModal(false)}
+                className="text-[#8e8e93] hover:text-[#111] p-1 rounded-full cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Tabs */}
+            <div className="flex items-center gap-2 border-b border-[#ececf0] pb-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setLinkModalTab("existing")}
+                className={`px-3 py-1.5 rounded-[10px] font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  linkModalTab === "existing"
+                    ? "bg-[#111] text-white"
+                    : "text-[#636366] hover:bg-[#f2f2f5]"
+                }`}
+              >
+                <span>Reuniões Existentes</span>
+                <span className="w-4 h-4 rounded-full bg-white/20 text-[10px] flex items-center justify-center">
+                  {linkableMeetings.length}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLinkModalTab("url")}
+                className={`px-3 py-1.5 rounded-[10px] font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  linkModalTab === "url"
+                    ? "bg-[#111] text-white"
+                    : "text-[#636366] hover:bg-[#f2f2f5]"
+                }`}
+              >
+                <Video className="w-3.5 h-3.5" />
+                <span>Colar Link de Reunião</span>
+              </button>
+            </div>
+
+            {linkModalTab === "existing" ? (
+              <div className="space-y-3">
+                {linkableMeetings.length === 0 ? (
+                  <div className="p-6 rounded-[16px] bg-[#fafafc] border border-dashed border-[#ececf0] text-center space-y-2">
+                    <p className="text-xs font-bold text-[#111]">
+                      Nenhuma outra reunião pendente no sistema para {client?.name || "este cliente"}.
+                    </p>
+                    <p className="text-[11px] text-[#8e8e93] max-w-[320px] mx-auto leading-relaxed">
+                      Pode agendar uma nova reunião através do botão &ldquo;Nova Reunião&rdquo; ou vincular diretamente via link na aba ao lado.
+                    </p>
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowLinkMeetingModal(false);
+                          handleOpenCreateMeeting();
+                        }}
+                        className="px-3.5 py-1.5 rounded-[10px] bg-[#111] hover:bg-black text-white text-xs font-bold cursor-pointer"
+                      >
+                        + Criar Nova Reunião
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
+                    {linkableMeetings.map((item) => {
+                      const isMeet = item.type === "google_meet";
+                      return (
+                        <div
+                          key={item.id}
+                          className="p-3.5 rounded-[14px] border border-[#ececf0] bg-[#fafafc] hover:bg-white hover:border-indigo-200 transition space-y-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5">
+                              {isMeet ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#eeeffe] text-[#4338ca] border border-indigo-200/60 flex items-center gap-1">
+                                  <Video className="w-3 h-3 text-indigo-500" />
+                                  <span>Google Meet</span>
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#e8f5e9] text-[#1b5e20] border border-emerald-200/60 flex items-center gap-1">
+                                  <MapPin className="w-3 h-3 text-emerald-600" />
+                                  <span>Presencial</span>
+                                </span>
+                              )}
+                              {item.source === "calendly" && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                  Calendly
+                                </span>
+                              )}
+                            </div>
+
+                            <span className="text-[10px] font-bold text-[#8e8e93]">
+                              {formatUpcomingTime(item.startDate)}
+                            </span>
+                          </div>
+
+                          <div>
+                            <div className="font-bold text-xs text-[#111]">{item.title}</div>
+                            <div className="text-[11px] text-[#636366] mt-0.5">
+                              {formatMeetingRange(item.startDate, item.endDate)}
+                            </div>
+                            {item.location && (
+                              <div className="text-[11px] text-[#8e8e93] truncate mt-0.5">
+                                Local: {item.location}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="pt-1 flex items-center justify-end">
+                            <button
+                              type="button"
+                              disabled={isSubmittingMeeting}
+                              onClick={() => handleLinkSelectedMeeting(item)}
+                              className="px-3 py-1.5 rounded-[10px] bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                            >
+                              <Link2 className="w-3 h-3" />
+                              <span>Vincular a este Evento</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <form onSubmit={handleLinkExternalMeeting} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="block font-bold text-[#111] mb-1">
+                    Link da Reunião (Google Meet ou Calendly) *
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    value={externalMeetUrl}
+                    onChange={(e) => setExternalMeetUrl(e.target.value)}
+                    placeholder="https://meet.google.com/xxx-yyyy-zzz"
+                    className="w-full px-3 py-2 bg-[#fafafc] border border-[#ececf0] rounded-[12px] text-xs font-mono outline-none focus:ring-2 focus:ring-[#007aff]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#111] mb-1">Título / Assunto da Reunião</label>
+                  <input
+                    type="text"
+                    value={externalMeetTitle}
+                    onChange={(e) => setExternalMeetTitle(e.target.value)}
+                    placeholder="Ex: Reunião de Acompanhamento"
+                    className="w-full px-3 py-2 bg-[#fafafc] border border-[#ececf0] rounded-[12px] text-xs outline-none focus:ring-2 focus:ring-[#007aff]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#111] mb-1">Data e Hora Prevista</label>
+                  <input
+                    type="datetime-local"
+                    value={externalMeetDate}
+                    onChange={(e) => setExternalMeetDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#fafafc] border border-[#ececf0] rounded-[12px] text-xs outline-none focus:ring-2 focus:ring-[#007aff]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#111] mb-1">Notas / Observações</label>
+                  <textarea
+                    rows={2}
+                    value={externalMeetNotes}
+                    onChange={(e) => setExternalMeetNotes(e.target.value)}
+                    placeholder="Notas ou pauta..."
+                    className="w-full p-2.5 bg-[#fafafc] border border-[#ececf0] rounded-[12px] text-xs outline-none focus:ring-2 focus:ring-[#007aff]"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#ececf0]">
+                  <button
+                    type="button"
+                    onClick={() => setShowLinkMeetingModal(false)}
+                    className="px-4 py-2 rounded-[12px] text-xs font-semibold text-[#636366] hover:bg-[#f2f2f5] cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingMeeting || !externalMeetUrl.trim()}
+                    className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    <span>Vincular Link</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

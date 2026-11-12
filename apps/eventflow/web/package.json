@@ -9,7 +9,7 @@
     "start": "next start",
     "check": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "echo 'No tests configured yet'",
+    "test": "tsx --test src/lib/*.test.ts",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

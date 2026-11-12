@@ -19,11 +19,23 @@ export async function getCurrentUser() {
     const session = await verifySessionToken(sessionToken);
     if (!session) return null;
 
+    const dbUser = await db.query.users.findFirst({
+      where: eq(users.id, session.userId),
+    });
+    if (dbUser) {
+      return {
+        id: dbUser.id,
+        name: dbUser.name,
+        email: dbUser.email,
+        role: dbUser.role as "admin" | "producer" | "warehouse",
+      };
+    }
+
     return {
       id: session.userId,
       name: session.name,
       email: session.email,
-      role: session.role,
+      role: session.role as "admin" | "producer" | "warehouse",
     };
   } catch {
     return null;

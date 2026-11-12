@@ -90,3 +90,9 @@ crash.*.log
 *.tfvars
 *.tfvars.json
 !terraform.tfvars.example
+
+# Local Agent & Skills
+.agents/
+.gemini/
+skills-lock.json
+

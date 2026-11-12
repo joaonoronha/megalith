@@ -90,6 +90,8 @@ export async function POST(req: NextRequest) {
         startDate: meetingStart,
         endDate: meetingEnd,
         status: "planeamento",
+        category: "Reunião Calendly",
+        theme: "Briefing & Consulta de Evento",
         notes: `Agendado via Calendly.\n${qaNotes}`,
         calendlyEventUri: data.event,
         createdAt: new Date(),

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/db/client";
 import { inventoryItems, eventAllocations, events, storageLocations, users } from "@/db/schema";
 import { eq, desc, asc } from "drizzle-orm";
+import { getCurrentUser } from "@/lib/auth";
 import InventoryDetailView from "@/components/InventoryDetailView";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +22,8 @@ export default async function InventoryItemPage({ params }: PageProps) {
     notFound();
   }
 
-  // Get all event allocations, storage locations and users
-  const [allocations, locations, allUsers] = await Promise.all([
+  // Get all event allocations, storage locations, users and currentUser
+  const [allocations, locations, allUsers, currentUser] = await Promise.all([
     db
       .select({
         id: eventAllocations.id,
@@ -51,6 +52,7 @@ export default async function InventoryItemPage({ params }: PageProps) {
         role: users.role,
       })
       .from(users),
+    getCurrentUser(),
   ]);
 
   return (
@@ -59,6 +61,7 @@ export default async function InventoryItemPage({ params }: PageProps) {
       allocations={allocations}
       locations={locations}
       users={allUsers}
+      currentUser={currentUser}
     />
   );
 }

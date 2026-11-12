@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { pullCalendlyMeetings } from "@/lib/calendly-sync";
 import { revalidatePath } from "next/cache";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   try {
     let token: string | undefined;
@@ -21,7 +23,10 @@ export async function POST(req: NextRequest) {
       revalidatePath("/events");
     } catch {}
 
-    return NextResponse.json(result, { status: result.success ? 200 : 400 });
+    return NextResponse.json(result, {
+      status: result.success ? 200 : 400,
+      headers: { "Cache-Control": "no-store, max-age=0" },
+    });
   } catch (err: any) {
     return NextResponse.json(
       { success: false, message: err?.message || "Sync failed" },
@@ -39,5 +44,7 @@ export async function GET() {
     revalidatePath("/eventos");
     revalidatePath("/events");
   } catch {}
-  return NextResponse.json(result);
+  return NextResponse.json(result, {
+    headers: { "Cache-Control": "no-store, max-age=0" },
+  });
 }

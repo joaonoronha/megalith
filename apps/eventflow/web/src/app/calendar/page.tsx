@@ -17,6 +17,9 @@ export default async function CalendarPage() {
       initialMovements={data.allMovements}
       initialTemplate={data.template}
       initialAlerts={data.allAlerts}
+      initialLocations={data.allLocations}
+      initialAllocations={data.allAllocations}
+      initialMeetings={data.allMeetings}
       initialTab="calendar"
     />
   );

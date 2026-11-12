@@ -14,6 +14,7 @@ import {
   quoteTemplates,
   auditLogs,
   eventMedia,
+  eventMeetings,
 } from "./schema";
 
 export async function seed() {
@@ -941,7 +942,70 @@ export async function seed() {
     },
   ]).onConflictDoNothing();
 
-  console.log("✅ Seeding completed successfully with audit logs and event media!");
+  // 11. Event Meetings (Google Meet & In Person)
+  await db.insert(eventMeetings).values([
+    {
+      id: "mtg-w-1",
+      eventId: eventWedding.id,
+      clientId: clientMarta.id,
+      title: "Briefing Online: Decoração Floral & Centros de Mesa",
+      type: "google_meet",
+      status: "agendada",
+      startDate: new Date("2026-11-18T10:30:00Z"),
+      endDate: new Date("2026-11-18T11:15:00Z"),
+      meetUrl: "https://meet.google.com/cfm-marta-briefing",
+      location: "Google Meet",
+      hostName: "Madalena Rosa (Produtora CFM)",
+      clientContactName: "Marta Almeida",
+      clientContactEmail: "marta.almeida@gmail.com",
+      clientContactPhone: "+351 925 432 109",
+      notes: "Revisão detalhada da paleta terracotta, caminhos de mesa em linho e arranjos florais secos com a decoradora principal.",
+      source: "manual",
+      createdAt: new Date("2026-11-10"),
+      updatedAt: new Date("2026-11-10"),
+    },
+    {
+      id: "mtg-w-2",
+      eventId: eventWedding.id,
+      clientId: clientMarta.id,
+      title: "Visita Técnica ao Espaço & Prova de Montagem",
+      type: "presencial",
+      status: "agendada",
+      startDate: new Date("2026-11-20T15:00:00Z"),
+      endDate: new Date("2026-11-20T16:30:00Z"),
+      location: "Quinta da Regaleira, Sintra (Jardim da Cerimónia)",
+      hostName: "João Silva (Operações CFM)",
+      clientContactName: "Marta Almeida & Diogo",
+      clientContactEmail: "marta.almeida@gmail.com",
+      clientContactPhone: "+351 925 432 109",
+      notes: "Inspeção no local com a cliente e o cerimonialista para medir passadeiras, testar pontos elétricos de 380V para iluminação exterior e validar acessos de carrinhas.",
+      source: "manual",
+      createdAt: new Date("2026-11-10"),
+      updatedAt: new Date("2026-11-10"),
+    },
+    {
+      id: "mtg-g-1",
+      eventId: eventGala.id,
+      clientId: clientMastercard.id,
+      title: "Alinhamento Técnico AV & Cronograma de Palco",
+      type: "google_meet",
+      status: "agendada",
+      startDate: new Date("2026-11-24T14:00:00Z"),
+      endDate: new Date("2026-11-24T15:00:00Z"),
+      meetUrl: "https://meet.google.com/cfm-mastercard-av",
+      location: "Google Meet",
+      hostName: "Administrador CFM",
+      clientContactName: "João Silva (Mastercard)",
+      clientContactEmail: "joao@mastercard.pt",
+      clientContactPhone: "+351 910 111 222",
+      notes: "Coordenação minuto-a-minuto com a equipa de multimédia para a entrega de prémios corporativos e ensaios gerais.",
+      source: "manual",
+      createdAt: new Date("2026-11-09"),
+      updatedAt: new Date("2026-11-09"),
+    },
+  ]).onConflictDoNothing();
+
+  console.log("✅ Seeding completed successfully with audit logs, event media, and meetings!");
 }
 
 if (import.meta.url.endsWith(process.argv[1])) {

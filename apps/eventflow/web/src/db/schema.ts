@@ -49,7 +49,7 @@ export const inventoryItems = sqliteTable("inventory_items", {
   warehouseLocation: text("warehouse_location"), // e.g. "Armazém A · B3 · P2"
   locationId: text("location_id").references(() => storageLocations.id),
   dimensions: text("dimensions"), // e.g. "40 × 45 × 92 cm"
-  unitPrice: real("unit_price").default(0).notNull(), // rental price per unit
+  unitPrice: real("unit_price").default(0).notNull(), // rental price per unit / event
   replacementCost: real("replacement_cost").default(0),
   imageUrl: text("image_url"),
   damagedQuantity: integer("damaged_quantity").default(0),
@@ -82,6 +82,9 @@ export const events = sqliteTable("events", {
   notes: text("notes"),
   coverImageUrl: text("cover_image_url"),
   calendlyEventUri: text("calendly_event_uri"),
+  linkedEventId: text("linked_event_id"), // If this event row (e.g. Calendly meeting) is linked to a main production event
+  meetingSummary: text("meeting_summary"), // Summary of the conversation / briefing discussion
+  meetingParticipants: text("meeting_participants"), // JSON array of participants who attended
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   lastUpdatedByUserId: text("last_updated_by_user_id"),
@@ -110,9 +113,26 @@ export const eventMedia = sqliteTable("event_media", {
   description: text("description"),
   imageUrl: text("image_url").notNull(),
   images: text("images"),
+  comments: text("comments"), // JSON string array of MoodboardComment
   tag: text("tag"), // e.g. "Mesa de Honra", "Iluminação", "Flores", "Mobiliário", "Lounge"
   orderIndex: integer("order_index").default(0),
   uploadedByName: text("uploaded_by_name").default("Administrador CFM"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+});
+
+// 4.3 Moodboard Comments & Collaborative Feedback
+export const moodboardComments = sqliteTable("moodboard_comments", {
+  id: text("id").primaryKey(),
+  mediaId: text("media_id").references(() => eventMedia.id, { onDelete: "cascade" }).notNull(),
+  eventId: text("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  userId: text("user_id"),
+  authorName: text("author_name").notNull().default("Equipa CFM"),
+  content: text("content").notNull(),
+  photoId: text("photo_id"),
+  photoIndex: integer("photo_index"),
+  photoLabel: text("photo_label"),
+  photoUrl: text("photo_url"),
+  imageUrl: text("image_url"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
 });
 
@@ -265,6 +285,31 @@ export const integrations = sqliteTable("integrations", {
   lastSyncedAt: integer("last_synced_at", { mode: "timestamp" }),
   syncStatus: text("sync_status"), // "idle" | "syncing" | "success" | "error"
   syncError: text("sync_error"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+});
+
+// 14. Event Meetings (Google Meet & In-Person meetings with clients/stakeholders)
+export const eventMeetings = sqliteTable("event_meetings", {
+  id: text("id").primaryKey(),
+  eventId: text("event_id").references(() => events.id, { onDelete: "cascade" }),
+  clientId: text("client_id").references(() => clients.id),
+  title: text("title").notNull(),
+  type: text("type", { enum: ["google_meet", "presencial", "outro"] }).default("google_meet").notNull(),
+  status: text("status", { enum: ["agendada", "realizada", "cancelada"] }).default("agendada").notNull(),
+  startDate: integer("start_date", { mode: "timestamp" }).notNull(),
+  endDate: integer("end_date", { mode: "timestamp" }),
+  location: text("location"), // In-person venue / address
+  meetUrl: text("meet_url"),   // Google Meet link (e.g. "https://meet.google.com/cfm-xxx-yyy")
+  notes: text("notes"),        // Agenda / discussion notes
+  hostUserId: text("host_user_id").references(() => users.id),
+  hostName: text("host_name").default("Equipa CFM"),
+  clientContactName: text("client_contact_name"),
+  clientContactEmail: text("client_contact_email"),
+  clientContactPhone: text("client_contact_phone"),
+  source: text("source", { enum: ["manual", "calendly", "linked"] }).default("manual").notNull(),
+  calendlyUri: text("calendly_uri"),
+  linkedEventRowId: text("linked_event_row_id"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
 });
