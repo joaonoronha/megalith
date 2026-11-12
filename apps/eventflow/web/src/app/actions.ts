@@ -11,6 +11,7 @@ import {
   inventoryItems,
   financialMovements,
   quoteTemplates,
+  users,
 } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -226,6 +227,48 @@ export async function updateItemTriageAction(itemId: string, action: "repair_all
   }
 
   revalidatePath("/");
+  revalidatePath(`/inventario/${itemId}`);
+  revalidatePath(`/artigos/${itemId}`);
+  return { success: true };
+}
+
+// 6.1 Update Inventory Item Details
+export async function updateItemAction(formData: FormData) {
+  const itemId = formData.get("itemId") as string;
+  if (!itemId) return { success: false, error: "ID do artigo é obrigatório." };
+
+  const name = formData.get("name") as string;
+  const category = formData.get("category") as string;
+  const totalQuantity = parseInt((formData.get("totalQuantity") as string) || "1", 10);
+  const minStock = parseInt((formData.get("minStock") as string) || "0", 10);
+  const warehouseLocation = formData.get("warehouseLocation") as string;
+  const dimensions = formData.get("dimensions") as string;
+  const unitPrice = parseFloat((formData.get("unitPrice") as string) || "0");
+  const replacementCost = parseFloat((formData.get("replacementCost") as string) || "0");
+  const imageUrl = formData.get("imageUrl") as string;
+
+  if (!name || !category) {
+    return { success: false, error: "Nome e categoria são obrigatórios." };
+  }
+
+  await db
+    .update(inventoryItems)
+    .set({
+      name,
+      category,
+      totalQuantity,
+      minStock,
+      warehouseLocation: warehouseLocation || "Armazém Principal",
+      dimensions: dimensions || null,
+      unitPrice,
+      replacementCost,
+      imageUrl: imageUrl || null,
+    })
+    .where(eq(inventoryItems.id, itemId));
+
+  revalidatePath("/");
+  revalidatePath(`/inventario/${itemId}`);
+  revalidatePath(`/artigos/${itemId}`);
   return { success: true };
 }
 
@@ -301,6 +344,27 @@ export async function createUserAction(formData: FormData) {
   const result = await createTeamUser({ name, email, password, role, customId });
   revalidatePath("/");
   return result;
+}
+
+// 8.1 Update User Action
+export async function updateUserAction(formData: FormData) {
+  const userId = formData.get("userId") as string;
+  const name = formData.get("name") as string;
+  const role = formData.get("role") as "admin" | "producer" | "warehouse";
+
+  if (!userId || !name) {
+    return { success: false, error: "ID e Nome são obrigatórios." };
+  }
+
+  await db
+    .update(users)
+    .set({ name, role: role || "admin" })
+    .where(eq(users.id, userId));
+
+  revalidatePath("/");
+  revalidatePath(`/utilizadores/${userId}`);
+  revalidatePath(`/users/${userId}`);
+  return { success: true };
 }
 
 // 9. Update Event Details (Category, Dates, Theme, Vibe, Customer Price, Notes, Special Needs)
