@@ -55,6 +55,9 @@ export async function getAppInitialData() {
     brandColor: "#111111",
   };
 
+  const { evaluateAndSyncAlerts } = await import("@/lib/alerts");
+  const allAlerts = await evaluateAndSyncAlerts();
+
   return {
     currentUser,
     allEvents,
@@ -64,5 +67,6 @@ export async function getAppInitialData() {
     allMovements,
     allUsers,
     template,
+    allAlerts,
   };
 }

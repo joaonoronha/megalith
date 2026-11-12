@@ -13,6 +13,7 @@ export type EntityPrefix =
   | "doc"  // Documents
   | "tpl"  // Templates
   | "med"  // Media items / Photos
+  | "alt"  // Alerts
   | "log"; // Audit Logs
 
 /**

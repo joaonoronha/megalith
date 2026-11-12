@@ -569,7 +569,79 @@ export default function EventDetailView({
     setTimeout(() => setCopiedQuoteId(null), 2500);
   };
 
+  // Media handlers
+  const handleAddMedia = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMediaUrl.trim()) return;
+
+    const tempId = "temp-" + Date.now();
+    const optimisticMedia: EventMediaItem = {
+      id: tempId,
+      eventId: event.id,
+      type: newMediaType,
+      title: newMediaTitle.trim() || (newMediaType === "idea_board" ? "Ideia / Conceito" : "Foto Real do Evento"),
+      description: newMediaDescription.trim() || null,
+      imageUrl: newMediaUrl.trim(),
+      tag: newMediaTag.trim() || "Geral",
+      orderIndex: Date.now(),
+      uploadedByName: currentUser?.name || "Administrador CFM",
+      createdAt: new Date(),
+    };
+
+    setMediaList((prev) => [optimisticMedia, ...prev]);
+    setShowAddMediaModal(false);
+
+    const formData = new FormData();
+    formData.append("eventId", event.id);
+    formData.append("type", newMediaType);
+    formData.append("title", optimisticMedia.title);
+    formData.append("description", optimisticMedia.description || "");
+    formData.append("imageUrl", optimisticMedia.imageUrl);
+    formData.append("tag", optimisticMedia.tag || "");
+
+    setNewMediaUrl("");
+    setNewMediaTitle("");
+    setNewMediaDescription("");
+
+    startTransition(async () => {
+      try {
+        const res = await addEventMediaAction(formData);
+        if (res.success && res.media) {
+          setMediaList((prev) =>
+            prev.map((m) => (m.id === tempId ? { ...m, id: res.media.id } : m))
+          );
+        }
+      } catch (err) {
+        console.error("Erro ao adicionar media:", err);
+      }
+    });
+  };
+
+  const handleDeleteMedia = async (mediaId: string) => {
+    if (!confirm("Tem a certeza que deseja remover esta imagem?")) return;
+
+    setMediaList((prev) => prev.filter((m) => m.id !== mediaId));
+    if (lightboxItem?.id === mediaId) {
+      setLightboxItem(null);
+    }
+
+    startTransition(async () => {
+      try {
+        await deleteEventMediaAction(mediaId, event.id);
+      } catch (err) {
+        console.error("Erro ao eliminar media:", err);
+      }
+    });
+  };
+
   // Calculations
+  const ideaBoardsCount = mediaList.filter((m) => m.type === "idea_board").length;
+  const finalOutcomesCount = mediaList.filter((m) => m.type === "final_outcome").length;
+  const filteredMedia = mediaList.filter((m) => {
+    if (mediaFilter === "all") return true;
+    return m.type === mediaFilter;
+  });
+
   const completedTasksCount = tasks.filter((t) => t.completed).length;
   const totalTasksCount = tasks.length;
   const pendingTasksCount = totalTasksCount - completedTasksCount;
@@ -1166,6 +1238,211 @@ export default function EventDetailView({
             </section>
 
             {/* ----------------------------------------------------------------- */}
+            {/* PAINÉIS DE IDEIAS (MOODBOARDS) & RESULTADOS FINAIS (FOTOS REAIS) */}
+            {/* ----------------------------------------------------------------- */}
+            <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-[#f2f2f5] flex items-center justify-center text-[#111]">
+                      <ImageIcon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-bold text-[#111]">
+                          Painéis de Ideias & Resultados Finais
+                        </h2>
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#f2f2f5] text-[#111]">
+                          {mediaList.length}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#8e8e93] mt-0.5">
+                        Moodboards de inspiração conceptual e fotografias reais do resultado do evento
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAddMediaModal(true)}
+                  className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 transition self-start sm:self-auto shadow-xs cursor-pointer flex-shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Adicionar Imagem</span>
+                </button>
+              </div>
+
+              {/* Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-2 pb-4 mb-5 border-b border-[#ececf0]">
+                <button
+                  type="button"
+                  onClick={() => setMediaFilter("all")}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                    mediaFilter === "all"
+                      ? "bg-[#111] text-white shadow-xs"
+                      : "bg-[#f2f2f5] text-[#636366] hover:bg-[#e5e5ea]"
+                  }`}
+                >
+                  <span>Todos</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${mediaFilter === "all" ? "bg-white/20 text-white" : "bg-black/5 text-[#8e8e93]"}`}>
+                    {mediaList.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMediaFilter("idea_board")}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                    mediaFilter === "idea_board"
+                      ? "bg-amber-500 text-white shadow-xs"
+                      : "bg-amber-50 text-amber-800 hover:bg-amber-100"
+                  }`}
+                >
+                  <Lightbulb className="w-3.5 h-3.5" />
+                  <span>Ideias & Conceito</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${mediaFilter === "idea_board" ? "bg-white/20 text-white" : "bg-amber-200/60 text-amber-900"}`}>
+                    {ideaBoardsCount}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMediaFilter("final_outcome")}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                    mediaFilter === "final_outcome"
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                  }`}
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Resultados Reais</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${mediaFilter === "final_outcome" ? "bg-white/20 text-white" : "bg-emerald-200/60 text-emerald-900"}`}>
+                    {finalOutcomesCount}
+                  </span>
+                </button>
+              </div>
+
+              {/* Gallery Grid */}
+              {filteredMedia.length === 0 ? (
+                <div className="text-center py-10 px-4 rounded-[16px] bg-[#fafafc] border border-dashed border-[#d2d2d7]">
+                  <div className="w-12 h-12 rounded-full bg-white shadow-xs flex items-center justify-center mx-auto mb-3 text-[#8e8e93]">
+                    <ImageIcon className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-[#111]">
+                    {mediaFilter === "idea_board"
+                      ? "Nenhum painel de ideias adicionado"
+                      : mediaFilter === "final_outcome"
+                      ? "Nenhuma fotografia de resultado final adicionada"
+                      : "Galeria de imagens vazia"}
+                  </h4>
+                  <p className="text-xs text-[#8e8e93] max-w-md mx-auto mt-1 mb-4">
+                    Adicione referências visuais de inspiração para a equipa e o cliente, ou registe as fotografias finais do evento concluído.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddMediaModal(true)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold hover:bg-black transition shadow-xs cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Adicionar primeira imagem</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {filteredMedia.map((item) => (
+                    <div
+                      key={item.id}
+                      className="group bg-white rounded-[18px] border border-[#ececf0] overflow-hidden hover:border-[#c7c7cc] hover:shadow-md transition-all flex flex-col"
+                    >
+                      {/* Image Thumbnail Container */}
+                      <div className="relative aspect-[16/10] bg-[#f2f2f5] overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={item.imageUrl}
+                          alt={item.title}
+                          className="w-full h-full object-cover transition duration-300 group-hover:scale-105 cursor-pointer"
+                          onClick={() => setLightboxItem(item)}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1200&q=80";
+                          }}
+                        />
+
+                        {/* Top Badges */}
+                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10 pointer-events-none">
+                          {item.type === "idea_board" ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/90 backdrop-blur-md text-white shadow-xs">
+                              <Lightbulb className="w-3 h-3" />
+                              <span>Ideia & Conceito</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-600/90 backdrop-blur-md text-white shadow-xs">
+                              <Camera className="w-3 h-3" />
+                              <span>Resultado Real</span>
+                            </span>
+                          )}
+
+                          {item.tag && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-black/60 backdrop-blur-md text-white">
+                              {item.tag}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Hover Overlay Action Buttons */}
+                        <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                          <button
+                            type="button"
+                            onClick={() => setLightboxItem(item)}
+                            title="Ver em tamanho grande"
+                            className="p-1.5 rounded-full bg-black/70 hover:bg-black text-white backdrop-blur-md transition cursor-pointer"
+                          >
+                            <ZoomIn className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMedia(item.id)}
+                            title="Eliminar imagem"
+                            className="p-1.5 rounded-full bg-rose-600/80 hover:bg-rose-700 text-white backdrop-blur-md transition cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Card Content */}
+                      <div className="p-3.5 flex flex-col flex-1 justify-between">
+                        <div>
+                          <h4 className="text-sm font-bold text-[#111] line-clamp-1 group-hover:text-[#007aff] transition">
+                            {item.title}
+                          </h4>
+                          {item.description && (
+                            <p className="text-xs text-[#636366] mt-1 line-clamp-2 leading-relaxed">
+                              {item.description}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="mt-3 pt-2.5 border-t border-[#f2f2f5] flex items-center justify-between text-[11px] text-[#8e8e93]">
+                          <span>{item.uploadedByName || "Equipa CFM"}</span>
+                          <button
+                            type="button"
+                            onClick={() => setLightboxItem(item)}
+                            className="text-[#007aff] hover:underline font-medium inline-flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <span>Ampliar</span>
+                            <ZoomIn className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* ----------------------------------------------------------------- */}
             {/* ACTION ITEMS CHECKLIST */}
             {/* ----------------------------------------------------------------- */}
             <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs">
@@ -1630,6 +1907,290 @@ export default function EventDetailView({
                   className="px-5 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold cursor-pointer"
                 >
                   Confirmar Alocação
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Modal */}
+      {lightboxItem && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
+          onClick={() => setLightboxItem(null)}
+        >
+          <div
+            className="relative max-w-4xl w-full max-h-[92vh] flex flex-col bg-[#1c1c1e] text-white rounded-[24px] overflow-hidden shadow-2xl border border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between bg-black/40">
+              <div className="flex items-center gap-2">
+                {lightboxItem.type === "idea_board" ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white">
+                    <Lightbulb className="w-3.5 h-3.5" />
+                    <span>Ideia & Conceito</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white">
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Resultado Final</span>
+                  </span>
+                )}
+                {lightboxItem.tag && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs bg-white/10 text-white/90">
+                    {lightboxItem.tag}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <a
+                  href={lightboxItem.imageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs text-white inline-flex items-center gap-1.5 transition"
+                >
+                  <span>Abrir original</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setLightboxItem(null)}
+                  className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Image Preview Container */}
+            <div className="flex-1 overflow-auto flex items-center justify-center p-4 bg-black/60 min-h-[300px]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={lightboxItem.imageUrl}
+                alt={lightboxItem.title}
+                className="max-h-[62vh] max-w-full object-contain rounded-[14px] shadow-lg"
+              />
+            </div>
+
+            {/* Footer with details */}
+            <div className="p-5 border-t border-white/10 bg-black/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-white">{lightboxItem.title}</h3>
+                {lightboxItem.description && (
+                  <p className="text-xs text-white/70 mt-1 max-w-xl">{lightboxItem.description}</p>
+                )}
+                <div className="text-[11px] text-white/50 mt-1">
+                  Adicionado por {lightboxItem.uploadedByName || "Administrador CFM"}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteMedia(lightboxItem.id)}
+                  className="px-3.5 py-1.5 rounded-[12px] bg-rose-600/80 hover:bg-rose-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Eliminar Imagem</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Media Modal */}
+      {showAddMediaModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setShowAddMediaModal(false)}
+        >
+          <div
+            className="bg-white rounded-[24px] max-w-lg w-full p-6 shadow-2xl border border-[#ececf0] space-y-4 max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#ececf0] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-[#111] text-white flex items-center justify-center">
+                  <ImageIcon className="w-3.5 h-3.5" />
+                </div>
+                <h3 className="font-bold text-base text-[#111]">Adicionar Imagem ao Evento</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddMediaModal(false)}
+                className="p-1 rounded-full text-[#8e8e93] hover:text-[#111] hover:bg-[#f2f2f5] transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Type selector toggle */}
+            <div>
+              <label className="block text-xs font-bold text-[#111] mb-2">Tipo de Imagem</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewMediaType("idea_board");
+                    if (newMediaTag === "Resultado Real") setNewMediaTag("Flores & Centros");
+                  }}
+                  className={`p-3 rounded-[14px] border text-left transition cursor-pointer ${
+                    newMediaType === "idea_board"
+                      ? "bg-amber-50 border-amber-300 ring-2 ring-amber-400/30"
+                      : "bg-[#fafafc] border-[#ececf0] hover:border-[#d2d2d7]"
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 mb-0.5">
+                    <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Painel de Ideias / Moodboard</span>
+                  </div>
+                  <p className="text-[11px] text-amber-700/80">
+                    Conceito, inspiração e referências visuais pré-evento.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewMediaType("final_outcome");
+                    setNewMediaTag("Resultado Real");
+                  }}
+                  className={`p-3 rounded-[14px] border text-left transition cursor-pointer ${
+                    newMediaType === "final_outcome"
+                      ? "bg-emerald-50 border-emerald-300 ring-2 ring-emerald-400/30"
+                      : "bg-[#fafafc] border-[#ececf0] hover:border-[#d2d2d7]"
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 mb-0.5">
+                    <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Resultado Final (Foto Real)</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-700/80">
+                    Fotografias reais da montagem final e do evento realizado.
+                  </p>
+                </button>
+              </div>
+            </div>
+
+            {/* Presets Inspiration Picker */}
+            <div>
+              <label className="block text-xs font-bold text-[#111] mb-1.5 flex items-center justify-between">
+                <span>Sugestões Rápidas de Inspiração CFM</span>
+                <span className="text-[10px] text-[#8e8e93] font-normal">1-clique para aplicar</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                {MEDIA_INSPIRATION_PRESETS.filter((p) => p.type === newMediaType).map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setNewMediaUrl(preset.url);
+                      setNewMediaTitle(preset.title);
+                      setNewMediaTag(preset.tag);
+                      setNewMediaDescription(preset.description);
+                    }}
+                    className={`p-2 rounded-[12px] border text-left flex items-center gap-2 transition cursor-pointer ${
+                      newMediaUrl === preset.url
+                        ? "bg-blue-50 border-blue-300 ring-1 ring-blue-400"
+                        : "bg-[#fafafc] border-[#ececf0] hover:bg-[#f2f2f5]"
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={preset.url}
+                      alt={preset.title}
+                      className="w-10 h-10 rounded-[8px] object-cover flex-shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-bold text-[#111] truncate">{preset.title}</div>
+                      <div className="text-[10px] text-[#8e8e93] truncate">{preset.tag}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleAddMedia} className="space-y-3 pt-2 border-t border-[#ececf0]">
+              {/* Image URL */}
+              <div>
+                <label className="block text-xs font-bold text-[#111] mb-1">
+                  URL da Imagem <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://images.unsplash.com/... ou URL direto"
+                  value={newMediaUrl}
+                  onChange={(e) => setNewMediaUrl(e.target.value)}
+                  className="w-full px-3.5 py-2 text-xs bg-[#fafafc] border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                />
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className="block text-xs font-bold text-[#111] mb-1">Título / Nome</label>
+                <input
+                  type="text"
+                  placeholder={newMediaType === "idea_board" ? "Ex: Centros de mesa em Terracotta" : "Ex: Foto da zona de cocktail finalizada"}
+                  value={newMediaTitle}
+                  onChange={(e) => setNewMediaTitle(e.target.value)}
+                  className="w-full px-3.5 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                />
+              </div>
+
+              {/* Tag & Category */}
+              <div>
+                <label className="block text-xs font-bold text-[#111] mb-1">Etiqueta / Categoria</label>
+                <select
+                  value={newMediaTag}
+                  onChange={(e) => setNewMediaTag(e.target.value)}
+                  className="w-full px-3.5 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] text-[#111]"
+                >
+                  <option value="Flores & Centros">Flores & Centros de Mesa</option>
+                  <option value="Iluminação & Ambiente">Iluminação & Ambiente</option>
+                  <option value="Cerimónia & Altar">Cerimónia & Altar</option>
+                  <option value="Lounge & Mobiliário">Lounge & Mobiliário</option>
+                  <option value="Mesa & Louça">Mesa, Toalhas & Louça</option>
+                  <option value="Palco & Som">Palco & Estruturas</option>
+                  <option value="Bolo & Doces">Bolo & Candy Bar</option>
+                  <option value="Zona de Fotos">Zona de Fotos / Backdrop</option>
+                  <option value="Resultado Real">Resultado Real Concluído</option>
+                  <option value="Geral">Geral</option>
+                </select>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-bold text-[#111] mb-1">Notas / Descrição (Opcional)</label>
+                <textarea
+                  rows={2}
+                  placeholder="Detalhes sobre materiais, fornecedor, posicionamento ou aprovação do cliente..."
+                  value={newMediaDescription}
+                  onChange={(e) => setNewMediaDescription(e.target.value)}
+                  className="w-full px-3.5 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff] resize-none"
+                />
+              </div>
+
+              {/* Modal Actions */}
+              <div className="pt-2 border-t border-[#ececf0] flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddMediaModal(false)}
+                  className="px-4 py-2 rounded-[12px] bg-[#f2f2f5] text-xs font-bold text-[#111] hover:bg-[#e5e5ea] transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newMediaUrl.trim()}
+                  className="px-5 py-2 rounded-[12px] bg-[#111] hover:bg-black disabled:opacity-50 text-white text-xs font-bold transition cursor-pointer"
+                >
+                  {newMediaType === "idea_board" ? "Adicionar ao Moodboard" : "Registar Foto Real"}
                 </button>
               </div>
             </form>
