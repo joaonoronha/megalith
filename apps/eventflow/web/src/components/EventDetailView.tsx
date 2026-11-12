@@ -313,6 +313,7 @@ function MoodboardCard({
   const images = useMemo(() => parseMediaImages(board), [board]);
   const comments = useMemo(() => parseMediaComments(board), [board]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [zoomModalUrl, setZoomModalUrl] = useState<{ url: string; alt?: string } | null>(null);
 
   // Comments state
   const [showComments, setShowComments] = useState(false);
@@ -494,33 +495,40 @@ function MoodboardCard({
         )}
 
         {/* Bottom Floating Bar inside image */}
-        <div className="absolute bottom-2.5 inset-x-3 flex items-center justify-between z-10 pointer-events-none">
-          {/* Dot Indicators */}
-          {images.length > 1 ? (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/50 backdrop-blur-md pointer-events-auto max-w-[70%] overflow-x-auto">
-              {images.map((_: MediaImageItem, idx: number) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentIndex(idx);
-                  }}
-                  className={`transition-all rounded-full cursor-pointer ${
-                    idx === activeIndex
-                      ? "w-4 h-1.5 bg-white"
-                      : "w-1.5 h-1.5 bg-white/50 hover:bg-white/80"
-                  }`}
-                  aria-label={`Ver foto ${idx + 1}`}
-                />
-              ))}
-            </div>
-          ) : (
-            <div />
-          )}
+        <div className="absolute bottom-2.5 inset-x-3 flex items-center justify-between gap-2 z-10 pointer-events-none">
+          {/* Dot Indicators & Bottom Caption */}
+          <div className="flex items-center gap-2 pointer-events-auto min-w-0 max-w-[70%]">
+            {images.length > 1 && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/60 backdrop-blur-md shrink-0 overflow-x-auto">
+                {images.map((_: MediaImageItem, idx: number) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentIndex(idx);
+                    }}
+                    className={`transition-all rounded-full cursor-pointer ${
+                      idx === activeIndex
+                        ? "w-4 h-1.5 bg-white"
+                        : "w-1.5 h-1.5 bg-white/50 hover:bg-white/80"
+                    }`}
+                    aria-label={`Ver foto ${idx + 1}`}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Bottom Caption Pill */}
+            {currentImage.title && (
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-black/65 backdrop-blur-md text-white/95 truncate shadow-xs">
+                {currentImage.title}
+              </span>
+            )}
+          </div>
 
           {/* Quick Actions (Zoom & Delete Photo) */}
-          <div className="flex items-center gap-1.5 pointer-events-auto">
+          <div className="flex items-center gap-1.5 pointer-events-auto shrink-0">
             <button
               type="button"
               onClick={() => onOpenLightbox(board, activeIndex)}
@@ -799,7 +807,7 @@ function MoodboardCard({
                             src={comment.imageUrl}
                             alt="Anexo da nota"
                             className="w-full max-h-32 object-cover cursor-pointer hover:opacity-90 transition"
-                            onClick={() => window.open(comment.imageUrl!, "_blank")}
+                            onClick={() => setZoomModalUrl({ url: comment.imageUrl!, alt: "Anexo da nota" })}
                           />
                         </div>
                       )}
@@ -966,6 +974,55 @@ function MoodboardCard({
           </div>
         )}
       </div>
+
+      {/* Comment Image Attachment Zoom Modal */}
+      {zoomModalUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 select-none animate-in fade-in duration-200"
+          onClick={() => setZoomModalUrl(null)}
+        >
+          <div
+            className="relative max-w-3xl max-h-[90vh] bg-[#1c1c1e] rounded-[20px] overflow-hidden shadow-2xl border border-white/10 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between bg-black/40 text-white">
+              <span className="text-xs font-semibold text-white/90">
+                {zoomModalUrl.alt || "Anexo da nota"}
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={zoomModalUrl.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+                  title="Abrir imagem original"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setZoomModalUrl(null)}
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+                  title="Fechar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body / Image Stage */}
+            <div className="p-3 sm:p-5 flex items-center justify-center bg-black/60 max-h-[calc(90vh-60px)] overflow-auto">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={zoomModalUrl.url}
+                alt={zoomModalUrl.alt || "Anexo"}
+                className="max-h-[75vh] w-auto max-w-full object-contain rounded-[12px] shadow-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1008,6 +1065,7 @@ function LightboxCommentsDrawer({
   const [urlInput, setUrlInput] = useState("");
   const [showUrlField, setShowUrlField] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [drawerZoomUrl, setDrawerZoomUrl] = useState<{ url: string; alt?: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const targetInfo = useMemo(() => {
@@ -1183,7 +1241,7 @@ function LightboxCommentsDrawer({
                       src={c.imageUrl}
                       alt="Anexo"
                       className="w-full max-h-32 object-cover cursor-pointer hover:opacity-90 transition"
-                      onClick={() => window.open(c.imageUrl!, "_blank")}
+                      onClick={() => setDrawerZoomUrl({ url: c.imageUrl!, alt: "Anexo" })}
                     />
                   </div>
                 )}
@@ -1297,6 +1355,55 @@ function LightboxCommentsDrawer({
           </button>
         </div>
       </form>
+
+      {/* Drawer Image Attachment Zoom Modal */}
+      {drawerZoomUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 select-none animate-in fade-in duration-200"
+          onClick={() => setDrawerZoomUrl(null)}
+        >
+          <div
+            className="relative max-w-3xl max-h-[90vh] bg-[#1c1c1e] rounded-[20px] overflow-hidden shadow-2xl border border-white/10 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between bg-black/40 text-white">
+              <span className="text-xs font-semibold text-white/90">
+                {drawerZoomUrl.alt || "Anexo da nota"}
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={drawerZoomUrl.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+                  title="Abrir imagem original"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setDrawerZoomUrl(null)}
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+                  title="Fechar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body / Image Stage */}
+            <div className="p-3 sm:p-5 flex items-center justify-center bg-black/60 max-h-[calc(90vh-60px)] overflow-auto">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={drawerZoomUrl.url}
+                alt={drawerZoomUrl.alt || "Anexo"}
+                className="max-h-[75vh] w-auto max-w-full object-contain rounded-[12px] shadow-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
