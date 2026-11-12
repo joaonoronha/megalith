@@ -744,10 +744,11 @@ export default function EventDetailView({
     startTransition(async () => {
       try {
         const res = await addBatchEventMediaAction(formData);
-        if (res.success && Array.isArray(res.mediaList)) {
+        if (res.success && "mediaList" in res && Array.isArray(res.mediaList)) {
+          const list = res.mediaList;
           setMediaList((prev) => {
             const nonTemps = prev.filter((m) => !m.id.startsWith("temp-"));
-            return [...res.mediaList, ...nonTemps];
+            return [...list, ...nonTemps];
           });
         }
       } catch (err) {

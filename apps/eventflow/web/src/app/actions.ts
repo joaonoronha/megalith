@@ -58,7 +58,7 @@ export async function createEventAction(formData: FormData) {
   const rawCustomId = (formData.get("customId") as string) || "";
 
   if (!name || !startDateStr) {
-    throw new Error("Nome do evento e data de início são obrigatórios.");
+    return { success: false, error: "Nome do evento e data de início são obrigatórios." };
   }
 
   // Generate clean, collision-free unique ID
@@ -795,7 +795,7 @@ export async function updateUserAction(formData: FormData) {
 // 9. Update Event Details (Category, Dates, Theme, Vibe, Customer Price, Notes, Special Needs)
 export async function updateEventDetailsAction(formData: FormData) {
   const eventId = formData.get("eventId") as string;
-  if (!eventId) throw new Error("Event ID is required");
+  if (!eventId) return { success: false, error: "ID do evento é obrigatório." };
 
   const name = formData.get("name") as string;
   const clientId = (formData.get("clientId") as string) || null;
@@ -1153,7 +1153,7 @@ export async function addEventMediaAction(formData: FormData) {
   const tag = (formData.get("tag") as string)?.trim() || "Geral";
 
   if (!eventId || !imageUrl) {
-    throw new Error("ID do evento e URL da imagem são obrigatórios.");
+    return { success: false, error: "ID do evento e URL da imagem são obrigatórios." };
   }
 
   const { getCurrentUser } = await import("@/lib/auth");
@@ -1197,7 +1197,7 @@ export async function addBatchEventMediaAction(formData: FormData) {
   const defaultDescription = (formData.get("description") as string)?.trim() || "";
 
   if (!eventId) {
-    throw new Error("ID do evento é obrigatório.");
+    return { success: false, error: "ID do evento é obrigatório." };
   }
 
   const { getCurrentUser } = await import("@/lib/auth");

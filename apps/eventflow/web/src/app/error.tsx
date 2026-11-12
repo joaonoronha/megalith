@@ -31,13 +31,19 @@ export default function ErrorBoundary({
           A plataforma encontrou um problema ao carregar os dados. Podes tentar recarregar ou voltar à página principal.
         </p>
 
-        {error.digest && (
-          <div className="mb-6 p-2.5 rounded-[12px] bg-[#f8f8fa] border border-[#ececf0] text-[11px] font-mono text-[#8e8e93] select-all">
-            Digest: {error.digest}
+        {error.message && (
+          <div className="mb-4 p-3 rounded-[12px] bg-rose-50 border border-rose-200 text-[11px] font-mono text-rose-800 text-left overflow-x-auto select-all max-h-32">
+            {error.message}
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        {error.digest && (
+          <div className="mb-6 p-2 rounded-[10px] bg-[#f8f8fa] border border-[#ececf0] text-[10px] font-mono text-[#8e8e93] select-all">
+            Código: {error.digest}
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
           <button
             onClick={() => reset()}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-[14px] bg-[#111111] hover:bg-black text-white text-xs font-semibold shadow-xs transition cursor-pointer"
@@ -47,6 +53,16 @@ export default function ErrorBoundary({
           </button>
 
           <Link
+            href="/login"
+            onClick={() => {
+              window.location.href = "/login";
+            }}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-[14px] bg-[#007aff] hover:bg-[#0066d6] text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+          >
+            <span>Iniciar Sessão</span>
+          </Link>
+
+          <Link
             href="/"
             onClick={() => {
               window.location.href = "/";
@@ -54,7 +70,7 @@ export default function ErrorBoundary({
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-[14px] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[#111111] text-xs font-semibold shadow-2xs transition cursor-pointer"
           >
             <Home className="w-3.5 h-3.5" />
-            <span>Página Principal</span>
+            <span>Início</span>
           </Link>
         </div>
       </div>
