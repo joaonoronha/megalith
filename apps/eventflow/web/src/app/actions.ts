@@ -416,6 +416,64 @@ export async function updateEventDetailsAction(formData: FormData) {
   return { success: true };
 }
 
+// 9.1 Update Event Patch (Instantaneous Auto-save for any field)
+export async function updateEventPatchAction(
+  eventId: string,
+  patch: {
+    name?: string;
+    clientId?: string | null;
+    venue?: string | null;
+    startDate?: string | Date;
+    endDate?: string | Date | null;
+    prepDate?: string | Date | null;
+    returnDate?: string | Date | null;
+    status?: any;
+    category?: string;
+    theme?: string | null;
+    vibeColors?: string | null;
+    customerPrice?: number;
+    totalBudget?: number;
+    specialNeeds?: string | null;
+    notes?: string | null;
+    coverImageUrl?: string | null;
+  }
+) {
+  if (!eventId) return { success: false, error: "Event ID is required" };
+
+  const updateData: Record<string, any> = {};
+  if (patch.name !== undefined) updateData.name = patch.name;
+  if (patch.clientId !== undefined) updateData.clientId = patch.clientId || null;
+  if (patch.venue !== undefined) updateData.venue = patch.venue || "";
+  if (patch.startDate !== undefined) {
+    updateData.startDate = patch.startDate ? new Date(patch.startDate) : new Date();
+  }
+  if (patch.endDate !== undefined) {
+    updateData.endDate = patch.endDate ? new Date(patch.endDate) : null;
+  }
+  if (patch.prepDate !== undefined) {
+    updateData.prepDate = patch.prepDate ? new Date(patch.prepDate) : null;
+  }
+  if (patch.returnDate !== undefined) {
+    updateData.returnDate = patch.returnDate ? new Date(patch.returnDate) : null;
+  }
+  if (patch.status !== undefined) updateData.status = patch.status;
+  if (patch.category !== undefined) updateData.category = patch.category;
+  if (patch.theme !== undefined) updateData.theme = patch.theme || null;
+  if (patch.vibeColors !== undefined) updateData.vibeColors = patch.vibeColors || null;
+  if (patch.customerPrice !== undefined) updateData.customerPrice = patch.customerPrice;
+  if (patch.totalBudget !== undefined) updateData.totalBudget = patch.totalBudget;
+  if (patch.specialNeeds !== undefined) updateData.specialNeeds = patch.specialNeeds || null;
+  if (patch.notes !== undefined) updateData.notes = patch.notes || "";
+  if (patch.coverImageUrl !== undefined) updateData.coverImageUrl = patch.coverImageUrl || "";
+
+  await db.update(events).set(updateData).where(eq(events.id, eventId));
+
+  revalidatePath("/");
+  revalidatePath(`/eventos/${eventId}`);
+  revalidatePath(`/events/${eventId}`);
+  return { success: true };
+}
+
 // 10. Update Event Theme & Vibe Colors
 export async function updateEventVibeAction(eventId: string, theme: string, vibeColors: string[]) {
   await db
@@ -437,6 +495,18 @@ export async function updateCustomerPriceAction(eventId: string, customerPrice: 
     .update(events)
     .set({ customerPrice })
     .where(eq(events.id, eventId));
+
+  revalidatePath("/");
+  revalidatePath(`/eventos/${eventId}`);
+  return { success: true };
+}
+
+// 11.1 Update Allocation Quantity
+export async function updateAllocationQuantityAction(allocationId: string, quantity: number, eventId: string) {
+  await db
+    .update(eventAllocations)
+    .set({ quantity: Math.max(1, quantity) })
+    .where(eq(eventAllocations.id, allocationId));
 
   revalidatePath("/");
   revalidatePath(`/eventos/${eventId}`);
