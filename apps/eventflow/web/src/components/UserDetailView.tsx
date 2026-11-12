@@ -17,6 +17,8 @@ import {
   X,
   ExternalLink,
   Briefcase,
+  MapPin,
+  Building,
 } from "lucide-react";
 import { updateUserAction } from "@/app/actions";
 
@@ -40,14 +42,24 @@ interface AssignedTask {
   eventStartDate: Date;
 }
 
+interface ManagedLocation {
+  id: string;
+  name: string;
+  code: string | null;
+  address: string | null;
+  notes: string | null;
+}
+
 interface UserDetailViewProps {
   user: TeamUser;
   assignedTasks: AssignedTask[];
+  managedLocations?: ManagedLocation[];
 }
 
 export default function UserDetailView({
   user: initialUser,
   assignedTasks,
+  managedLocations = [],
 }: UserDetailViewProps) {
   const [user, setUser] = useState<TeamUser>(initialUser);
   const [copiedId, setCopiedId] = useState(false);
@@ -200,6 +212,69 @@ export default function UserDetailView({
             </div>
           </div>
         </section>
+
+        {/* ================================================================= */}
+        {/* MANAGED STORAGE LOCATIONS */}
+        {/* ================================================================= */}
+        {managedLocations.length > 0 && (
+          <section className="bg-white border border-[#ececf0] rounded-[24px] p-6 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Building className="w-5 h-5 text-[#007aff]" />
+                  <h2 className="text-lg font-bold text-[#111]">
+                    Locais de Armazenamento sob Gestão
+                  </h2>
+                </div>
+                <p className="text-xs text-[#8e8e93] mt-0.5">
+                  Armazéns e polos logísticos geridos por este membro da equipa
+                </p>
+              </div>
+
+              <span className="text-xs font-bold px-3 py-1 bg-[#f0f7ff] text-[#0066cc] border border-[#d6e7ff] rounded-full self-start sm:self-auto">
+                {managedLocations.length} local(ais)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {managedLocations.map((loc) => (
+                <div
+                  key={loc.id}
+                  className="p-4 rounded-[16px] border border-[#ececf0] bg-[#fafafc] hover:border-[#007aff]/40 transition space-y-1.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-sm text-[#111]">{loc.name}</span>
+                    {loc.code && (
+                      <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white border border-[#ececf0] text-[#3a3a3c] font-bold">
+                        {loc.code}
+                      </span>
+                    )}
+                  </div>
+                  {loc.address && (
+                    <div className="text-xs text-[#8e8e93] flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{loc.address}</span>
+                    </div>
+                  )}
+                  {loc.notes && (
+                    <div className="text-[11px] text-[#636366] italic line-clamp-2">
+                      "{loc.notes}"
+                    </div>
+                  )}
+                  <div className="pt-2 border-t border-[#ececf0]/70 flex justify-end">
+                    <Link
+                      href="/inventario"
+                      className="text-xs font-semibold text-[#007aff] hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Ver stock no inventário</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ================================================================= */}
         {/* ASSIGNED TASKS & EVENT RESPONSIBILITIES */}

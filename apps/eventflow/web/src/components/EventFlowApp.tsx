@@ -15,6 +15,8 @@ import {
   DollarSign,
   Package,
   Users,
+  User,
+  Building,
   FileText,
   ExternalLink,
   Copy,
@@ -30,15 +32,21 @@ import {
   Bell,
   Clock,
   CheckCheck,
+  LogOut,
+  TrendingUp,
+  AlertCircle,
 } from "lucide-react";
 import AuditLogModal from "@/components/AuditLogModal";
 import AlertsDrawerModal from "@/components/AlertsDrawerModal";
+import StorageLocationsModal, { StorageLocation } from "@/components/StorageLocationsModal";
+import FinanceView from "@/components/FinanceView";
 import { formatRelativeTime } from "@/lib/date-format";
 import {
   createEventAction,
   updateEventStatusAction,
   createQuoteAction,
   createMovementAction,
+  deleteMovementAction,
   createItemAction,
   updateItemTriageAction,
   createClientAction,
@@ -60,7 +68,9 @@ interface Props {
   initialMovements: any[];
   initialTemplate: any;
   initialAlerts?: any[];
-  initialTab?: "home" | "calendar" | "events" | "inventory" | "more";
+  initialLocations?: any[];
+  initialAllocations?: any[];
+  initialTab?: "home" | "calendar" | "events" | "inventory" | "finance" | "more";
 }
 
 // Helpers
@@ -145,16 +155,19 @@ export default function EventFlowApp({
   initialMovements,
   initialTemplate,
   initialAlerts = [],
+  initialLocations = [],
+  initialAllocations = [],
   initialTab = "home",
 }: Props) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const pathname = usePathname();
 
-  const getTabFromPath = (path: string): "home" | "calendar" | "events" | "inventory" | "more" => {
+  const getTabFromPath = (path: string): "home" | "calendar" | "events" | "inventory" | "finance" | "more" => {
     if (path === "/calendario" || path === "/calendar") return "calendar";
     if (path === "/eventos" || path === "/events") return "events";
     if (path === "/inventario" || path === "/inventory") return "inventory";
+    if (path === "/financas" || path === "/finance") return "finance";
     if (path === "/mais" || path === "/more") return "more";
     if (path === "/") return "home";
     return initialTab || "home";
@@ -168,6 +181,10 @@ export default function EventFlowApp({
   const [clientsList, setClientsList] = useState(initialClients);
   const [quotesList, setQuotesList] = useState(initialQuotes);
   const [movementsList, setMovementsList] = useState(initialMovements);
+  const [allocationsList, setAllocationsList] = useState<any[]>(initialAllocations);
+  const [locationsList, setLocationsList] = useState<any[]>(initialLocations);
+  const [showLocationsModal, setShowLocationsModal] = useState(false);
+  const [locationsModalInitialMode, setLocationsModalInitialMode] = useState<"list" | "create">("list");
   const [alertsList, setAlertsList] = useState<any[]>(initialAlerts || []);
   const [showAlertsDrawer, setShowAlertsDrawer] = useState(false);
   const [homeAlertFilter, setHomeAlertFilter] = useState<"all" | "new" | "snoozed">("all");
@@ -273,11 +290,11 @@ export default function EventFlowApp({
   // Search & Navigation
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<
-    "home" | "calendar" | "events" | "inventory" | "more"
+    "home" | "calendar" | "events" | "inventory" | "finance" | "more"
   >(() => getTabFromPath(pathname));
 
   const handleTabSwitch = (
-    tab: "home" | "calendar" | "events" | "inventory" | "more",
+    tab: "home" | "calendar" | "events" | "inventory" | "finance" | "more",
     href: string,
     e?: React.MouseEvent
   ) => {
@@ -380,12 +397,30 @@ export default function EventFlowApp({
 
   const inventoryLocations = useMemo(() => {
     const locs = new Set<string>();
+    locationsList.forEach((l) => {
+      if (l.name?.trim()) locs.add(l.name.trim());
+    });
     itemsList.forEach((i) => {
       const loc = i.warehouseLocation?.trim() || "Armazém Principal";
       locs.add(loc);
     });
     return Array.from(locs).sort();
-  }, [itemsList]);
+  }, [itemsList, locationsList]);
+
+  // Helper to resolve manager for an item's location
+  const getLocationDetails = (locNameOrId?: string | null, locationId?: string | null) => {
+    if (locationId) {
+      const found = locationsList.find((l) => l.id === locationId);
+      if (found) return found;
+    }
+    if (!locNameOrId) return locationsList[0] || null;
+    const clean = locNameOrId.toLowerCase();
+    return (
+      locationsList.find(
+        (l) => clean.includes(l.name.toLowerCase()) || l.name.toLowerCase().includes(clean)
+      ) || null
+    );
+  };
 
   // Alert counters
   const inventoryAlertCounters = useMemo(() => {
@@ -411,15 +446,17 @@ export default function EventFlowApp({
       const isLow = available < item.minStock;
       const hasAlert = damaged > 0 || isLow;
 
-      // 1. Text search (Name, SKU, ID, Category, Location)
+      // 1. Text search (Name, SKU, ID, Category, Location, Manager)
       if (inventorySearch.trim()) {
         const query = inventorySearch.toLowerCase().trim();
+        const locDetails = getLocationDetails(item.warehouseLocation, item.locationId);
         const matches =
           item.name?.toLowerCase().includes(query) ||
           item.sku?.toLowerCase().includes(query) ||
           item.id?.toLowerCase().includes(query) ||
           item.category?.toLowerCase().includes(query) ||
-          item.warehouseLocation?.toLowerCase().includes(query);
+          item.warehouseLocation?.toLowerCase().includes(query) ||
+          locDetails?.managerName?.toLowerCase().includes(query);
         if (!matches) return false;
       }
 
@@ -431,7 +468,11 @@ export default function EventFlowApp({
       // 3. Location filter
       if (inventoryLocationFilter !== "all") {
         const loc = item.warehouseLocation || "Armazém Principal";
-        if (loc !== inventoryLocationFilter) return false;
+        const matchesLoc =
+          loc === inventoryLocationFilter ||
+          loc.toLowerCase().includes(inventoryLocationFilter.toLowerCase()) ||
+          item.locationId === inventoryLocationFilter;
+        if (!matchesLoc) return false;
       }
 
       // 4. Alert filter
@@ -442,7 +483,7 @@ export default function EventFlowApp({
 
       return true;
     });
-  }, [itemsList, inventorySearch, inventoryCategoryFilter, inventoryLocationFilter, inventoryAlertFilter]);
+  }, [itemsList, locationsList, inventorySearch, inventoryCategoryFilter, inventoryLocationFilter, inventoryAlertFilter]);
 
   // Financial aggregates
   const totalEntradas = movementsList
@@ -573,44 +614,60 @@ export default function EventFlowApp({
   return (
     <div className="min-h-screen bg-[#f5f5f7] text-[#111111] pb-[max(6.5rem,calc(5.5rem+env(safe-area-inset-bottom)))] font-sans antialiased">
       {/* Top Global Header Bar */}
-      <header className="sticky top-0 z-30 bg-[#f5f5f7]/85 backdrop-blur-md border-b border-[#ececf0]/80">
-        <div className="max-w-[940px] mx-auto px-3.5 sm:px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+      <header className="sticky top-0 z-30 bg-[#f5f5f7]/90 backdrop-blur-md border-b border-[#ececf0]/80">
+        <div className="max-w-[940px] mx-auto px-3 sm:px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <span className="font-extrabold text-[15px] tracking-tight text-[#111]">CFM Eventos</span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/5 text-[#636366] uppercase tracking-wider">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/5 text-[#636366] uppercase tracking-wider hidden xs:inline">
               EventFlow
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Global Notification Bell */}
             <button
               onClick={() => setShowAlertsDrawer(true)}
-              className="relative p-2 rounded-xl text-[#3a3a3c] hover:bg-black/5 transition cursor-pointer flex items-center justify-center"
+              className="relative min-w-[38px] min-h-[38px] p-2 rounded-xl text-[#3a3a3c] hover:bg-black/5 active:bg-black/10 transition cursor-pointer flex items-center justify-center touch-manipulation"
               title="Centro de Alertas & Notificações"
+              aria-label="Alertas e Notificações"
             >
               <Bell className="w-5 h-5" />
               {newAlertsCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-[#ff3b30] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs animate-in zoom-in-75">
+                <span className="absolute top-1 right-1 min-w-[17px] h-[17px] px-1 bg-[#ff3b30] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs animate-in zoom-in-75">
                   {newAlertsCount}
                 </span>
               )}
             </button>
 
             {user ? (
-              <div
-                onClick={() => setShowLoginModal(true)}
-                className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold cursor-pointer hover:bg-[#fafafc] transition shadow-2xs"
-              >
-                <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold">
-                  {user.name.charAt(0)}
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div
+                  className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold shadow-2xs"
+                  title={`${user.name} (${user.email}) · Acesso ${user.role}`}
+                >
+                  <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold">
+                    {user.name.charAt(0)}
+                  </div>
+                  <span className="text-[#111] hidden sm:inline">{user.name.split(" ")[0]}</span>
                 </div>
-                <span className="text-[#111] hidden sm:inline">{user.name.split(" ")[0]}</span>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await logoutAction();
+                    setUser(null);
+                  }}
+                  className="min-h-[36px] px-2.5 py-1 rounded-xl bg-white border border-[#ececf0] hover:border-rose-200 active:bg-rose-100 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer flex items-center gap-1.5 shadow-2xs touch-manipulation"
+                  title="Terminar sessão"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Sair</span>
+                </button>
               </div>
             ) : (
               <button
                 onClick={() => setShowLoginModal(true)}
-                className="px-3 py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold text-[#111] hover:bg-[#fafafc] transition cursor-pointer shadow-2xs"
+                className="min-h-[36px] px-3 py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold text-[#111] hover:bg-[#fafafc] active:bg-[#f2f2f5] transition cursor-pointer shadow-2xs touch-manipulation"
               >
                 Entrar
               </button>
@@ -690,10 +747,10 @@ export default function EventFlowApp({
 
                 <div className="flex items-center gap-2.5">
                   <button
-                    onClick={() => setShowLedgerModal(true)}
+                    onClick={(e) => handleTabSwitch("finance", "/financas", e)}
                     className="text-[13px] font-semibold text-[#007aff] hover:underline cursor-pointer"
                   >
-                    Ver detalhe →
+                    Ver detalhe financeiro →
                   </button>
                   <button
                     onClick={() => setShowMovementModal(true)}
@@ -1221,10 +1278,10 @@ export default function EventFlowApp({
                 </div>
 
                 {/* Filter Pills */}
-                <div className="flex items-center gap-1.5 mb-2.5 px-0.5">
+                <div className="flex items-center gap-1.5 mb-2.5 px-0.5 overflow-x-auto no-scrollbar py-0.5 max-w-full">
                   <button
                     onClick={() => setHomeAlertFilter("all")}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
+                    className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer touch-manipulation ${
                       homeAlertFilter === "all"
                         ? "bg-[#111] text-white"
                         : "bg-white text-[#636366] hover:bg-[#ececf0] border border-[#ececf0]"
@@ -1234,7 +1291,7 @@ export default function EventFlowApp({
                   </button>
                   <button
                     onClick={() => setHomeAlertFilter("new")}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer flex items-center gap-1 ${
+                    className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer flex items-center gap-1 touch-manipulation ${
                       homeAlertFilter === "new"
                         ? "bg-[#007aff] text-white"
                         : "bg-white text-[#636366] hover:bg-[#ececf0] border border-[#ececf0]"
@@ -1255,7 +1312,7 @@ export default function EventFlowApp({
                   </button>
                   <button
                     onClick={() => setHomeAlertFilter("snoozed")}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
+                    className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer touch-manipulation ${
                       homeAlertFilter === "snoozed"
                         ? "bg-[#111] text-white"
                         : "bg-white text-[#636366] hover:bg-[#ececf0] border border-[#ececf0]"
@@ -1359,42 +1416,43 @@ export default function EventFlowApp({
                                       isSnoozeOpen ? null : alert.id
                                     );
                                   }}
-                                  className="p-1 rounded-md hover:bg-black/5 text-inherit opacity-75 hover:opacity-100 transition cursor-pointer"
+                                  className="w-8 h-8 rounded-lg hover:bg-black/5 active:bg-black/10 text-inherit opacity-75 hover:opacity-100 transition cursor-pointer flex items-center justify-center touch-manipulation"
                                   title="Adiar..."
+                                  aria-label="Adiar alerta"
                                 >
                                   <Clock className="w-3.5 h-3.5" />
                                 </button>
 
                                 {isSnoozeOpen && (
-                                  <div className="absolute right-0 top-6 w-44 bg-white border border-[#ececf0] rounded-xl shadow-lg p-1.5 z-30 text-[#111] animate-in fade-in zoom-in-95 duration-150">
+                                  <div className="absolute right-0 top-full mt-1.5 w-48 bg-white border border-[#ececf0] rounded-2xl shadow-xl p-1.5 z-30 text-[#111] animate-in fade-in zoom-in-95 duration-150">
                                     <div className="text-[9px] font-bold text-[#8e8e93] uppercase px-2 py-1">
                                       Adiar alerta
                                     </div>
                                     <button
                                       type="button"
                                       onClick={() => handleSnoozeAlert(alert.id, 4)}
-                                      className="w-full text-left px-2 py-1.5 text-xs hover:bg-[#f2f2f5] rounded-md transition"
+                                      className="w-full text-left px-2.5 py-2 text-xs sm:text-sm hover:bg-[#f2f2f5] active:bg-[#e5e5ea] rounded-xl transition cursor-pointer"
                                     >
                                       🕒 4 horas
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => handleSnoozeAlert(alert.id, 24)}
-                                      className="w-full text-left px-2 py-1.5 text-xs hover:bg-[#f2f2f5] rounded-md transition"
+                                      className="w-full text-left px-2.5 py-2 text-xs sm:text-sm hover:bg-[#f2f2f5] active:bg-[#e5e5ea] rounded-xl transition cursor-pointer"
                                     >
                                       🕒 1 dia
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => handleSnoozeAlert(alert.id, 72)}
-                                      className="w-full text-left px-2 py-1.5 text-xs hover:bg-[#f2f2f5] rounded-md transition"
+                                      className="w-full text-left px-2.5 py-2 text-xs sm:text-sm hover:bg-[#f2f2f5] active:bg-[#e5e5ea] rounded-xl transition cursor-pointer"
                                     >
                                       🕒 3 dias
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => handleSnoozeAlert(alert.id, 168)}
-                                      className="w-full text-left px-2 py-1.5 text-xs hover:bg-[#f2f2f5] rounded-md transition"
+                                      className="w-full text-left px-2.5 py-2 text-xs sm:text-sm hover:bg-[#f2f2f5] active:bg-[#e5e5ea] rounded-xl transition cursor-pointer"
                                     >
                                       🕒 1 semana
                                     </button>
@@ -1402,7 +1460,7 @@ export default function EventFlowApp({
                                     <button
                                       type="button"
                                       onClick={() => handleDismissAlert(alert.id)}
-                                      className="w-full text-left px-2 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-md transition"
+                                      className="w-full text-left px-2.5 py-2 text-xs sm:text-sm text-rose-600 hover:bg-rose-50 active:bg-rose-100 rounded-xl transition cursor-pointer font-medium"
                                     >
                                       Dispensar
                                     </button>
@@ -1412,11 +1470,11 @@ export default function EventFlowApp({
                             </div>
                           </div>
 
-                          <div className="mt-2.5 pt-2 border-t border-black/5 flex items-center justify-between">
+                          <div className="mt-2.5 pt-2 border-t border-black/5 flex items-center justify-between gap-2 flex-wrap">
                             <button
                               type="button"
                               onClick={() => handleAlertActionClick(alert)}
-                              className="text-[11px] font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                              className="min-h-[34px] px-2 py-1 text-[11px] sm:text-xs font-bold hover:underline active:opacity-70 flex items-center gap-1 cursor-pointer touch-manipulation"
                             >
                               <span>Resolver agora</span>
                               <ChevronRight className="w-3 h-3" />
@@ -1425,7 +1483,7 @@ export default function EventFlowApp({
                               <button
                                 type="button"
                                 onClick={() => handleAcknowledgeAlert(alert.id)}
-                                className="text-[10px] opacity-75 hover:opacity-100 hover:underline cursor-pointer"
+                                className="min-h-[34px] px-2 py-1 text-[10px] sm:text-[11px] opacity-75 hover:opacity-100 active:opacity-50 hover:underline cursor-pointer touch-manipulation"
                               >
                                 Marcar lido
                               </button>
@@ -1865,13 +1923,45 @@ export default function EventFlowApp({
                 </p>
               </div>
 
-              <button
-                onClick={() => setShowItemWizard(true)}
-                className="px-4 py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition self-start sm:self-auto cursor-pointer shadow-2xs"
-              >
-                <span>＋</span>
-                <span>Novo artigo</span>
-              </button>
+              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocationsModalInitialMode("create");
+                    setShowLocationsModal(true);
+                  }}
+                  className="px-3.5 py-2.5 rounded-[12px] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[#111] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  title="Especificar um novo local para armazenar inventário e quem é a pessoa que o gere"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-[#007aff]" />
+                  <span>+ Novo Local</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocationsModalInitialMode("list");
+                    setShowLocationsModal(true);
+                  }}
+                  className="px-3.5 py-2.5 rounded-[12px] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[#111] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  title="Gerir locais de armazenamento e responsáveis de armazém"
+                >
+                  <Building className="w-3.5 h-3.5 text-[#636366]" />
+                  <span>Locais & Gestores</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-[#f2f2f5] text-[#3a3a3c] font-bold border border-[#ececf0]">
+                    {locationsList.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowItemWizard(true)}
+                  className="px-4 py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                >
+                  <span>＋</span>
+                  <span>Novo artigo</span>
+                </button>
+              </div>
             </div>
 
             {/* Filter Toolbar */}
@@ -1932,17 +2022,29 @@ export default function EventFlowApp({
                     onChange={(e) => setInventoryLocationFilter(e.target.value)}
                     className="w-full pl-8 pr-7 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff] transition appearance-none cursor-pointer"
                   >
-                    <option value="all">Todos os Locais</option>
-                    {inventoryLocations.map((loc) => {
+                    <option value="all">Todos os Locais ({itemsList.length})</option>
+                    {locationsList.map((loc) => {
                       const count = itemsList.filter(
-                        (i) => (i.warehouseLocation || "Armazém Principal") === loc
+                        (i) => i.locationId === loc.id || (i.warehouseLocation || "Armazém Principal").includes(loc.name)
                       ).length;
                       return (
-                        <option key={loc} value={loc}>
-                          {loc} ({count})
+                        <option key={loc.id} value={loc.name}>
+                          {loc.name} · {loc.managerName} ({count})
                         </option>
                       );
                     })}
+                    {inventoryLocations
+                      .filter((loc) => !locationsList.some((l) => l.name === loc))
+                      .map((loc) => {
+                        const count = itemsList.filter(
+                          (i) => (i.warehouseLocation || "Armazém Principal") === loc
+                        ).length;
+                        return (
+                          <option key={loc} value={loc}>
+                            {loc} ({count})
+                          </option>
+                        );
+                      })}
                   </select>
                   <ChevronRight className="w-3.5 h-3.5 text-[#8e8e93] absolute right-2.5 top-1/2 -translate-y-1/2 rotate-90 pointer-events-none" />
                 </div>
@@ -2171,15 +2273,30 @@ export default function EventFlowApp({
                         </span>
                       </div>
 
-                      {/* Column 3: Warehouse Location */}
+                      {/* Column 3: Warehouse Location & Manager */}
                       <div className="lg:col-span-2 flex lg:block items-center justify-between text-xs">
                         <span className="lg:hidden text-[#8e8e93] font-medium">Localização:</span>
-                        <div className="inline-flex items-center gap-1 text-xs text-[#3a3a3c]">
-                          <MapPin className="w-3.5 h-3.5 text-[#8e8e93] shrink-0" />
-                          <span className="truncate max-w-[150px]">
-                            {item.warehouseLocation || "Armazém Principal"}
-                          </span>
-                        </div>
+                        {(() => {
+                          const locDetails = getLocationDetails(item.warehouseLocation, item.locationId);
+                          return (
+                            <div className="space-y-0.5">
+                              <div className="inline-flex items-center gap-1 text-xs text-[#3a3a3c]">
+                                <MapPin className="w-3.5 h-3.5 text-[#007aff] shrink-0" />
+                                <span className="truncate max-w-[150px] font-medium">
+                                  {item.warehouseLocation || "Armazém Principal"}
+                                </span>
+                              </div>
+                              {locDetails?.managerName && (
+                                <div className="flex items-center gap-1 text-[11px] text-[#636366]">
+                                  <User className="w-3 h-3 text-[#8e8e93] shrink-0" />
+                                  <span className="truncate max-w-[150px]">
+                                    Gestor: <strong className="font-semibold text-[#111]">{locDetails.managerName}</strong>
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Column 4: Stock & Alert Badges */}
@@ -2274,7 +2391,37 @@ export default function EventFlowApp({
         )}
 
         {/* ========================================================= */}
-        {/* TAB 5: MORE (CRM, Quotes, Finance & Team) */}
+        {/* TAB 5: FINANCE & PROFITABILITY (Finanças & Lucros MoM) */}
+        {/* ========================================================= */}
+        {activeTab === "finance" && (
+          <FinanceView
+            events={eventsList}
+            items={itemsList}
+            movements={movementsList}
+            allocations={allocationsList}
+            clients={clientsList}
+            quotes={quotesList}
+            onAddMovement={async (formData) => {
+              const res = await createMovementAction(formData);
+              if (res && res.success && res.movement) {
+                setMovementsList((prev) => [res.movement, ...prev]);
+              }
+              return res;
+            }}
+            onDeleteMovement={async (id) => {
+              const res = await deleteMovementAction(id);
+              if (res && res.success) {
+                setMovementsList((prev) => prev.filter((m) => m.id !== id));
+              }
+              return res;
+            }}
+            onOpenItemWizard={() => setShowItemWizard(true)}
+            onOpenMovementModal={() => setShowMovementModal(true)}
+          />
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 6: MORE (CRM, Quotes, Finance & Team) */}
         {/* ========================================================= */}
         {activeTab === "more" && (
           <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs space-y-6">
@@ -2285,6 +2432,29 @@ export default function EventFlowApp({
               <p className="text-xs text-[#8e8e93]">
                 Equipa de acesso administrativo, CRM de clientes e propostas comerciais
               </p>
+            </div>
+
+            {/* Quick Access to Finance */}
+            <div
+              onClick={(e) => handleTabSwitch("finance", "/financas", e)}
+              className="p-4 rounded-[16px] bg-[#f8f8fa] hover:bg-[#f2f2f5] border border-[#ececf0] flex items-center justify-between cursor-pointer transition"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#eaf8ee] text-[#217a3b] flex items-center justify-center font-bold">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-[#111111]">
+                    Painel Financeiro & Despesas Mensais
+                  </div>
+                  <div className="text-xs text-[#8e8e93]">
+                    Lucro mês a mês, volume de eventos, controlo de despesas e inventário mais requisitado
+                  </div>
+                </div>
+              </div>
+              <span className="text-[#007aff] font-semibold text-xs flex items-center gap-1">
+                Abrir Painel →
+              </span>
             </div>
 
             {/* Session Card */}
@@ -2300,34 +2470,15 @@ export default function EventFlowApp({
                   <div className="text-xs text-[#8e8e93]">
                     {user
                       ? `${user.email} · Acesso ${user.role}`
-                      : "Inicia sessão com credenciais de administrador"}
+                      : "Inicia sessão no topo da página"}
                   </div>
                 </div>
               </div>
 
               <div>
-                {user ? (
-                  <form
-                    action={async () => {
-                      await logoutAction();
-                      setUser(null);
-                    }}
-                  >
-                    <button
-                      type="submit"
-                      className="px-3.5 py-1.5 rounded-[10px] bg-white border border-[#ececf0] text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                    >
-                      Terminar sessão
-                    </button>
-                  </form>
-                ) : (
-                  <button
-                    onClick={() => setShowLoginModal(true)}
-                    className="px-4 py-2 rounded-[10px] bg-[#111111] text-white text-xs font-semibold hover:bg-black transition cursor-pointer"
-                  >
-                    Iniciar sessão
-                  </button>
-                )}
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                  {user ? "Sessão Ativa" : "Visitante"}
+                </span>
               </div>
             </div>
 
@@ -2706,7 +2857,24 @@ export default function EventFlowApp({
             </svg>
           </Link>
 
-          {/* 5. Mais */}
+          {/* 5. Finanças */}
+          <Link
+            href="/financas"
+            onClick={(e) => handleTabSwitch("finance", "/financas", e)}
+            className="w-[48px] h-[48px] sm:w-[44px] sm:h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
+            style={{
+              backgroundColor:
+                activeTab === "finance"
+                  ? "rgba(0,122,255,0.11)"
+                  : "transparent",
+              color: activeTab === "finance" ? "#007aff" : "#8e8e93",
+            }}
+            title="Finanças"
+          >
+            <TrendingUp className="w-5 h-5" />
+          </Link>
+
+          {/* 6. Mais */}
           <Link
             href="/mais"
             onClick={(e) => handleTabSwitch("more", "/mais", e)}
@@ -2833,10 +3001,32 @@ export default function EventFlowApp({
       {showItemWizard && (
         <ItemWizardModal
           onClose={() => setShowItemWizard(false)}
-          onCreated={(newItem) => {
+          locations={locationsList}
+          users={teamUsers}
+          onCreated={(newItem, newLocation, createdMovement) => {
             setItemsList((prev) => [...prev, newItem]);
+            if (newLocation) {
+              setLocationsList((prev) => [...prev, newLocation]);
+            }
+            if (createdMovement) {
+              setMovementsList((prev) => [createdMovement, ...prev]);
+            }
             setShowItemWizard(false);
           }}
+        />
+      )}
+
+      {/* STORAGE LOCATIONS & MANAGERS MODAL */}
+      {showLocationsModal && (
+        <StorageLocationsModal
+          isOpen={showLocationsModal}
+          onClose={() => setShowLocationsModal(false)}
+          locations={locationsList}
+          items={itemsList}
+          users={teamUsers}
+          initialMode={locationsModalInitialMode}
+          onLocationsChange={(newLocs) => setLocationsList(newLocs)}
+          onSelectLocationForFilter={(locName) => setInventoryLocationFilter(locName)}
         />
       )}
 
@@ -3256,9 +3446,13 @@ function TriageModal({
 function ItemWizardModal({
   onClose,
   onCreated,
+  locations = [],
+  users = [],
 }: {
   onClose: () => void;
-  onCreated: (item: any) => void;
+  onCreated: (item: any, newLocation?: any, movement?: any) => void;
+  locations?: any[];
+  users?: any[];
 }) {
   const [sku, setSku] = useState("");
   const [customId, setCustomId] = useState("");
@@ -3267,9 +3461,58 @@ function ItemWizardModal({
   const [totalQuantity, setTotalQuantity] = useState("50");
   const [minStock, setMinStock] = useState("10");
   const [unitPrice, setUnitPrice] = useState("6.00");
-  const [warehouseLocation, setWarehouseLocation] = useState("Armazém Principal");
+  const [purchasePrice, setPurchasePrice] = useState("45.00");
+  const [totalPurchasePrice, setTotalPurchasePrice] = useState("2250.00");
+
+  // Location State
+  const defaultLoc = locations[0];
+  const [selectedLocationId, setSelectedLocationId] = useState<string>(
+    defaultLoc?.id || "custom"
+  );
+  const [subLocationDetails, setSubLocationDetails] = useState("");
+  const [isSpecifyingNewLoc, setIsSpecifyingNewLoc] = useState(
+    locations.length === 0
+  );
+
+  // New Location Fields
+  const [newLocName, setNewLocName] = useState("");
+  const [newLocCode, setNewLocCode] = useState("");
+  const [newLocManagerUserId, setNewLocManagerUserId] = useState(
+    users[0]?.id || "custom"
+  );
+  const [newLocManagerName, setNewLocManagerName] = useState(
+    users[0]?.name || "Administrador CFM"
+  );
+  const [newLocManagerContact, setNewLocManagerContact] = useState(
+    users[0]?.email || ""
+  );
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleManagerUserChange = (uId: string) => {
+    setNewLocManagerUserId(uId);
+    if (uId && uId !== "custom") {
+      const u = users.find((usr) => usr.id === uId);
+      if (u) {
+        setNewLocManagerName(u.name);
+        setNewLocManagerContact(u.email);
+      }
+    } else if (uId === "custom") {
+      setNewLocManagerName("");
+      setNewLocManagerContact("");
+    }
+  };
+
+  const handleLocationDropdownChange = (val: string) => {
+    if (val === "new") {
+      setIsSpecifyingNewLoc(true);
+      setSelectedLocationId("");
+    } else {
+      setIsSpecifyingNewLoc(false);
+      setSelectedLocationId(val);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3285,11 +3528,65 @@ function ItemWizardModal({
       formData.set("totalQuantity", totalQuantity);
       formData.set("minStock", minStock);
       formData.set("unitPrice", unitPrice);
-      formData.set("warehouseLocation", warehouseLocation);
+      formData.set("purchasePrice", purchasePrice);
+      formData.set("totalPurchasePrice", totalPurchasePrice);
+      formData.set("replacementCost", purchasePrice);
+
+      let chosenWarehouseLocation = "Armazém Principal";
+      let chosenLocationId: string | null = null;
+
+      if (isSpecifyingNewLoc) {
+        if (!newLocName.trim()) {
+          setError("Indique o nome do novo local de armazenamento.");
+          setIsSubmitting(false);
+          return;
+        }
+        if (!newLocManagerName.trim()) {
+          setError("Indique a pessoa responsável pelo novo local.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        formData.set("newLocationName", newLocName.trim());
+        formData.set("newLocationManagerName", newLocManagerName.trim());
+        formData.set("newLocationManagerContact", newLocManagerContact.trim());
+        formData.set(
+          "newLocationManagerUserId",
+          newLocManagerUserId === "custom" ? "" : newLocManagerUserId
+        );
+
+        chosenWarehouseLocation = subLocationDetails.trim()
+          ? `${newLocName.trim()} · ${subLocationDetails.trim()}`
+          : newLocName.trim();
+        formData.set("warehouseLocation", chosenWarehouseLocation);
+      } else {
+        const matched = locations.find((l) => l.id === selectedLocationId);
+        chosenLocationId = matched ? matched.id : null;
+        const baseName = matched ? matched.name : "Armazém Principal";
+        chosenWarehouseLocation = subLocationDetails.trim()
+          ? `${baseName} · ${subLocationDetails.trim()}`
+          : baseName;
+
+        if (chosenLocationId) {
+          formData.set("locationId", chosenLocationId);
+        }
+        formData.set("warehouseLocation", chosenWarehouseLocation);
+      }
 
       const res = await createItemAction(formData);
       if (res.success && res.item) {
-        onCreated(res.item);
+        let newLocationObj = null;
+        if (isSpecifyingNewLoc) {
+          newLocationObj = {
+            id: res.item.locationId,
+            name: newLocName.trim(),
+            code: newLocCode.trim() || newLocName.trim().slice(0, 8).toUpperCase(),
+            managerUserId: newLocManagerUserId === "custom" ? null : newLocManagerUserId,
+            managerName: newLocManagerName.trim(),
+            managerContact: newLocManagerContact.trim() || null,
+          };
+        }
+        onCreated(res.item, newLocationObj, res.movement);
       } else {
         setError(res.error || "Erro ao criar artigo.");
       }
@@ -3300,16 +3597,18 @@ function ItemWizardModal({
     }
   };
 
+  const selectedLocObj = locations.find((l) => l.id === selectedLocationId);
+
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-[22px] w-full max-w-md border border-[#ececf0] shadow-xl overflow-y-auto max-h-[calc(100dvh-2rem)] p-5 sm:p-6 text-xs">
+      <div className="bg-white rounded-[22px] w-full max-w-lg border border-[#ececf0] shadow-xl overflow-y-auto max-h-[calc(100dvh-2rem)] p-5 sm:p-6 text-xs">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-[17px] font-bold text-[#111111]">
               Novo Artigo de Stock
             </h2>
             <p className="text-[11px] text-[#8e8e93] mt-0.5">
-              Adicionar material ao inventário permanente
+              Adicionar material ao inventário com local e gestor atribuído
             </p>
           </div>
           <button
@@ -3388,7 +3687,13 @@ function ItemWizardModal({
                 min="1"
                 required
                 value={totalQuantity}
-                onChange={(e) => setTotalQuantity(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setTotalQuantity(val);
+                  const q = parseFloat(val) || 0;
+                  const u = parseFloat(purchasePrice) || 0;
+                  setTotalPurchasePrice((q * u).toFixed(2));
+                }}
                 className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
               />
             </div>
@@ -3414,15 +3719,184 @@ function ItemWizardModal({
             </div>
           </div>
 
-          <div>
-            <label className="block font-bold text-[#3a3a3c] mb-1">Localização em Armazém</label>
-            <input
-              type="text"
-              value={warehouseLocation}
-              onChange={(e) => setWarehouseLocation(e.target.value)}
-              placeholder="Ex: Corredor A, Prateleira 2"
-              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-            />
+          {/* Automatic Expense on Item Purchase */}
+          <div className="p-3.5 rounded-[16px] bg-[#fffbf0] border border-[#f5dfa8] space-y-2.5">
+            <div className="flex items-center gap-2 font-bold text-xs text-[#8c6417]">
+              <AlertCircle className="w-4 h-4 text-[#8c6417] shrink-0" />
+              <span>Valor de Compra / Aquisição & Lançamento de Despesa</span>
+            </div>
+            <p className="text-[11px] text-[#5c430e]">
+              ⚠️ <strong>Atenção:</strong> Ao adicionar este artigo, será gerada automaticamente uma despesa financeira correspondente ao valor de compra no módulo de Finanças.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-bold text-[#3a3a3c] mb-1">
+                  Custo Unit. Compra (€)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={purchasePrice}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setPurchasePrice(val);
+                    const q = parseFloat(totalQuantity) || 0;
+                    const u = parseFloat(val) || 0;
+                    setTotalPurchasePrice((q * u).toFixed(2));
+                  }}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-[#3a3a3c] mb-1">
+                  Despesa Total Gerada (€)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={totalPurchasePrice}
+                  onChange={(e) => setTotalPurchasePrice(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* STORAGE LOCATION SPECIFICATION */}
+          <div className="pt-2 border-t border-[#ececf0] space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block font-bold text-[#3a3a3c] flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-[#007aff]" />
+                <span>Local de Armazenamento do Artigo</span>
+              </label>
+
+              <button
+                type="button"
+                onClick={() => setIsSpecifyingNewLoc(!isSpecifyingNewLoc)}
+                className="text-[11px] font-semibold text-[#007aff] hover:underline"
+              >
+                {isSpecifyingNewLoc ? "← Escolher local existente" : "+ Novo local"}
+              </button>
+            </div>
+
+            {!isSpecifyingNewLoc ? (
+              <div className="space-y-2">
+                <select
+                  value={selectedLocationId}
+                  onChange={(e) => handleLocationDropdownChange(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                >
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name} — Gestor: {loc.managerName}
+                    </option>
+                  ))}
+                  <option value="new">+ Especificar um novo local de armazenamento...</option>
+                </select>
+
+                {selectedLocObj && (
+                  <div className="p-2.5 rounded-[12px] bg-[#fafafc] border border-[#ececf0] flex items-center justify-between text-[11px] text-[#636366]">
+                    <div className="flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-[#007aff]" />
+                      <span>
+                        Gestor do Local: <strong className="text-[#111]">{selectedLocObj.managerName}</strong>
+                      </span>
+                    </div>
+                    {selectedLocObj.managerContact && (
+                      <span className="font-mono text-[10px] text-[#8e8e93]">
+                        {selectedLocObj.managerContact}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-[16px] bg-[#f0f7ff]/50 border border-[#007aff]/30 space-y-3">
+                <div className="text-[11px] font-bold text-[#0066cc]">
+                  Especificar Novo Local & Pessoa Responsável:
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#3a3a3c] mb-1">
+                      Nome do Local *
+                    </label>
+                    <input
+                      type="text"
+                      required={isSpecifyingNewLoc}
+                      value={newLocName}
+                      onChange={(e) => setNewLocName(e.target.value)}
+                      placeholder="Ex: Armazém C, Pavilhão Sintra"
+                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-[#ececf0] rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#3a3a3c] mb-1">
+                      Atribuir da Equipa CFM
+                    </label>
+                    <select
+                      value={newLocManagerUserId}
+                      onChange={(e) => handleManagerUserChange(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-[#ececf0] rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                    >
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.role})
+                        </option>
+                      ))}
+                      <option value="custom">Outro Gestor Externo</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#3a3a3c] mb-1">
+                      Nome da Pessoa que Gere o Local *
+                    </label>
+                    <input
+                      type="text"
+                      required={isSpecifyingNewLoc}
+                      value={newLocManagerName}
+                      onChange={(e) => setNewLocManagerName(e.target.value)}
+                      placeholder="Nome completo do gestor"
+                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-[#ececf0] rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#3a3a3c] mb-1">
+                      Contacto do Gestor (Email/Tel)
+                    </label>
+                    <input
+                      type="text"
+                      value={newLocManagerContact}
+                      onChange={(e) => setNewLocManagerContact(e.target.value)}
+                      placeholder="gestor@cfmeventos.pt"
+                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-[#ececf0] rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-[11px] font-medium text-[#8e8e93] mb-1">
+                Detalhe / Prateleira / Fila (Opcional)
+              </label>
+              <input
+                type="text"
+                value={subLocationDetails}
+                onChange={(e) => setSubLocationDetails(e.target.value)}
+                placeholder="Ex: Corredor A, Prateleira 2, Palete 4"
+                className="w-full px-3 py-1.5 text-xs bg-white border border-[#ececf0] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+              />
+            </div>
           </div>
 
           <button

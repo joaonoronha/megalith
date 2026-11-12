@@ -270,7 +270,139 @@ export async function seed() {
     createdAt: now,
   };
 
-  await db.insert(events).values([eventPooh, eventGala, eventWedding, eventLoreal]).onConflictDoUpdate({
+  // Additional Multi-Month Events (August, September, November 2026) for MoM analytics
+  const eventSunsetAug = {
+    id: "evt-sunset-aug",
+    name: "Sunset Corporate Lounge · NOS",
+    clientId: clientMastercard.id,
+    venue: "SUD Lisboa Terrazza",
+    startDate: new Date("2026-08-14T17:00:00Z"),
+    endDate: new Date("2026-08-14T23:00:00Z"),
+    status: "concluido" as const,
+    totalBudget: 2800.00,
+    customerPrice: 5200.00,
+    category: "Corporativo",
+    theme: "Sunset Warm Glow",
+    vibeColors: JSON.stringify(["#E65100", "#FFB74D", "#212121"]),
+    notes: "Evento corporate com bar exterior e iluminação de velas.",
+    createdAt: new Date("2026-08-01"),
+  };
+
+  const eventWeddingAug = {
+    id: "evt-wedding-aug",
+    name: "Casamento Inês & Pedro",
+    clientId: clientMarta.id,
+    venue: "Quinta do Casal Novo",
+    startDate: new Date("2026-08-22T13:00:00Z"),
+    endDate: new Date("2026-08-23T03:00:00Z"),
+    status: "concluido" as const,
+    totalBudget: 5100.00,
+    customerPrice: 9400.00,
+    category: "Casamento",
+    theme: "Olive Green & Gold",
+    vibeColors: JSON.stringify(["#556B2F", "#D4AF37", "#FFFFFF"]),
+    notes: "Banquete para 90 pessoas.",
+    createdAt: new Date("2026-08-05"),
+  };
+
+  const eventTechSep = {
+    id: "evt-tech-sep",
+    name: "Tech Summit Lisboa · VIP Lounge",
+    clientId: clientMastercard.id,
+    venue: "Altice Arena, Lisboa",
+    startDate: new Date("2026-09-11T09:00:00Z"),
+    endDate: new Date("2026-09-11T19:00:00Z"),
+    status: "concluido" as const,
+    totalBudget: 3500.00,
+    customerPrice: 6800.00,
+    category: "Corporativo",
+    theme: "Modern Tech Slate",
+    vibeColors: JSON.stringify(["#007AFF", "#1C1C1E", "#E5E5EA"]),
+    notes: "Mobiliário e zona lounge para networking executivo.",
+    createdAt: new Date("2026-09-01"),
+  };
+
+  const eventBatizadoSep = {
+    id: "evt-batizado-sep",
+    name: "Batizado Santiago",
+    clientId: clientMarta.id,
+    venue: "Palácio da Cruz Quebrada",
+    startDate: new Date("2026-09-19T12:00:00Z"),
+    endDate: new Date("2026-09-19T18:00:00Z"),
+    status: "concluido" as const,
+    totalBudget: 1700.00,
+    customerPrice: 3400.00,
+    category: "Batizado",
+    theme: "Pure White & Linen",
+    vibeColors: JSON.stringify(["#FFFFFF", "#EEDC82", "#A0C4DF"]),
+    notes: "Almoço familiar e mesa de doces.",
+    createdAt: new Date("2026-09-05"),
+  };
+
+  const eventColecaoSep = {
+    id: "evt-colecao-sep",
+    name: "Apresentação Coleção Outono",
+    clientId: clientLoreal.id,
+    venue: "Lx Factory, Lisboa",
+    startDate: new Date("2026-09-27T16:00:00Z"),
+    endDate: new Date("2026-09-27T22:00:00Z"),
+    status: "concluido" as const,
+    totalBudget: 2300.00,
+    customerPrice: 4600.00,
+    category: "Jantar de Marca",
+    theme: "Autumn Glow",
+    vibeColors: JSON.stringify(["#C0392B", "#D35400", "#F39C12"]),
+    notes: "Lançamento sazonal para influenciadores.",
+    createdAt: new Date("2026-09-12"),
+  };
+
+  const eventNovGala = {
+    id: "evt-nov-gala",
+    name: "Gala Inovação & Sustentabilidade 2026",
+    clientId: clientMastercard.id,
+    venue: "Pátio da Galé, Lisboa",
+    startDate: new Date("2026-11-07T18:30:00Z"),
+    endDate: new Date("2026-11-07T23:59:00Z"),
+    status: "concluido" as const,
+    totalBudget: 3900.00,
+    customerPrice: 7800.00,
+    category: "Gala Corporativa",
+    theme: "Green & Silver Prestige",
+    vibeColors: JSON.stringify(["#2E7D32", "#CFD8DC", "#1A237E"]),
+    notes: "Cerimónia formal com jantar volante para 150 participantes.",
+    createdAt: new Date("2026-10-25"),
+  };
+
+  const eventNovAniversario = {
+    id: "evt-nov-aniv",
+    name: "Aniversário 40 Anos Privado",
+    clientId: clientMarta.id,
+    venue: "Villa Tamariz, Cascais",
+    startDate: new Date("2026-11-21T19:00:00Z"),
+    endDate: new Date("2026-11-22T02:00:00Z"),
+    status: "confirmado" as const,
+    totalBudget: 2100.00,
+    customerPrice: 4200.00,
+    category: "Aniversário",
+    theme: "Midnight Chic",
+    vibeColors: JSON.stringify(["#0B0C10", "#1F2833", "#C5C6C7", "#66FCF1"]),
+    notes: "Festa privada com pista de dança e lounge.",
+    createdAt: new Date("2026-11-02"),
+  };
+
+  await db.insert(events).values([
+    eventPooh,
+    eventGala,
+    eventWedding,
+    eventLoreal,
+    eventSunsetAug,
+    eventWeddingAug,
+    eventTechSep,
+    eventBatizadoSep,
+    eventColecaoSep,
+    eventNovGala,
+    eventNovAniversario,
+  ]).onConflictDoUpdate({
     target: events.id,
     set: {
       category: sql`excluded.category`,
@@ -281,15 +413,49 @@ export async function seed() {
     },
   });
 
-  // 6. Allocations (Mastercard Gala & Winnie the Pooh)
+  // 6. Allocations (Mastercard Gala, Pooh, Wedding, Loreal & Multi-Month events)
   await db.insert(eventAllocations).values([
+    // Gala
     { id: "alc-1", eventId: eventGala.id, itemId: chairItem.id, quantity: 18, status: "reservado" },
     { id: "alc-2", eventId: eventGala.id, itemId: candleItem.id, quantity: 72, status: "reservado" },
     { id: "alc-3", eventId: eventGala.id, itemId: tableItem.id, quantity: 8, status: "reservado" },
+    // Pooh
     { id: "alc-p1", eventId: eventPooh.id, itemId: chairItem.id, quantity: 30, status: "reservado", notes: "Cadeiras Chiavari para zona infantil" },
     { id: "alc-p2", eventId: eventPooh.id, itemId: tableItem.id, quantity: 4, status: "reservado", notes: "Mesas para banquete e mesa do bolo" },
     { id: "alc-p3", eventId: eventPooh.id, itemId: candleItem.id, quantity: 12, status: "reservado", notes: "Velas LED seguras para o fim de tarde" },
     { id: "alc-p4", eventId: eventPooh.id, itemId: glassItem.id, quantity: 40, status: "reservado", notes: "Copos para bar de sumos naturais" },
+    // Casamento Marta & João
+    { id: "alc-w1", eventId: eventWedding.id, itemId: chairItem.id, quantity: 120, status: "reservado", notes: "Cadeiras para cerimónia e banquete" },
+    { id: "alc-w2", eventId: eventWedding.id, itemId: tableItem.id, quantity: 12, status: "reservado", notes: "Mesas redondas para sala principal" },
+    { id: "alc-w3", eventId: eventWedding.id, itemId: candleItem.id, quantity: 60, status: "reservado", notes: "Centros de mesa iluminados" },
+    { id: "alc-w4", eventId: eventWedding.id, itemId: glassItem.id, quantity: 110, status: "reservado", notes: "Copos de boas-vindas e brinde" },
+    // L'Oréal Dinner
+    { id: "alc-l1", eventId: eventLoreal.id, itemId: chairItem.id, quantity: 24, status: "reservado" },
+    { id: "alc-l2", eventId: eventLoreal.id, itemId: tableItem.id, quantity: 3, status: "reservado" },
+    { id: "alc-l3", eventId: eventLoreal.id, itemId: candleItem.id, quantity: 35, status: "reservado" },
+    { id: "alc-l4", eventId: eventLoreal.id, itemId: glassItem.id, quantity: 50, status: "reservado" },
+    // August Events
+    { id: "alc-aug1", eventId: eventSunsetAug.id, itemId: chairItem.id, quantity: 40, status: "devolvido" },
+    { id: "alc-aug2", eventId: eventSunsetAug.id, itemId: candleItem.id, quantity: 45, status: "devolvido" },
+    { id: "alc-aug3", eventId: eventSunsetAug.id, itemId: glassItem.id, quantity: 80, status: "devolvido" },
+    { id: "alc-aug4", eventId: eventWeddingAug.id, itemId: chairItem.id, quantity: 90, status: "devolvido" },
+    { id: "alc-aug5", eventId: eventWeddingAug.id, itemId: tableItem.id, quantity: 10, status: "devolvido" },
+    { id: "alc-aug6", eventId: eventWeddingAug.id, itemId: candleItem.id, quantity: 50, status: "devolvido" },
+    // September Events
+    { id: "alc-sep1", eventId: eventTechSep.id, itemId: chairItem.id, quantity: 50, status: "devolvido" },
+    { id: "alc-sep2", eventId: eventTechSep.id, itemId: tableItem.id, quantity: 6, status: "devolvido" },
+    { id: "alc-sep3", eventId: eventTechSep.id, itemId: candleItem.id, quantity: 30, status: "devolvido" },
+    { id: "alc-sep4", eventId: eventBatizadoSep.id, itemId: chairItem.id, quantity: 35, status: "devolvido" },
+    { id: "alc-sep5", eventId: eventBatizadoSep.id, itemId: tableItem.id, quantity: 4, status: "devolvido" },
+    { id: "alc-sep6", eventId: eventColecaoSep.id, itemId: candleItem.id, quantity: 40, status: "devolvido" },
+    { id: "alc-sep7", eventId: eventColecaoSep.id, itemId: glassItem.id, quantity: 70, status: "devolvido" },
+    // November Events
+    { id: "alc-nov1", eventId: eventNovGala.id, itemId: chairItem.id, quantity: 80, status: "reservado" },
+    { id: "alc-nov2", eventId: eventNovGala.id, itemId: tableItem.id, quantity: 8, status: "reservado" },
+    { id: "alc-nov3", eventId: eventNovGala.id, itemId: candleItem.id, quantity: 65, status: "reservado" },
+    { id: "alc-nov4", eventId: eventNovGala.id, itemId: glassItem.id, quantity: 100, status: "reservado" },
+    { id: "alc-nov5", eventId: eventNovAniversario.id, itemId: chairItem.id, quantity: 40, status: "reservado" },
+    { id: "alc-nov6", eventId: eventNovAniversario.id, itemId: candleItem.id, quantity: 30, status: "reservado" },
   ]).onConflictDoNothing();
 
   // 6.1 Action Items Checklist
@@ -332,13 +498,47 @@ export async function seed() {
     { id: "ql-3", quoteId: quote104.id, itemId: null, description: "Produção e montagem técnica", quantity: 1, unitPrice: 1200.00, total: 1200.00 },
   ]).onConflictDoNothing();
 
-  // 8. Financial Movements
+  // 8. Financial Movements (Month-over-Month Entradas, Saídas & Despesas Mensais)
   await db.insert(financialMovements).values([
+    // --- Agosto 2026 ---
+    { id: "mov-aug-1", type: "entrada", category: "Evento", description: "Liquidação Sunset Corporate NOS", amount: 5200.00, date: new Date("2026-08-15"), eventId: eventSunsetAug.id, clientId: clientMastercard.id },
+    { id: "mov-aug-2", type: "entrada", category: "Evento", description: "Liquidação Casamento Inês & Pedro", amount: 9400.00, date: new Date("2026-08-23"), eventId: eventWeddingAug.id, clientId: clientMarta.id },
+    { id: "mov-aug-3", type: "saida", category: "Fornecedor", description: "Equipa de som e DJ exterior", amount: 2800.00, date: new Date("2026-08-16") },
+    { id: "mov-aug-4", type: "saida", category: "Transporte", description: "Furgão alugado e combustível Agosto", amount: 620.00, date: new Date("2026-08-20") },
+    { id: "mov-aug-5", type: "saida", category: "Rendas & Instalações", description: "Renda Armazém Loures - Agosto", amount: 1200.00, date: new Date("2026-08-01") },
+    { id: "mov-aug-6", type: "saida", category: "Utilidades", description: "Eletricidade e Comunicações - Agosto", amount: 380.00, date: new Date("2026-08-05") },
+    { id: "mov-aug-7", type: "investimento", category: "Material / Stock", description: "Lote de 40x Copos Martini", amount: 480.00, date: new Date("2026-08-10") },
+
+    // --- Setembro 2026 ---
+    { id: "mov-sep-1", type: "entrada", category: "Evento", description: "Liquidação Tech Summit VIP Lounge", amount: 6800.00, date: new Date("2026-09-12"), eventId: eventTechSep.id, clientId: clientMastercard.id },
+    { id: "mov-sep-2", type: "entrada", category: "Evento", description: "Liquidação Batizado Santiago", amount: 3400.00, date: new Date("2026-09-20"), eventId: eventBatizadoSep.id, clientId: clientMarta.id },
+    { id: "mov-sep-3", type: "entrada", category: "Evento", description: "Liquidação Coleção Outono", amount: 4600.00, date: new Date("2026-09-28"), eventId: eventColecaoSep.id, clientId: clientLoreal.id },
+    { id: "mov-sep-4", type: "saida", category: "Fornecedor", description: "Técnicos de AV e iluminação de palco", amount: 3100.00, date: new Date("2026-09-13") },
+    { id: "mov-sep-5", type: "saida", category: "Transporte", description: "Logística e portagens Setembro", amount: 520.00, date: new Date("2026-09-22") },
+    { id: "mov-sep-6", type: "saida", category: "Rendas & Instalações", description: "Renda Armazém Loures - Setembro", amount: 1200.00, date: new Date("2026-09-01") },
+    { id: "mov-sep-7", type: "saida", category: "Utilidades", description: "Eletricidade e Comunicações - Setembro", amount: 410.00, date: new Date("2026-09-05") },
+    { id: "mov-sep-8", type: "saida", category: "Subscrições & Software", description: "Software Gestão Eventos - Setembro", amount: 180.00, date: new Date("2026-09-02") },
+
+    // --- Outubro 2026 ---
     { id: "mov-1", type: "entrada", category: "Evento", description: "Adiantamento 50% Mastercard Gala", amount: 1365.30, date: new Date("2026-10-01"), eventId: eventGala.id, clientId: clientMastercard.id },
     { id: "mov-2", type: "entrada", category: "Evento", description: "Liquidação Casamento Marta & João", amount: 7950.00, date: new Date("2026-10-03"), eventId: eventWedding.id, clientId: clientMarta.id },
-    { id: "mov-3", type: "saida", category: "Transporte", description: "Carrinha de transporte e gasóleo", amount: 480.00, date: new Date("2026-10-04") },
+    { id: "mov-oct-3", type: "entrada", category: "Evento", description: "Liquidação L'Oréal Brand Dinner", amount: 6200.00, date: new Date("2026-10-10"), eventId: eventLoreal.id, clientId: clientLoreal.id },
+    { id: "mov-oct-4", type: "entrada", category: "Evento", description: "Adiantamento Aniversário Martim", amount: 1925.00, date: new Date("2026-10-15"), eventId: eventPooh.id, clientId: clientMarta.id },
+    { id: "mov-3", type: "saida", category: "Transporte", description: "Carrinha de transporte e gasóleo Outubro", amount: 480.00, date: new Date("2026-10-04") },
     { id: "mov-4", type: "saida", category: "Fornecedor", description: "Equipa externa de som e luzes", amount: 3900.00, date: new Date("2026-10-05") },
     { id: "mov-5", type: "investimento", category: "Material / Stock", description: "Aquisição de 20x Cadeiras Chiavari", amount: 2150.00, date: new Date("2026-10-02") },
+    { id: "mov-oct-6", type: "saida", category: "Rendas & Instalações", description: "Renda Armazém Loures - Outubro", amount: 1200.00, date: new Date("2026-10-01") },
+    { id: "mov-oct-7", type: "saida", category: "Utilidades", description: "Eletricidade e Comunicações - Outubro", amount: 390.00, date: new Date("2026-10-05") },
+    { id: "mov-oct-8", type: "saida", category: "Subscrições & Software", description: "Software Gestão Eventos - Outubro", amount: 180.00, date: new Date("2026-10-02") },
+
+    // --- Novembro 2026 ---
+    { id: "mov-nov-1", type: "entrada", category: "Evento", description: "Liquidação Gala Inovação & Sustentabilidade", amount: 7800.00, date: new Date("2026-11-08"), eventId: eventNovGala.id, clientId: clientMastercard.id },
+    { id: "mov-nov-2", type: "entrada", category: "Evento", description: "Sinal 50% Aniversário 40 Anos Privado", amount: 2100.00, date: new Date("2026-11-03"), eventId: eventNovAniversario.id, clientId: clientMarta.id },
+    { id: "mov-nov-3", type: "saida", category: "Fornecedor", description: "Equipa audiovisual e montagem Pátio da Galé", amount: 2400.00, date: new Date("2026-11-08") },
+    { id: "mov-nov-4", type: "saida", category: "Rendas & Instalações", description: "Renda Armazém Loures - Novembro", amount: 1200.00, date: new Date("2026-11-01") },
+    { id: "mov-nov-5", type: "saida", category: "Utilidades", description: "Eletricidade e Comunicações - Novembro", amount: 350.00, date: new Date("2026-11-05") },
+    { id: "mov-nov-6", type: "saida", category: "Subscrições & Software", description: "Software Gestão Eventos - Novembro", amount: 180.00, date: new Date("2026-11-02") },
+    { id: "mov-nov-7", type: "saida", category: "Transporte", description: "Combustível e portagens Novembro", amount: 320.00, date: new Date("2026-11-09") },
   ]).onConflictDoNothing();
 
   // 9. Audit Logs (Histórico inicial de alterações)

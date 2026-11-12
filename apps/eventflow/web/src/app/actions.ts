@@ -22,11 +22,19 @@ import { redirect } from "next/navigation";
 import crypto from "crypto";
 import { generateId, generateReferenceCode, formatCustomId } from "@/lib/id";
 import { recordAuditLog, getAuditLogsForEntity, getRecentAuditLogs } from "@/lib/audit";
+import fs from "fs/promises";
+import path from "path";
 
 function invalidateAllCaches() {
-  revalidatePath("/");
-  revalidatePath("/inventario");
-  revalidatePath("/inventory");
+  try {
+    revalidatePath("/");
+    revalidatePath("/inventario");
+    revalidatePath("/inventory");
+    revalidatePath("/financas");
+    revalidatePath("/finance");
+  } catch {
+    // Ignore when executed outside Next request context
+  }
 }
 
 // 1. Create Event
@@ -214,6 +222,34 @@ export async function createMovementAction(formData: FormData) {
   return { success: true, id, movement };
 }
 
+// 4.1 Delete Financial Movement / Expense
+export async function deleteMovementAction(id: string) {
+  if (!id) {
+    return { success: false, error: "ID do movimento é obrigatório." };
+  }
+
+  const existing = await db.query.financialMovements.findFirst({
+    where: eq(financialMovements.id, id),
+  });
+
+  if (!existing) {
+    return { success: false, error: "Movimento financeiro não encontrado." };
+  }
+
+  await db.delete(financialMovements).where(eq(financialMovements.id, id));
+
+  await recordAuditLog({
+    entityType: "inventory",
+    entityId: id,
+    action: "removido",
+    title: "Movimento financeiro removido",
+    details: `Movimento "${existing.description}" (€${existing.amount.toFixed(2)}) removido do registo financeiro.`,
+  });
+
+  invalidateAllCaches();
+  return { success: true, id };
+}
+
 // 4.9 Storage Locations Management
 export async function createStorageLocationAction(formData: FormData) {
   const name = (formData.get("name") as string)?.trim();
@@ -386,6 +422,19 @@ export async function createItemAction(formData: FormData) {
     return { success: false, error: "SKU, nome e categoria são obrigatórios." };
   }
 
+  // Acquisition cost / bought price calculation:
+  // Automatically creates a financial expense for the value that the item was bought.
+  const rawPurchasePrice = formData.get("purchasePrice") as string;
+  const rawTotalPurchasePrice = formData.get("totalPurchasePrice") as string;
+  let totalCost = 0;
+  if (rawTotalPurchasePrice && !isNaN(parseFloat(rawTotalPurchasePrice)) && parseFloat(rawTotalPurchasePrice) > 0) {
+    totalCost = parseFloat(rawTotalPurchasePrice);
+  } else if (rawPurchasePrice && !isNaN(parseFloat(rawPurchasePrice)) && parseFloat(rawPurchasePrice) > 0) {
+    totalCost = parseFloat(rawPurchasePrice) * totalQuantity;
+  } else if (replacementCost > 0 && formData.get("skipAutoExpense") !== "true") {
+    totalCost = replacementCost * totalQuantity;
+  }
+
   const rawCustomId = (formData.get("customId") as string) || "";
   const id = rawCustomId.trim() ? formatCustomId("itm", rawCustomId) : generateId("itm");
   const item = {
@@ -406,16 +455,35 @@ export async function createItemAction(formData: FormData) {
   };
   await db.insert(inventoryItems).values(item);
 
+  // Auto-create expense for the value that item was bought
+  let createdMovement: any = null;
+  if (totalCost > 0) {
+    const movId = generateId("mov");
+    createdMovement = {
+      id: movId,
+      type: "saida" as const,
+      category: "Material / Stock",
+      description: `Aquisição de Stock: ${name} (${totalQuantity} un.)`,
+      amount: totalCost,
+      date: new Date(),
+      eventId: null,
+      clientId: null,
+      notes: `Despesa gerada automaticamente na compra/criação do artigo ${sku.toUpperCase().trim()} (${id})`,
+      createdAt: new Date(),
+    };
+    await db.insert(financialMovements).values(createdMovement);
+  }
+
   await recordAuditLog({
     entityType: "inventory",
     entityId: id,
     action: "criado",
     title: "Artigo criado",
-    details: `${name} (${sku}) adicionado ao inventário (${totalQuantity} un., €${unitPrice}/dia, local: ${warehouseLocation || "Armazém Principal"})`,
+    details: `${name} (${sku}) adicionado ao inventário (${totalQuantity} un., €${unitPrice}/dia, local: ${warehouseLocation || "Armazém Principal"})${totalCost > 0 ? ` · Despesa automática de €${totalCost.toFixed(2)} registada em Finanças.` : ""}`,
   });
 
   invalidateAllCaches();
-  return { success: true, id, item };
+  return { success: true, id, item, movement: createdMovement };
 }
 
 // 6. Update Stock Triage (Damaged / Repaired)
@@ -1064,6 +1132,117 @@ export async function addEventMediaAction(formData: FormData) {
   revalidatePath(`/eventos/${eventId}`);
   revalidatePath(`/events/${eventId}`);
   return { success: true, media: newMedia };
+}
+
+export async function addBatchEventMediaAction(formData: FormData) {
+  const eventId = formData.get("eventId") as string;
+  const type = (formData.get("type") as "idea_board" | "final_outcome") || "idea_board";
+  const defaultTag = (formData.get("tag") as string)?.trim() || "Geral";
+  const defaultDescription = (formData.get("description") as string)?.trim() || "";
+
+  if (!eventId) {
+    throw new Error("ID do evento é obrigatório.");
+  }
+
+  const { getCurrentUser } = await import("@/lib/auth");
+  const user = await getCurrentUser();
+  const authorName = user?.name || "Administrador CFM";
+
+  const uploadsDir = path.join(process.cwd(), "public", "uploads");
+  await fs.mkdir(uploadsDir, { recursive: true });
+
+  const insertedMedia: any[] = [];
+
+  // 1. Process local file uploads (multiple files)
+  const files = formData.getAll("files") as File[];
+  const fileTitles = formData.getAll("fileTitles") as string[];
+  const fileTags = formData.getAll("fileTags") as string[];
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (file && typeof file.arrayBuffer === "function" && file.size > 0) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const rawExt = path.extname(file.name || "").toLowerCase() || ".jpg";
+      const sanitizedBase = path.basename(file.name || "imagem", rawExt).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
+      const uniqueName = `${Date.now()}-${generateId("f")}-${sanitizedBase}${rawExt}`;
+      const filePath = path.join(uploadsDir, uniqueName);
+
+      await fs.writeFile(filePath, buffer);
+
+      const imageUrl = `/api/uploads/${uniqueName}`;
+      const mediaId = generateId("med");
+      const title = fileTitles[i]?.trim() || file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ") || (type === "idea_board" ? "Ideia / Conceito" : "Foto Real do Evento");
+      const tag = fileTags[i]?.trim() || defaultTag;
+
+      const mediaRecord = {
+        id: mediaId,
+        eventId,
+        type,
+        title,
+        description: defaultDescription || null,
+        imageUrl,
+        tag,
+        orderIndex: Date.now() + i,
+        uploadedByName: authorName,
+        createdAt: new Date(),
+      };
+
+      await db.insert(eventMedia).values(mediaRecord);
+      insertedMedia.push(mediaRecord);
+    }
+  }
+
+  // 2. Process web URLs (multiple URLs or presets)
+  const urls = formData.getAll("urls") as string[];
+  const urlTitles = formData.getAll("urlTitles") as string[];
+  const urlTags = formData.getAll("urlTags") as string[];
+
+  for (let j = 0; j < urls.length; j++) {
+    const rawUrl = urls[j]?.trim();
+    if (rawUrl) {
+      const mediaId = generateId("med");
+      const title = urlTitles[j]?.trim() || (type === "idea_board" ? `Referência Visual ${j + 1}` : `Fotografia Real ${j + 1}`);
+      const tag = urlTags[j]?.trim() || defaultTag;
+
+      const mediaRecord = {
+        id: mediaId,
+        eventId,
+        type,
+        title,
+        description: defaultDescription || null,
+        imageUrl: rawUrl,
+        tag,
+        orderIndex: Date.now() + files.length + j,
+        uploadedByName: authorName,
+        createdAt: new Date(),
+      };
+
+      await db.insert(eventMedia).values(mediaRecord);
+      insertedMedia.push(mediaRecord);
+    }
+  }
+
+  // 3. Record Audit Log for the batch
+  if (insertedMedia.length > 0) {
+    const actionLabel = type === "idea_board" ? "painel_ideias" : "resultado_final";
+    const titleLabel = type === "idea_board"
+      ? `${insertedMedia.length} imagens adicionadas ao Moodboard`
+      : `${insertedMedia.length} fotos reais adicionadas ao resultado`;
+
+    await recordAuditLog({
+      entityType: "event",
+      entityId: eventId,
+      action: actionLabel,
+      title: titleLabel,
+      details: `${files.length} ficheiros locais, ${urls.length} URLs web`,
+    });
+  }
+
+  invalidateAllCaches();
+  revalidatePath(`/eventos/${eventId}`);
+  revalidatePath(`/events/${eventId}`);
+
+  return { success: true, count: insertedMedia.length, mediaList: insertedMedia };
 }
 
 export async function deleteEventMediaAction(mediaId: string, eventId: string) {

@@ -17,6 +17,8 @@ export default async function HomePage() {
       initialMovements={data.allMovements}
       initialTemplate={data.template}
       initialAlerts={data.allAlerts}
+      initialLocations={data.allLocations}
+      initialAllocations={data.allAllocations}
       initialTab="home"
     />
   );

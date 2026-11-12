@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition, useRef } from "react";
+import React, { useState, useTransition, useRef, useMemo } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -9,6 +9,9 @@ import {
   Check,
   Calendar,
   MapPin,
+  User,
+  Building,
+  Plus,
   X,
   AlertTriangle,
   Wrench,
@@ -25,6 +28,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import AuditLogModal from "@/components/AuditLogModal";
+import StorageLocationsModal, { StorageLocation, TeamUser } from "@/components/StorageLocationsModal";
 import { formatRelativeTime } from "@/lib/date-format";
 import { updateItemPatchAction, updateItemTriageAction } from "@/app/actions";
 
@@ -36,6 +40,7 @@ interface InventoryItem {
   totalQuantity: number;
   minStock: number | null;
   warehouseLocation: string | null;
+  locationId?: string | null;
   dimensions: string | null;
   unitPrice: number;
   replacementCost: number | null;
@@ -62,6 +67,8 @@ interface ItemAllocation {
 interface InventoryDetailViewProps {
   item: InventoryItem;
   allocations: ItemAllocation[];
+  locations?: StorageLocation[];
+  users?: TeamUser[];
 }
 
 const PRESET_CATEGORIES = [
@@ -98,8 +105,13 @@ const PRESET_IMAGE_TEMPLATES = [
 export default function InventoryDetailView({
   item: initialItem,
   allocations,
+  locations: initialLocations = [],
+  users: teamUsers = [],
 }: InventoryDetailViewProps) {
   const [item, setItem] = useState<InventoryItem>(initialItem);
+  const [locationsList, setLocationsList] = useState<StorageLocation[]>(initialLocations);
+  const [showLocationsModal, setShowLocationsModal] = useState(false);
+  const [locationsModalMode, setLocationsModalMode] = useState<"list" | "create">("list");
   const [copiedId, setCopiedId] = useState(false);
   const [copiedSku, setCopiedSku] = useState(false);
   const [showTriageModal, setShowTriageModal] = useState(false);
@@ -108,6 +120,22 @@ export default function InventoryDetailView({
   const [customImageUrl, setCustomImageUrl] = useState(item.imageUrl || "");
   const [damageQuantity, setDamageQuantity] = useState(1);
   const [isPending, startTransition] = useTransition();
+
+  // Find designated location and manager
+  const currentLocation = useMemo(() => {
+    if (item.locationId) {
+      const found = locationsList.find((l) => l.id === item.locationId);
+      if (found) return found;
+    }
+    if (item.warehouseLocation) {
+      const locStr = item.warehouseLocation.toLowerCase();
+      const found = locationsList.find(
+        (l) => locStr.includes(l.name.toLowerCase()) || l.name.toLowerCase().includes(locStr)
+      );
+      if (found) return found;
+    }
+    return locationsList[0] || null;
+  }, [item.locationId, item.warehouseLocation, locationsList]);
 
   // Auto-save state
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
@@ -358,26 +386,80 @@ export default function InventoryDetailView({
                   />
                 </div>
 
-                {/* Inline Location & Dimensions */}
+                {/* Inline Location & Manager & Dimensions */}
                 <div className="flex flex-wrap items-center gap-2.5 text-xs">
-                  {/* Warehouse Location Selector / Input */}
+                  {/* Warehouse Location Selector */}
                   <div className="inline-flex items-center gap-1.5 bg-[#f0f7ff] text-[#0066cc] border border-[#d6e7ff] px-2.5 py-1 rounded-[10px]">
                     <MapPin className="w-3.5 h-3.5 text-[#0066cc] shrink-0" />
                     <input
                       type="text"
                       list="locations-datalist"
                       value={item.warehouseLocation || ""}
-                      onChange={(e) => handleFieldChange("warehouseLocation", e.target.value)}
-                      placeholder="Local no Armazém..."
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const matchedLoc = locationsList.find(
+                          (l) => l.name.toLowerCase() === val.toLowerCase()
+                        );
+                        handleFieldChange("warehouseLocation", val);
+                        if (matchedLoc) {
+                          handleFieldChange("locationId", matchedLoc.id, true);
+                        }
+                      }}
+                      placeholder="Local de armazenamento..."
                       className="bg-transparent text-xs font-semibold text-[#0066cc] placeholder:text-[#0066cc]/50 focus:outline-none min-w-[170px]"
                       title="Edite a localização física no armazém"
                     />
                     <datalist id="locations-datalist">
-                      {PRESET_LOCATIONS.map((loc) => (
-                        <option key={loc} value={loc} />
+                      {locationsList.map((loc) => (
+                        <option key={loc.id} value={loc.name}>
+                          {loc.name} (Gestor: {loc.managerName})
+                        </option>
                       ))}
                     </datalist>
                   </div>
+
+                  {/* Manager Display & Quick Manage Button */}
+                  {currentLocation && (
+                    <div
+                      className="inline-flex items-center gap-1.5 bg-[#fafafc] text-[#3a3a3c] border border-[#ececf0] px-2.5 py-1 rounded-[10px]"
+                      title={`Pessoa responsável: ${currentLocation.managerName}${currentLocation.managerContact ? ` (${currentLocation.managerContact})` : ""}`}
+                    >
+                      <User className="w-3.5 h-3.5 text-[#007aff] shrink-0" />
+                      <span className="text-[11px]">
+                        Gestor: <strong className="font-semibold text-[#111]">{currentLocation.managerName}</strong>
+                      </span>
+                      {currentLocation.managerContact && (
+                        <span className="text-[10px] text-[#8e8e93] font-mono hidden md:inline">
+                          · {currentLocation.managerContact}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLocationsModalMode("list");
+                          setShowLocationsModal(true);
+                        }}
+                        className="text-[10px] text-[#007aff] hover:underline font-semibold ml-1 cursor-pointer"
+                        title="Gerir locais de armazenamento e responsáveis"
+                      >
+                        Gerir
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Button to specify a brand new location */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLocationsModalMode("create");
+                      setShowLocationsModal(true);
+                    }}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#007aff] hover:text-[#005bb5] bg-[#f0f7ff] hover:bg-[#e0efff] px-2.5 py-1 rounded-[10px] transition cursor-pointer"
+                    title="Especificar um novo local para guardar inventário"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Novo Local</span>
+                  </button>
 
                   {/* Dimensions Input */}
                   <div className="inline-flex items-center gap-1.5 bg-[#fafafc] text-[#3a3a3c] border border-[#ececf0] px-2.5 py-1 rounded-[10px]">
@@ -830,6 +912,21 @@ export default function InventoryDetailView({
         entityId={item.id}
         entityTitle={item.name}
       />
+
+      {/* Storage Locations & Facility Managers Modal */}
+      {showLocationsModal && (
+        <StorageLocationsModal
+          isOpen={showLocationsModal}
+          onClose={() => setShowLocationsModal(false)}
+          locations={locationsList}
+          items={[item]}
+          users={teamUsers}
+          initialMode={locationsModalMode}
+          onLocationsChange={(updated) => {
+            setLocationsList(updated);
+          }}
+        />
+      )}
     </div>
   );
 }
