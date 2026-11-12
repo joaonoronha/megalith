@@ -139,9 +139,9 @@ export default async function PublicQuotePage({
       </div>
 
       {/* Main Quote Paper */}
-      <div className="w-full max-w-3xl bg-white border border-[#ececf0] rounded-2xl p-8 sm:p-12 shadow-sm print:border-none print:shadow-none print:p-0">
+      <div className="w-full max-w-3xl bg-white border border-[#ececf0] rounded-2xl p-5 sm:p-12 shadow-sm print:border-none print:shadow-none print:p-0">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between border-b border-[#ececf0] pb-8 gap-6">
+        <div className="flex flex-col sm:flex-row justify-between border-b border-[#ececf0] pb-6 sm:pb-8 gap-4 sm:gap-6">
           <div>
             <div className="text-2xl font-black tracking-tight text-[#111111]">
               {template.companyName}
@@ -159,7 +159,7 @@ export default async function PublicQuotePage({
         </div>
 
         {/* Client & Event Details */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 py-6 border-b border-[#ececf0] text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 py-6 border-b border-[#ececf0] text-sm">
           <div>
             <div className="text-xs font-semibold text-[#8e8e93] uppercase tracking-wider mb-1">
               Cliente
@@ -182,27 +182,29 @@ export default async function PublicQuotePage({
         </div>
 
         {/* Line Items */}
-        <div className="py-6">
-          <div className="grid grid-cols-12 text-xs font-semibold text-[#8e8e93] uppercase tracking-wider pb-3 border-b border-[#ececf0]">
-            <div className="col-span-6">Descrição</div>
-            <div className="col-span-2 text-center">Qtd.</div>
-            <div className="col-span-2 text-right">Unitário</div>
-            <div className="col-span-2 text-right">Total</div>
-          </div>
+        <div className="py-6 overflow-x-auto no-scrollbar">
+          <div className="min-w-[460px] sm:min-w-0">
+            <div className="grid grid-cols-12 text-xs font-semibold text-[#8e8e93] uppercase tracking-wider pb-3 border-b border-[#ececf0]">
+              <div className="col-span-6">Descrição</div>
+              <div className="col-span-2 text-center">Qtd.</div>
+              <div className="col-span-2 text-right">Unitário</div>
+              <div className="col-span-2 text-right">Total</div>
+            </div>
 
-          <div className="divide-y divide-[#ececf0]">
-            {lines.map((item) => (
-              <div key={item.id} className="grid grid-cols-12 py-3.5 text-sm items-center">
-                <div className="col-span-6 font-medium text-[#111111]">{item.description}</div>
-                <div className="col-span-2 text-center text-[#8e8e93]">{item.quantity}</div>
-                <div className="col-span-2 text-right text-[#8e8e93]">
-                  €{item.unitPrice.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
+            <div className="divide-y divide-[#ececf0]">
+              {lines.map((item) => (
+                <div key={item.id} className="grid grid-cols-12 py-3.5 text-sm items-center">
+                  <div className="col-span-6 font-medium text-[#111111]">{item.description}</div>
+                  <div className="col-span-2 text-center text-[#8e8e93]">{item.quantity}</div>
+                  <div className="col-span-2 text-right text-[#8e8e93]">
+                    €{item.unitPrice.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="col-span-2 text-right font-medium text-[#111111]">
+                    €{item.total.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
+                  </div>
                 </div>
-                <div className="col-span-2 text-right font-medium text-[#111111]">
-                  €{item.total.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
 

@@ -376,9 +376,9 @@ export default function EventFlowApp({
     : [];
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] text-[#111111] pb-28 font-sans antialiased">
+    <div className="min-h-screen bg-[#f5f5f7] text-[#111111] pb-[max(6.5rem,calc(5.5rem+env(safe-area-inset-bottom)))] font-sans antialiased">
       {/* Main Content Area */}
-      <main className="max-w-[940px] mx-auto px-4 pt-8 pb-10">
+      <main className="max-w-[940px] mx-auto px-3.5 sm:px-6 pt-5 sm:pt-8 pb-10">
         {/* ========================================================= */}
         {/* TAB 1: HOME */}
         {/* ========================================================= */}
@@ -386,13 +386,13 @@ export default function EventFlowApp({
           <section className="space-y-4">
             {/* Header Greeting */}
             <div className="mb-4">
-              <h1 className="text-[36px] sm:text-[39px] font-extrabold tracking-[-1.5px] text-[#111111] leading-none mb-3.5">
+              <h1 className="text-[28px] sm:text-[39px] font-extrabold tracking-[-1px] sm:tracking-[-1.5px] text-[#111111] leading-tight mb-3">
                 Olá CFM Eventos.
               </h1>
 
               {/* Search bar matching prototype */}
-              <div className="w-full max-w-[720px] h-[50px] bg-white border border-[#ececf0] rounded-[15px] px-4 flex items-center gap-3 shadow-[0_1px_0_rgba(0,0,0,0.015)]">
-                <Search className="w-4 h-4 text-[#8e8e93]" />
+              <div className="w-full max-w-[720px] h-[48px] sm:h-[50px] bg-white border border-[#ececf0] rounded-[15px] px-3.5 sm:px-4 flex items-center gap-3 shadow-[0_1px_0_rgba(0,0,0,0.015)]">
+                <Search className="w-4 h-4 text-[#8e8e93] flex-shrink-0" />
                 <input
                   type="text"
                   value={searchTerm}
@@ -403,7 +403,7 @@ export default function EventFlowApp({
                 {searchTerm && (
                   <button
                     onClick={() => setSearchTerm("")}
-                    className="p-1 rounded-full text-[#8e8e93] hover:text-[#111] hover:bg-[#f2f2f5]"
+                    className="p-1 rounded-full text-[#8e8e93] hover:text-[#111] hover:bg-[#f2f2f5] cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -411,10 +411,10 @@ export default function EventFlowApp({
               </div>
 
               {/* 2 Buttons under Search / Greeting */}
-              <div className="flex flex-wrap items-center gap-2.5 mt-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 mt-3">
                 <button
                   onClick={() => setShowEventWizard(true)}
-                  className="min-h-[44px] px-4 py-2.5 rounded-[12px] bg-[#111111] hover:bg-black text-white text-[13px] font-semibold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  className="flex-1 sm:flex-initial min-h-[44px] px-4 py-2.5 rounded-[12px] bg-[#111111] hover:bg-black text-white text-[13px] font-semibold flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer"
                 >
                   <span className="text-base font-normal leading-none">＋</span>
                   <span>Novo evento</span>
@@ -425,7 +425,7 @@ export default function EventFlowApp({
                     setSelectedEventForQuote("");
                     setShowQuoteWizard(true);
                   }}
-                  className="min-h-[44px] px-4 py-2.5 rounded-[12px] bg-white border border-black/10 hover:bg-[#f8f8fa] text-[#111111] text-[13px] font-semibold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  className="flex-1 sm:flex-initial min-h-[44px] px-4 py-2.5 rounded-[12px] bg-white border border-black/10 hover:bg-[#f8f8fa] text-[#111111] text-[13px] font-semibold flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer"
                 >
                   <span className="text-base font-normal leading-none">＋</span>
                   <span>Novo orçamento</span>
@@ -1094,19 +1094,19 @@ export default function EventFlowApp({
 
             {/* Interactive Monthly Calendar Grid */}
             <div className="border border-[#ececf0] rounded-[20px] overflow-hidden bg-white shadow-2xs">
-              <div className="grid grid-cols-7 border-b border-[#ececf0] bg-[#fafafc] text-center text-xs font-semibold text-[#8e8e93] py-2.5">
-                <div>Segunda</div>
-                <div>Terça</div>
-                <div>Quarta</div>
-                <div>Quinta</div>
-                <div>Sexta</div>
-                <div>Sábado</div>
-                <div>Domingo</div>
+              <div className="grid grid-cols-7 border-b border-[#ececf0] bg-[#fafafc] text-center text-xs font-semibold text-[#8e8e93] py-2 sm:py-2.5">
+                <div><span className="hidden sm:inline">Segunda</span><span className="sm:hidden">Seg</span></div>
+                <div><span className="hidden sm:inline">Terça</span><span className="sm:hidden">Ter</span></div>
+                <div><span className="hidden sm:inline">Quarta</span><span className="sm:hidden">Qua</span></div>
+                <div><span className="hidden sm:inline">Quinta</span><span className="sm:hidden">Qui</span></div>
+                <div><span className="hidden sm:inline">Sexta</span><span className="sm:hidden">Sex</span></div>
+                <div><span className="hidden sm:inline">Sábado</span><span className="sm:hidden">Sáb</span></div>
+                <div><span className="hidden sm:inline">Domingo</span><span className="sm:hidden">Dom</span></div>
               </div>
 
               <div className="grid grid-cols-7 divide-x divide-y divide-[#f0f0f3] bg-[#f9f9fb]">
                 {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-                  <div key={`cal-blank-${i}`} className="min-h-[96px] bg-[#f5f5f7]/40 p-2" />
+                  <div key={`cal-blank-${i}`} className="min-h-[58px] sm:min-h-[96px] bg-[#f5f5f7]/40 p-1 sm:p-2" />
                 ))}
 
                 {Array.from({ length: daysInMonth }).map((_, i) => {
@@ -1126,7 +1126,7 @@ export default function EventFlowApp({
                     <div
                       key={`cal-day-${day}`}
                       onClick={() => handleCalendarDayClick(day)}
-                      className={`min-h-[96px] p-2 transition cursor-pointer flex flex-col justify-between group ${
+                      className={`min-h-[58px] sm:min-h-[96px] p-1 sm:p-2 transition cursor-pointer flex flex-col justify-between group ${
                         isSelected
                           ? "bg-[#111]/[0.035] ring-2 ring-inset ring-[#111]"
                           : hasEvents
@@ -1136,7 +1136,7 @@ export default function EventFlowApp({
                     >
                       <div className="flex items-center justify-between">
                         <span
-                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition ${
+                          className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold transition ${
                             isSelected
                               ? "bg-[#111] text-white shadow-xs"
                               : isToday
@@ -1150,14 +1150,15 @@ export default function EventFlowApp({
                         </span>
 
                         {hasEvents && (
-                          <span className="text-[10px] font-bold text-[#24793a] bg-[#eaf8ee] px-1.5 py-0.5 rounded-full">
-                            {dayEvents.length} {dayEvents.length === 1 ? "evt" : "evts"}
+                          <span className="text-[9px] sm:text-[10px] font-bold text-[#24793a] bg-[#eaf8ee] px-1 sm:px-1.5 py-0.5 rounded-full">
+                            <span className="hidden sm:inline">{dayEvents.length} {dayEvents.length === 1 ? "evt" : "evts"}</span>
+                            <span className="sm:hidden">{dayEvents.length}</span>
                           </span>
                         )}
                       </div>
 
-                      {/* Event pills preview */}
-                      <div className="space-y-1 my-1.5 flex-1 min-w-0">
+                      {/* Event pills preview on Desktop */}
+                      <div className="hidden sm:block space-y-1 my-1.5 flex-1 min-w-0">
                         {dayEvents.slice(0, 2).map((evt) => {
                           const statusObj = getStatusStyle(evt.status);
                           return (
@@ -1178,7 +1179,22 @@ export default function EventFlowApp({
                         )}
                       </div>
 
-                      <div className="text-[10px] text-[#8e8e93] opacity-0 group-hover:opacity-100 transition flex items-center justify-end font-semibold">
+                      {/* Event dots preview on Mobile */}
+                      {hasEvents && (
+                        <div className="sm:hidden flex items-center justify-center gap-0.5 sm:gap-1 mt-1">
+                          {dayEvents.slice(0, 3).map((evt) => (
+                            <span
+                              key={evt.id}
+                              className="w-1.5 h-1.5 rounded-full bg-[#007aff]"
+                            />
+                          ))}
+                          {dayEvents.length > 3 && (
+                            <span className="text-[8px] font-bold text-[#8e8e93] leading-none">+</span>
+                          )}
+                        </div>
+                      )}
+                      {/* Hover action on Desktop */}
+                      <div className="hidden sm:flex text-[10px] text-[#8e8e93] opacity-0 group-hover:opacity-100 transition items-center justify-end font-semibold">
                         {hasEvents ? "Ver resumo →" : "＋ Criar"}
                       </div>
                     </div>
@@ -1893,13 +1909,13 @@ export default function EventFlowApp({
       </main>
 
       {/* Floating Bottom Navigation Bar (Apple-style matching prototype) */}
-      <aside className="fixed bottom-0 left-0 right-0 z-40 bg-[rgba(249,249,251,0.96)] backdrop-blur-[24px] border-t border-[#ececf0] py-2 flex items-center justify-center">
+      <aside className="fixed bottom-0 left-0 right-0 z-40 bg-[rgba(249,249,251,0.96)] backdrop-blur-[24px] border-t border-[#ececf0] pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] px-3 flex items-center justify-center shadow-[0_-1px_12px_rgba(0,0,0,0.04)]">
         <div className="w-full max-w-[650px] flex items-center justify-around h-[52px]">
           {/* 1. Início */}
           <Link
             href="/"
             onClick={(e) => handleTabSwitch("home", "/", e)}
-            className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
+            className="w-[48px] h-[48px] sm:w-[44px] sm:h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
             style={{
               backgroundColor:
                 activeTab === "home" ? "rgba(0,122,255,0.11)" : "transparent",
@@ -1926,7 +1942,7 @@ export default function EventFlowApp({
           <Link
             href="/calendario"
             onClick={(e) => handleTabSwitch("calendar", "/calendario", e)}
-            className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
+            className="w-[48px] h-[48px] sm:w-[44px] sm:h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
             style={{
               backgroundColor:
                 activeTab === "calendar"
@@ -1955,7 +1971,7 @@ export default function EventFlowApp({
           <Link
             href="/eventos"
             onClick={(e) => handleTabSwitch("events", "/eventos", e)}
-            className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
+            className="w-[48px] h-[48px] sm:w-[44px] sm:h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
             style={{
               backgroundColor:
                 activeTab === "events"
@@ -1987,7 +2003,7 @@ export default function EventFlowApp({
           <Link
             href="/inventario"
             onClick={(e) => handleTabSwitch("inventory", "/inventario", e)}
-            className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
+            className="w-[48px] h-[48px] sm:w-[44px] sm:h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
             style={{
               backgroundColor:
                 activeTab === "inventory"
@@ -2016,7 +2032,7 @@ export default function EventFlowApp({
           <Link
             href="/mais"
             onClick={(e) => handleTabSwitch("more", "/mais", e)}
-            className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
+            className="w-[48px] h-[48px] sm:w-[44px] sm:h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
             style={{
               backgroundColor:
                 activeTab === "more" ? "rgba(0,122,255,0.11)" : "transparent",
@@ -2232,7 +2248,7 @@ function MovementModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-[22px] w-full max-w-md border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs">
+      <div className="bg-white rounded-[22px] w-full max-w-md border border-[#ececf0] shadow-xl overflow-y-auto max-h-[calc(100dvh-2rem)] p-5 sm:p-6 text-xs">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-[17px] font-bold text-[#111111]">Novo Movimento Financeiro</h2>
@@ -2488,7 +2504,7 @@ function TriageModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-[22px] w-full max-w-sm border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs">
+      <div className="bg-white rounded-[22px] w-full max-w-sm border border-[#ececf0] shadow-xl overflow-y-auto max-h-[calc(100dvh-2rem)] p-5 sm:p-6 text-xs">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-[17px] font-bold text-[#111111]">
@@ -2596,7 +2612,7 @@ function ItemWizardModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-[22px] w-full max-w-md border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs">
+      <div className="bg-white rounded-[22px] w-full max-w-md border border-[#ececf0] shadow-xl overflow-y-auto max-h-[calc(100dvh-2rem)] p-5 sm:p-6 text-xs">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-[17px] font-bold text-[#111111]">
@@ -2782,7 +2798,7 @@ function ClientWizardModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-[22px] w-full max-w-md border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs">
+      <div className="bg-white rounded-[22px] w-full max-w-md border border-[#ececf0] shadow-xl overflow-y-auto max-h-[calc(100dvh-2rem)] p-5 sm:p-6 text-xs">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-[17px] font-bold text-[#111111]">Novo Cliente CRM</h2>
@@ -2932,7 +2948,7 @@ function LoginModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-[22px] w-full max-w-sm border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs">
+      <div className="bg-white rounded-[22px] w-full max-w-sm border border-[#ececf0] shadow-xl overflow-y-auto max-h-[calc(100dvh-2rem)] p-5 sm:p-6 text-xs">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-[17px] font-bold text-[#111111]">Iniciar Sessão</h2>
@@ -3040,7 +3056,7 @@ function NewUserModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-[22px] w-full max-w-sm border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs">
+      <div className="bg-white rounded-[22px] w-full max-w-sm border border-[#ececf0] shadow-xl overflow-y-auto max-h-[calc(100dvh-2rem)] p-5 sm:p-6 text-xs">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-[17px] font-bold text-[#111111]">Criar Conta de Equipa</h2>

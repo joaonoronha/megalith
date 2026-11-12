@@ -128,34 +128,34 @@ export default function InventoryDetailView({
   return (
     <div className="min-h-screen bg-[#f5f5f7] text-[#111111] pb-24 font-sans antialiased">
       {/* Top Header */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-[#ececf0] px-4 py-3">
-        <div className="max-w-[1100px] mx-auto flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-white/85 backdrop-blur-md border-b border-[#ececf0] px-3.5 sm:px-4 py-2.5 sm:py-3">
+        <div className="max-w-[1100px] mx-auto flex items-center justify-between gap-2">
           <Link
             href="/inventario"
-            className="inline-flex items-center gap-2 text-xs font-semibold text-[#636366] hover:text-[#111111] transition bg-[#f2f2f5] hover:bg-[#e5e5ea] px-3 py-1.5 rounded-full"
+            className="inline-flex items-center gap-1.5 sm:gap-2 text-xs font-semibold text-[#636366] hover:text-[#111111] transition bg-[#f2f2f5] hover:bg-[#e5e5ea] px-2.5 sm:px-3 py-1.5 rounded-full flex-shrink-0"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Voltar ao Catálogo de Stock</span>
+            <span>Voltar<span className="hidden sm:inline"> ao Catálogo de Stock</span></span>
           </Link>
 
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:inline text-[11px] text-[#8e8e93]">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            <span className="hidden md:inline text-[11px] text-[#8e8e93]">
               Last updated by <strong className="text-[#3a3a3c] font-semibold">{item.lastUpdatedByName || "Administrador CFM"}</strong> {formatRelativeTime(item.updatedAt, "en")}
             </span>
             <button
               onClick={() => setShowAuditModal(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#007aff] hover:text-[#005bb5] bg-[#f2f2f5] hover:bg-[#e5e5ea] px-3 py-1.5 rounded-[12px] transition cursor-pointer"
+              className="inline-flex items-center gap-1 sm:gap-1.5 text-xs font-semibold text-[#007aff] hover:text-[#005bb5] bg-[#f2f2f5] hover:bg-[#e5e5ea] px-2.5 sm:px-3 py-1.5 rounded-[12px] transition cursor-pointer"
               title="Ver histórico de alterações"
             >
               <History className="w-3.5 h-3.5" />
-              <span>Histórico</span>
+              <span className="hidden sm:inline">Histórico</span>
             </button>
             <button
               onClick={() => setShowEditModal(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#111] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] px-3.5 py-1.5 rounded-[12px] shadow-2xs transition cursor-pointer"
+              className="inline-flex items-center gap-1 sm:gap-1.5 text-xs font-semibold text-[#111] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] px-2.5 sm:px-3.5 py-1.5 rounded-[12px] shadow-2xs transition cursor-pointer"
             >
               <Edit3 className="w-3.5 h-3.5" />
-              <span>Editar Artigo</span>
+              <span>Editar<span className="hidden sm:inline"> Artigo</span></span>
             </button>
           </div>
         </div>
