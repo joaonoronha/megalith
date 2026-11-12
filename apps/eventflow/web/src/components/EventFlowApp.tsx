@@ -164,11 +164,23 @@ export default function EventFlowApp({
   }, [pathname]);
 
   // Calendar State & Interactive Day Details Modal
-  const [currentCalendarDate, setCurrentCalendarDate] = useState(() => new Date(2026, 9, 1)); // Default Outubro 2026
+  const [today] = useState(() => new Date());
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const currentCalendarYear = currentCalendarDate.getFullYear();
-  const currentCalendarMonth = currentCalendarDate.getMonth(); // 9 = Outubro
+  const currentCalendarMonth = currentCalendarDate.getMonth();
 
-  const [selectedDay, setSelectedDay] = useState<number>(30);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const now = new Date();
+    return {
+      year: now.getFullYear(),
+      month: now.getMonth(),
+      day: now.getDate(),
+    };
+  });
+
   const [calendarPopupDate, setCalendarPopupDate] = useState<{
     year: number;
     month: number;
@@ -277,6 +289,15 @@ export default function EventFlowApp({
   const handleNextMonth = () => {
     setCurrentCalendarDate(new Date(currentCalendarYear, currentCalendarMonth + 1, 1));
   };
+  const handleTodayMonth = () => {
+    const now = new Date();
+    setCurrentCalendarDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    setSelectedDate({
+      year: now.getFullYear(),
+      month: now.getMonth(),
+      day: now.getDate(),
+    });
+  };
 
   const getEventsForCalendarDay = (day: number, month = currentCalendarMonth, year = currentCalendarYear) => {
     return eventsList.filter((e) => {
@@ -297,11 +318,15 @@ export default function EventFlowApp({
       .map((e) => new Date(e.startDate).getDate())
   );
 
-  // Events for selected day
-  const eventsForSelectedDay = getEventsForCalendarDay(selectedDay);
+  // Events for selected day (matches selectedDate day, month and year)
+  const eventsForSelectedDay = getEventsForCalendarDay(
+    selectedDate.day,
+    selectedDate.month,
+    selectedDate.year
+  );
 
   const handleCalendarDayClick = (day: number, month = currentCalendarMonth, year = currentCalendarYear) => {
-    setSelectedDay(day);
+    setSelectedDate({ year, month, day });
     setCalendarPopupDate({ year, month, day });
   };
 
@@ -588,13 +613,20 @@ export default function EventFlowApp({
                     </div>
                     <div className="text-[12px] text-[#8e8e93]">{currentCalendarYear}</div>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={handlePrevMonth}
                       className="p-1 rounded-lg hover:bg-[#f2f2f5] text-[#8e8e93] hover:text-[#111] transition cursor-pointer"
                       title="Mês anterior"
                     >
                       <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={handleTodayMonth}
+                      className="px-1.5 py-0.5 rounded-lg hover:bg-[#f2f2f5] text-[10px] font-bold text-[#8e8e93] hover:text-[#111] transition cursor-pointer"
+                      title="Ir para hoje"
+                    >
+                      Hoje
                     </button>
                     <button
                       onClick={handleNextMonth}
@@ -630,7 +662,14 @@ export default function EventFlowApp({
                   ))}
                   {Array.from({ length: daysInMonth }).map((_, i) => {
                     const day = i + 1;
-                    const isSelected = selectedDay === day;
+                    const isSelected =
+                      selectedDate.year === currentCalendarYear &&
+                      selectedDate.month === currentCalendarMonth &&
+                      selectedDate.day === day;
+                    const isToday =
+                      today.getFullYear() === currentCalendarYear &&
+                      today.getMonth() === currentCalendarMonth &&
+                      today.getDate() === day;
                     const hasEvent = eventDays.has(day);
                     const dayEvents = getEventsForCalendarDay(day);
 
@@ -641,6 +680,8 @@ export default function EventFlowApp({
                         className={`h-8 flex flex-col items-center justify-center rounded-[9px] transition cursor-pointer relative ${
                           isSelected
                             ? "bg-[#111] text-white font-bold shadow-xs"
+                            : isToday
+                            ? "border border-[#007aff] text-[#007aff] font-bold hover:bg-[#007aff]/10"
                             : hasEvent
                             ? "bg-[#f0f0f2] text-[#3a3a3c] font-semibold hover:bg-[#e4e4e7]"
                             : "text-[#454549] hover:bg-[#f7f7f9]"
@@ -668,10 +709,21 @@ export default function EventFlowApp({
                 <div className="mt-3.5 pt-3 border-t border-[#ececf0]">
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-wider">
-                      {selectedDay} de {currentMonthName}
+                      {selectedDate.day} de {monthNames[selectedDate.month]}
+                      {selectedDate.year === today.getFullYear() &&
+                        selectedDate.month === today.getMonth() &&
+                        selectedDate.day === today.getDate() && (
+                          <span className="ml-1.5 text-[#007aff] font-bold">· Hoje</span>
+                        )}
                     </div>
                     <button
-                      onClick={() => handleCalendarDayClick(selectedDay)}
+                      onClick={() =>
+                        handleCalendarDayClick(
+                          selectedDate.day,
+                          selectedDate.month,
+                          selectedDate.year
+                        )
+                      }
                       className="text-[11px] text-[#007aff] hover:underline font-semibold cursor-pointer"
                     >
                       Ver detalhes →
@@ -703,7 +755,7 @@ export default function EventFlowApp({
                       <span>Sem eventos marcados.</span>
                       <button
                         onClick={() => {
-                          const formattedIsoDate = `${currentCalendarYear}-${String(currentCalendarMonth + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}T10:00`;
+                          const formattedIsoDate = `${selectedDate.year}-${String(selectedDate.month + 1).padStart(2, "0")}-${String(selectedDate.day).padStart(2, "0")}T10:00`;
                           setEventWizardInitialDate(formattedIsoDate);
                           setShowEventWizard(true);
                         }}
@@ -918,6 +970,13 @@ export default function EventFlowApp({
                       <ChevronLeft className="w-4 h-4" />
                     </button>
                     <button
+                      onClick={handleTodayMonth}
+                      className="px-2 py-0.5 rounded-lg hover:bg-white text-[11px] font-bold text-[#636366] hover:text-[#111] transition cursor-pointer"
+                      title="Ir para o mês atual"
+                    >
+                      Hoje
+                    </button>
+                    <button
                       onClick={handleNextMonth}
                       className="p-1 rounded-lg hover:bg-white text-[#636366] hover:text-[#111] transition cursor-pointer"
                       title="Mês seguinte"
@@ -963,7 +1022,14 @@ export default function EventFlowApp({
                 {Array.from({ length: daysInMonth }).map((_, i) => {
                   const day = i + 1;
                   const dayEvents = getEventsForCalendarDay(day);
-                  const isSelected = selectedDay === day;
+                  const isSelected =
+                    selectedDate.year === currentCalendarYear &&
+                    selectedDate.month === currentCalendarMonth &&
+                    selectedDate.day === day;
+                  const isToday =
+                    today.getFullYear() === currentCalendarYear &&
+                    today.getMonth() === currentCalendarMonth &&
+                    today.getDate() === day;
                   const hasEvents = dayEvents.length > 0;
 
                   return (
@@ -972,7 +1038,7 @@ export default function EventFlowApp({
                       onClick={() => handleCalendarDayClick(day)}
                       className={`min-h-[96px] p-2 transition cursor-pointer flex flex-col justify-between group ${
                         isSelected
-                          ? "bg-[#007aff]/[0.04] ring-2 ring-inset ring-[#007aff]"
+                          ? "bg-[#111]/[0.035] ring-2 ring-inset ring-[#111]"
                           : hasEvents
                           ? "bg-white hover:bg-[#fafafc]"
                           : "bg-white/80 hover:bg-white"
@@ -982,9 +1048,11 @@ export default function EventFlowApp({
                         <span
                           className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition ${
                             isSelected
-                              ? "bg-[#007aff] text-white"
+                              ? "bg-[#111] text-white shadow-xs"
+                              : isToday
+                              ? "border-2 border-[#007aff] text-[#007aff] font-bold"
                               : hasEvents
-                              ? "bg-[#111] text-white"
+                              ? "bg-[#2c2c2e] text-white"
                               : "text-[#48484a] group-hover:bg-[#f0f0f3]"
                           }`}
                         >
@@ -2917,7 +2985,9 @@ function EventWizardModal({
   onClose: () => void;
   onCreated: (event: any) => void;
 }) {
-  const baseDate = initialDate ? initialDate.split("T")[0] : "2026-10-15";
+  const baseDate = initialDate
+    ? initialDate.split("T")[0]
+    : new Date().toISOString().split("T")[0];
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [customId, setCustomId] = useState("");
@@ -2930,7 +3000,7 @@ function EventWizardModal({
   const [startDate, setStartDate] = useState(
     initialDate
       ? (initialDate.includes("T") ? initialDate : `${initialDate}T18:00`)
-      : "2026-10-15T18:00"
+      : `${baseDate}T18:00`
   );
   const [endDate, setEndDate] = useState(`${baseDate}T23:59`);
   const [prepDate, setPrepDate] = useState(`${baseDate}T09:00`);
