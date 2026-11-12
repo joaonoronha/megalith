@@ -324,7 +324,7 @@ export default function EventDetailView({
     try {
       if (!raw) return ["#111111", "#8E8E93", "#E5E5EA"];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : ["#111111"];
+      return Array.isArray(parsed) ? parsed : ["#111111", "#8E8E93", "#E5E5EA"];
     } catch {
       return ["#111111", "#8E8E93", "#E5E5EA"];
     }
@@ -408,6 +408,13 @@ export default function EventDetailView({
 
   const handleAddColor = () => {
     const updated = [...currentColors, "#D4AF37"];
+    const jsonColors = JSON.stringify(updated);
+    setEvent((prev) => ({ ...prev, vibeColors: jsonColors }));
+    savePatch({ vibeColors: jsonColors });
+  };
+
+  const handleRemoveColor = (indexToRemove: number) => {
+    const updated = currentColors.filter((_, idx) => idx !== indexToRemove);
     const jsonColors = JSON.stringify(updated);
     setEvent((prev) => ({ ...prev, vibeColors: jsonColors }));
     savePatch({ vibeColors: jsonColors });
