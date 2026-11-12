@@ -440,9 +440,13 @@ export default function EventFlowApp({
                               >
                                 {evt.name}
                               </Link>
-                              <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0] flex-shrink-0">
+                              <Link
+                                href={`/eventos/${evt.id}`}
+                                className="font-mono text-[10px] text-[#8e8e93] hover:text-[#007aff] bg-[#fafafc] hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] flex-shrink-0 transition"
+                                title="ID do Evento"
+                              >
                                 #{evt.id}
-                              </span>
+                              </Link>
                               {evt.theme && (
                                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#fef7e0] text-[#b06000] border border-[#feefc3] flex items-center gap-1 flex-shrink-0">
                                   <Sparkles className="w-2.5 h-2.5" />
@@ -645,12 +649,20 @@ export default function EventFlowApp({
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-[14px] font-bold text-[#111111] truncate">
+                              <Link
+                                href={`/inventario/${item.id}`}
+                                className="text-[14px] font-bold text-[#111111] hover:text-[#007aff] transition truncate"
+                                title="Ver ficha do artigo"
+                              >
                                 {item.name}
-                              </span>
-                              <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0] flex-shrink-0">
+                              </Link>
+                              <Link
+                                href={`/inventario/${item.id}`}
+                                className="font-mono text-[10px] text-[#8e8e93] hover:text-[#007aff] bg-[#fafafc] hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] flex-shrink-0 transition"
+                                title="ID do Artigo"
+                              >
                                 #{item.id}
-                              </span>
+                              </Link>
                             </div>
                             <div className="text-[12px] text-[#8e8e93] mt-0.5 truncate">
                               {item.totalQuantity - (item.damagedQuantity || 0)} disponíveis de{" "}
@@ -909,9 +921,13 @@ export default function EventFlowApp({
                           >
                             {e.name}
                           </Link>
-                          <span className="font-mono text-[10px] text-[#8e8e93] bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#e5e5ea]">
+                          <Link
+                            href={`/eventos/${e.id}`}
+                            className="font-mono text-[10px] text-[#8e8e93] hover:text-[#007aff] bg-[#f2f2f5] hover:bg-[#e5e5ea] px-1.5 py-0.5 rounded border border-[#e5e5ea] transition"
+                            title="ID do Evento"
+                          >
                             #{e.id}
-                          </span>
+                          </Link>
                           {e.category && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f2f2f5] text-[#48484a]">
                               {e.category}
@@ -1043,12 +1059,20 @@ export default function EventFlowApp({
                     <div>
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-wider">
+                          <Link
+                            href={`/inventario/${item.id}`}
+                            className="text-[11px] font-bold text-[#8e8e93] hover:text-[#111] uppercase tracking-wider transition"
+                            title="SKU do Artigo"
+                          >
                             {item.sku}
-                          </span>
-                          <span className="font-mono text-[10px] text-[#8e8e93] bg-white px-1.5 py-0.5 rounded border border-[#ececf0]">
+                          </Link>
+                          <Link
+                            href={`/inventario/${item.id}`}
+                            className="font-mono text-[10px] text-[#8e8e93] hover:text-[#007aff] bg-white px-1.5 py-0.5 rounded border border-[#ececf0] transition"
+                            title="Ver ficha do artigo"
+                          >
                             #{item.id}
-                          </span>
+                          </Link>
                         </div>
                         {damaged > 0 ? (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">
@@ -1065,7 +1089,15 @@ export default function EventFlowApp({
                         )}
                       </div>
 
-                      <div className="font-bold text-sm text-[#111]">{item.name}</div>
+                      <div className="font-bold text-sm text-[#111]">
+                        <Link
+                          href={`/inventario/${item.id}`}
+                          className="hover:text-[#007aff] transition"
+                          title="Ver ficha do artigo"
+                        >
+                          {item.name}
+                        </Link>
+                      </div>
                       <div className="text-xs text-[#8e8e93] mt-0.5">
                         {item.warehouseLocation || "Armazém Principal"}
                       </div>
@@ -1083,9 +1115,17 @@ export default function EventFlowApp({
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-[#ececf0] flex items-center justify-between">
-                      <span className="text-xs font-bold text-[#111]">
-                        €{(item.unitPrice || 0).toFixed(2)}/dia
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-[#111]">
+                          €{(item.unitPrice || 0).toFixed(2)}/dia
+                        </span>
+                        <Link
+                          href={`/inventario/${item.id}`}
+                          className="text-[11px] font-semibold text-[#007aff] hover:underline"
+                        >
+                          Ver ficha →
+                        </Link>
+                      </div>
 
                       {damaged > 0 && (
                         <button
@@ -1197,21 +1237,36 @@ export default function EventFlowApp({
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-[#111111]">
+                          <Link
+                            href={`/utilizadores/${u.id}`}
+                            className="font-bold text-sm text-[#111111] hover:text-[#007aff] transition"
+                            title="Ver perfil do utilizador"
+                          >
                             {u.name}
-                          </span>
-                          <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0]">
+                          </Link>
+                          <Link
+                            href={`/utilizadores/${u.id}`}
+                            className="font-mono text-[10px] text-[#8e8e93] hover:text-[#007aff] bg-[#fafafc] hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] transition"
+                            title="ID do Utilizador"
+                          >
                             #{u.id}
-                          </span>
+                          </Link>
                         </div>
                         <div className="text-[11px] text-[#8e8e93]">{u.email}</div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
                       <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#eaf8ee] text-[#24793a] capitalize">
                         {u.role}
                       </span>
+                      <Link
+                        href={`/utilizadores/${u.id}`}
+                        className="text-[11px] font-semibold text-[#8e8e93] hover:text-[#111] transition"
+                        title="Ver detalhes da conta"
+                      >
+                        Ver perfil →
+                      </Link>
                     </div>
                   </div>
                 ))}

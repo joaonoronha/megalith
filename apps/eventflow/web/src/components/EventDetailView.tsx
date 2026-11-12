@@ -756,26 +756,48 @@ export default function EventDetailView({
                     >
                       <div className="flex items-center gap-3.5 min-w-0">
                         {a.itemImageUrl ? (
-                          <img
-                            src={a.itemImageUrl}
-                            alt={a.itemName}
-                            className="w-12 h-12 rounded-[10px] object-cover border border-black/5 flex-shrink-0"
-                          />
+                          <Link href={`/inventario/${a.itemId}`} className="flex-shrink-0" title="Ver ficha do artigo">
+                            <img
+                              src={a.itemImageUrl}
+                              alt={a.itemName}
+                              className="w-12 h-12 rounded-[10px] object-cover border border-black/5 hover:opacity-85 transition"
+                            />
+                          </Link>
                         ) : (
-                          <div className="w-12 h-12 rounded-[10px] bg-[#ececf0] flex items-center justify-center text-[#8e8e93] font-bold text-xs flex-shrink-0">
+                          <Link
+                            href={`/inventario/${a.itemId}`}
+                            className="w-12 h-12 rounded-[10px] bg-[#ececf0] hover:bg-[#e5e5ea] flex items-center justify-center text-[#8e8e93] font-bold text-xs flex-shrink-0 transition"
+                            title="Ver ficha do artigo"
+                          >
                             {a.itemSku?.substring(0, 3)}
-                          </div>
+                          </Link>
                         )}
 
                         <div className="min-w-0">
-                          <div className="font-bold text-sm text-[#111] truncate">{a.itemName}</div>
+                          <div className="font-bold text-sm text-[#111] truncate">
+                            <Link
+                              href={`/inventario/${a.itemId}`}
+                              className="hover:text-[#007aff] transition"
+                              title="Ver ficha do artigo no inventário"
+                            >
+                              {a.itemName}
+                            </Link>
+                          </div>
                           <div className="text-xs text-[#8e8e93] flex flex-wrap items-center gap-2 mt-0.5">
-                            <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-[#ececf0] text-[10px]" title="SKU">
+                            <Link
+                              href={`/inventario/${a.itemId}`}
+                              className="font-mono bg-white hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] text-[10px] transition"
+                              title="SKU do Artigo"
+                            >
                               {a.itemSku}
-                            </span>
-                            <span className="font-mono text-[#8e8e93] text-[10px]" title="ID do Artigo">
+                            </Link>
+                            <Link
+                              href={`/inventario/${a.itemId}`}
+                              className="font-mono text-[#8e8e93] hover:text-[#007aff] text-[10px] transition"
+                              title="ID do Artigo"
+                            >
                               #{a.itemId}
-                            </span>
+                            </Link>
                             <span>•</span>
                             <span>{a.itemCategory}</span>
                             {a.itemWarehouseLocation && (
