@@ -32,6 +32,7 @@ import {
   Eye,
   Check,
 } from "lucide-react";
+import { countsForFinance, isCancelledEvent } from "@/lib/events";
 
 interface FinanceViewProps {
   events: any[];
@@ -187,8 +188,9 @@ export default function FinanceView({
       }
     });
 
-    // Collect all unique months and projected financials from events
+    // Collect all unique months and projected financials from active events (excluding cancelled)
     events.forEach((e) => {
+      if (!countsForFinance(e)) return;
       const key = getMonthKey(e.startDate);
       if (!key) return;
       if (!monthsMap[key]) {
@@ -286,10 +288,11 @@ export default function FinanceView({
       const totalGastos = totalSaidas + totalInvestimentos;
       const lucroTotal = totalEntradas - totalGastos;
       const margemGeral = totalEntradas > 0 ? (lucroTotal / totalEntradas) * 100 : 0;
-      const totalEventos = events.length;
+      const activeEvents = events.filter((e) => countsForFinance(e));
+      const totalEventos = activeEvents.length;
 
-      const faturacaoProjetadaTotal = events.reduce((sum, e) => sum + (Number(e.customerPrice) || 0), 0);
-      const custosProjetadosTotal = events.reduce((sum, e) => sum + (Number(e.totalBudget) || 0), 0);
+      const faturacaoProjetadaTotal = activeEvents.reduce((sum, e) => sum + (Number(e.customerPrice) || 0), 0);
+      const custosProjetadosTotal = activeEvents.reduce((sum, e) => sum + (Number(e.totalBudget) || 0), 0);
       const lucroProjetadoTotal = faturacaoProjetadaTotal - custosProjetadosTotal;
       const margemProjetadaGeral = faturacaoProjetadaTotal > 0 ? (lucroProjetadoTotal / faturacaoProjetadaTotal) * 100 : 0;
       const totalAReceber = Math.max(0, faturacaoProjetadaTotal - totalEntradas);
@@ -367,9 +370,11 @@ export default function FinanceView({
     }
   }, [selectedMonth, monthlyData, movements, events]);
 
-  // 2. Event-by-Event Profitability & Projections
+  // 2. Event-by-Event Profitability & Projections (excluding cancelled events)
   const eventProfitabilityList = useMemo(() => {
-    const list = events.map((ev) => {
+    const list = events
+      .filter((ev) => countsForFinance(ev))
+      .map((ev) => {
       const client = clients.find((c) => c.id === ev.clientId);
       const evMovements = movements.filter((m) => m.eventId === ev.id);
 
@@ -498,8 +503,15 @@ export default function FinanceView({
       }
     > = {};
 
-    // Group all allocations by item
+    const cancelledEventIds = new Set(
+      events.filter((e) => !countsForFinance(e)).map((e) => e.id)
+    );
+
+    // Group all allocations by item (ignoring allocations for cancelled events)
     allocations.forEach((alc) => {
+      if (alc.eventId && cancelledEventIds.has(alc.eventId)) {
+        return;
+      }
       const item = items.find((i) => i.id === alc.itemId);
       if (!usageMap[alc.itemId]) {
         usageMap[alc.itemId] = {
@@ -716,7 +728,7 @@ export default function FinanceView({
             >
               <span>Rentabilidade por Evento</span>
               <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-[#6366f1]/10 text-[#4f46e5]">
-                {events.length}
+                {events.filter((e) => countsForFinance(e)).length}
               </span>
             </button>
             <button
@@ -1936,7 +1948,7 @@ export default function FinanceView({
                   className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                 >
                   <option value="">Geral / Despesa de Armazém</option>
-                  {events.map((ev) => (
+                  {events.filter((ev) => countsForFinance(ev)).map((ev) => (
                     <option key={ev.id} value={ev.id}>
                       {ev.name} ({new Date(ev.startDate).toLocaleDateString("pt-PT")})
                     </option>
@@ -2042,7 +2054,7 @@ export default function FinanceView({
                   className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#217a3b]"
                 >
                   <option value="">Selecione o evento...</option>
-                  {events.map((ev) => (
+                  {events.filter((ev) => countsForFinance(ev)).map((ev) => (
                     <option key={ev.id} value={ev.id}>
                       {ev.name} · {formatEuro(ev.customerPrice || 0)}
                     </option>

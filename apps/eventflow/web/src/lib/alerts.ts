@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import { eq, desc, inArray } from "drizzle-orm";
 import { generateId } from "@/lib/id";
+import { isCancelledEvent } from "@/lib/events";
 
 export interface AlertCandidate {
   fingerprint: string;
@@ -175,6 +176,14 @@ export async function evaluateAndSyncAlerts() {
 
   for (const quote of allQuotes) {
     if (quote.status !== "aprovado") continue;
+
+    // Do not trigger payment alerts for cancelled events
+    if (quote.eventId) {
+      const linkedEvent = allEvents.find((e) => e.id === quote.eventId);
+      if (isCancelledEvent(linkedEvent)) {
+        continue;
+      }
+    }
 
     const approvalDate = quote.signedAt
       ? new Date(quote.signedAt)
