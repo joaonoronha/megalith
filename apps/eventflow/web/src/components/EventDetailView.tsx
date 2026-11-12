@@ -501,44 +501,47 @@ export default function EventDetailView({
   return (
     <div className="min-h-screen bg-[#f5f5f7] text-[#111111] pb-24 font-sans antialiased">
       {/* Top Navbar */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-[#ececf0] px-4 py-3">
-        <div className="max-w-[1100px] mx-auto flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-white/85 backdrop-blur-md border-b border-[#ececf0] px-3.5 sm:px-4 py-2.5 sm:py-3">
+        <div className="max-w-[1100px] mx-auto flex items-center justify-between gap-2">
           <Link
             href="/eventos"
-            className="inline-flex items-center gap-2 text-xs font-semibold text-[#636366] hover:text-[#111111] transition bg-[#f2f2f5] hover:bg-[#e5e5ea] px-3 py-1.5 rounded-full"
+            className="inline-flex items-center gap-1.5 sm:gap-2 text-xs font-semibold text-[#636366] hover:text-[#111111] transition bg-[#f2f2f5] hover:bg-[#e5e5ea] px-2.5 sm:px-3 py-1.5 rounded-full flex-shrink-0"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Voltar aos Eventos</span>
+            <span>Voltar<span className="hidden sm:inline"> aos Eventos</span></span>
           </Link>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3">
             {/* Auto-save Status Indicator */}
-            <div className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-[#fafafc] border border-[#ececf0]">
+            <div className="flex items-center gap-1.5 text-xs font-medium px-2 sm:px-2.5 py-1 rounded-full bg-[#fafafc] border border-[#ececf0] flex-shrink-0">
               {saveStatus === "saving" ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-[#007aff]" />
-                  <span className="text-[#007aff] font-semibold">A guardar...</span>
+                  <span className="text-[#007aff] font-semibold text-[11px] sm:text-xs">A guardar...</span>
                 </>
               ) : saveStatus === "saved" ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-emerald-700 font-semibold">Guardado instantaneamente</span>
+                  <span className="text-emerald-700 font-semibold text-[11px] sm:text-xs">
+                    <span className="hidden sm:inline">Guardado instantaneamente</span>
+                    <span className="sm:hidden">Guardado</span>
+                  </span>
                 </>
               ) : (
                 <>
                   <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                  <span className="text-rose-600 font-semibold">Erro ao guardar</span>
+                  <span className="text-rose-600 font-semibold text-[11px] sm:text-xs">Erro ao guardar</span>
                 </>
               )}
             </div>
 
             {/* Status Dropdown */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-medium text-[#8e8e93] hidden sm:inline">Estado:</span>
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+              <span className="text-[11px] font-medium text-[#8e8e93] hidden md:inline">Estado:</span>
               <select
                 value={event.status}
                 onChange={(e) => handleFieldChange("status", e.target.value, true)}
-                className={`text-xs font-bold px-3 py-1.5 rounded-full border outline-none cursor-pointer transition ${
+                className={`text-[11px] sm:text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-full border outline-none cursor-pointer transition ${
                   getStatusBadge(event.status).bg
                 }`}
               >
@@ -554,18 +557,18 @@ export default function EventDetailView({
             </div>
 
             {/* Auditing Log & Last Updated */}
-            <div className="flex items-center gap-2 pl-2 border-l border-[#ececf0]">
+            <div className="flex items-center gap-1.5 sm:gap-2 pl-1.5 sm:pl-2 border-l border-[#ececf0] flex-shrink-0">
               <span className="hidden lg:inline text-[11px] text-[#8e8e93]">
                 Last updated by <strong className="text-[#3a3a3c] font-semibold">{event.lastUpdatedByName || "Administrador CFM"}</strong> {formatRelativeTime(event.updatedAt, "en")}
               </span>
               <button
                 type="button"
                 onClick={() => setShowAuditModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#007aff] hover:text-[#005bb5] font-semibold text-xs transition cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#007aff] hover:text-[#005bb5] font-semibold text-xs transition cursor-pointer"
                 title="Ver histórico de alterações do evento"
               >
                 <History className="w-3.5 h-3.5" />
-                <span>Histórico</span>
+                <span className="hidden sm:inline">Histórico</span>
               </button>
             </div>
           </div>
