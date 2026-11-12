@@ -11,19 +11,23 @@ import {
 } from "./session";
 
 export async function getCurrentUser() {
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!sessionToken) return null;
+  try {
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+    if (!sessionToken) return null;
 
-  const session = await verifySessionToken(sessionToken);
-  if (!session) return null;
+    const session = await verifySessionToken(sessionToken);
+    if (!session) return null;
 
-  return {
-    id: session.userId,
-    name: session.name,
-    email: session.email,
-    role: session.role,
-  };
+    return {
+      id: session.userId,
+      name: session.name,
+      email: session.email,
+      role: session.role,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function loginUser(email: string, password: string): Promise<{
