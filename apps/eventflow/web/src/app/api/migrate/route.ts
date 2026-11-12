@@ -8,7 +8,7 @@ export async function GET() {
     await ensureDbMigrated();
     return NextResponse.json({
       success: true,
-      message: "Database schema successfully migrated (linked_event_id, meeting_summary, meeting_participants, comments, moodboard_comments, event_meetings).",
+      message: "Database schema successfully migrated (linked_event_id, meeting_summary, meeting_participants, comments, moodboard_comments, event_meetings, event_custom_items).",
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {

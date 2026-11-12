@@ -75,6 +75,7 @@ interface Props {
   initialAlerts?: any[];
   initialLocations?: any[];
   initialAllocations?: any[];
+  initialCustomItems?: any[];
   initialMeetings?: any[];
   initialTab?: "home" | "calendar" | "events" | "inventory" | "finance" | "more";
 }
@@ -180,6 +181,7 @@ export default function EventFlowApp({
   initialAlerts = [],
   initialLocations = [],
   initialAllocations = [],
+  initialCustomItems = [],
   initialMeetings = [],
   initialTab = "home",
 }: Props) {
@@ -207,6 +209,7 @@ export default function EventFlowApp({
   const [quotesList, setQuotesList] = useState(initialQuotes);
   const [movementsList, setMovementsList] = useState(initialMovements);
   const [allocationsList, setAllocationsList] = useState<any[]>(initialAllocations);
+  const [customItemsList, setCustomItemsList] = useState<any[]>(initialCustomItems);
   const [locationsList, setLocationsList] = useState<any[]>(initialLocations);
   const [showLocationsModal, setShowLocationsModal] = useState(false);
   const [locationsModalInitialMode, setLocationsModalInitialMode] = useState<"list" | "create">("list");
@@ -3637,6 +3640,8 @@ export default function EventFlowApp({
           clients={clientsList}
           events={eventsList}
           inventory={itemsList}
+          allocations={allocationsList}
+          customItems={customItemsList}
           initialEventId={selectedEventForQuote}
           onClose={() => setShowQuoteWizard(false)}
           onCreated={(newQuote) => {
@@ -5654,6 +5659,8 @@ function QuoteWizardModal({
   clients,
   events,
   inventory,
+  allocations = [],
+  customItems = [],
   initialEventId,
   onClose,
   onCreated,
@@ -5661,6 +5668,8 @@ function QuoteWizardModal({
   clients: any[];
   events: any[];
   inventory: any[];
+  allocations?: any[];
+  customItems?: any[];
   initialEventId?: string;
   onClose: () => void;
   onCreated: (quote: any) => void;
@@ -5692,6 +5701,34 @@ function QuoteWizardModal({
   ]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const importEventItems = () => {
+    const eventAllocations = allocations.filter((a: any) => a.eventId === eventId);
+    const eventCustom = customItems.filter((c: any) => c.eventId === eventId);
+    const newLines: Array<{ itemId?: string; description: string; quantity: number; unitPrice: number }> = [];
+
+    eventAllocations.forEach((a: any) => {
+      const inv = inventory.find((i: any) => i.id === a.itemId);
+      newLines.push({
+        itemId: a.itemId,
+        description: inv?.name || "Artigo de Armazém",
+        quantity: a.quantity || 1,
+        unitPrice: inv?.unitPrice || 0,
+      });
+    });
+
+    eventCustom.forEach((c: any) => {
+      newLines.push({
+        description: `${c.name} (${c.category || "Personalizado"})`,
+        quantity: c.quantity || 1,
+        unitPrice: c.unitPrice || 0,
+      });
+    });
+
+    if (newLines.length > 0) {
+      setLines(newLines);
+    }
+  };
 
   const addLine = () => {
     setLines((prev) => [
@@ -5831,13 +5868,26 @@ function QuoteWizardModal({
                 <span className="font-bold text-sm text-[#111111]">
                   Linhas de Artigos & Serviços
                 </span>
-                <button
-                  type="button"
-                  onClick={addLine}
-                  className="text-xs font-bold text-[#007aff] hover:underline cursor-pointer"
-                >
-                  + Adicionar linha
-                </button>
+                <div className="flex items-center gap-2">
+                  {(allocations.filter((a: any) => a.eventId === eventId).length > 0 ||
+                    customItems.filter((c: any) => c.eventId === eventId).length > 0) && (
+                    <button
+                      type="button"
+                      onClick={importEventItems}
+                      className="px-2.5 py-1 rounded-lg bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[11px] font-semibold text-[#111] transition cursor-pointer"
+                      title="Importar artigos reservados do stock e artigos exclusivos deste evento"
+                    >
+                      Importar Artigos do Evento
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={addLine}
+                    className="text-xs font-bold text-[#007aff] hover:underline cursor-pointer"
+                  >
+                    + Adicionar linha
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2.5 max-h-60 overflow-y-auto">

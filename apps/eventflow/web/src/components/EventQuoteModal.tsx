@@ -56,10 +56,20 @@ interface LineItem {
   unitPrice: number;
 }
 
+interface CustomQuoteItem {
+  id: string;
+  name: string;
+  category?: string | null;
+  quantity: number;
+  unitPrice: number;
+  unitCost?: number;
+}
+
 interface EventQuoteModalProps {
   event: EventData;
   client: ClientData | null;
   allocations: AllocationItem[];
+  customItems?: CustomQuoteItem[];
   allItems: InventoryItem[];
   onClose: () => void;
   onCreated: (newQuote: any) => void;
@@ -69,32 +79,50 @@ export default function EventQuoteModal({
   event,
   client,
   allocations,
+  customItems = [],
   allItems,
   onClose,
   onCreated,
 }: EventQuoteModalProps) {
-  // Pre-fill lines: If event already has material allocations, import them as initial quote lines
-  const initialLines: LineItem[] =
-    allocations.length > 0
-      ? allocations.map((a) => ({
-          itemId: a.itemId,
-          description: a.itemName,
-          quantity: a.quantity || 1,
-          unitPrice: a.itemUnitPrice || 0,
-        }))
-      : [
-          {
-            itemId: allItems[0]?.id,
-            description: allItems[0]?.name || "Cadeiras Chiavari Douradas",
-            quantity: 50,
-            unitPrice: allItems[0]?.unitPrice || 6.0,
-          },
-          {
-            description: "Produção de Evento & Montagem Técnica CFM",
-            quantity: 1,
-            unitPrice: 650.0,
-          },
-        ];
+  // Pre-fill lines: If event already has material allocations or custom event items, import them as initial quote lines
+  const initialLines: LineItem[] = [];
+
+  if (allocations && allocations.length > 0) {
+    allocations.forEach((a) => {
+      initialLines.push({
+        itemId: a.itemId,
+        description: a.itemName,
+        quantity: a.quantity || 1,
+        unitPrice: a.itemUnitPrice || 0,
+      });
+    });
+  }
+
+  if (customItems && customItems.length > 0) {
+    customItems.forEach((c) => {
+      initialLines.push({
+        description: `${c.name}${c.category && c.category !== "Personalizado" ? ` (${c.category})` : " (Personalizado)"}`,
+        quantity: c.quantity || 1,
+        unitPrice: c.unitPrice || 0,
+      });
+    });
+  }
+
+  if (initialLines.length === 0) {
+    initialLines.push(
+      {
+        itemId: allItems[0]?.id,
+        description: allItems[0]?.name || "Cadeiras Chiavari Douradas",
+        quantity: 50,
+        unitPrice: allItems[0]?.unitPrice || 6.0,
+      },
+      {
+        description: "Produção de Evento & Montagem Técnica CFM",
+        quantity: 1,
+        unitPrice: 650.0,
+      }
+    );
+  }
 
   const [lines, setLines] = useState<LineItem[]>(initialLines);
   const [validityDays, setValidityDays] = useState("15");
@@ -130,14 +158,32 @@ export default function EventQuoteModal({
   };
 
   const handleImportAllocations = () => {
-    if (allocations.length === 0) return;
-    const importedLines = allocations.map((a) => ({
-      itemId: a.itemId,
-      description: a.itemName,
-      quantity: a.quantity || 1,
-      unitPrice: a.itemUnitPrice || 0,
-    }));
-    setLines(importedLines);
+    const importedLines: LineItem[] = [];
+
+    if (allocations.length > 0) {
+      allocations.forEach((a) => {
+        importedLines.push({
+          itemId: a.itemId,
+          description: a.itemName,
+          quantity: a.quantity || 1,
+          unitPrice: a.itemUnitPrice || 0,
+        });
+      });
+    }
+
+    if (customItems.length > 0) {
+      customItems.forEach((c) => {
+        importedLines.push({
+          description: `${c.name}${c.category && c.category !== "Personalizado" ? ` (${c.category})` : " (Personalizado)"}`,
+          quantity: c.quantity || 1,
+          unitPrice: c.unitPrice || 0,
+        });
+      });
+    }
+
+    if (importedLines.length > 0) {
+      setLines(importedLines);
+    }
   };
 
   const handleRemoveLine = (idx: number) => {
@@ -372,15 +418,18 @@ export default function EventQuoteModal({
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                {allocations.length > 0 && (
+                {(allocations.length > 0 || customItems.length > 0) && (
                   <button
                     type="button"
                     onClick={handleImportAllocations}
                     className="px-2.5 py-1 rounded-[8px] bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[11px] font-semibold text-[#111] flex items-center gap-1 transition cursor-pointer"
-                    title="Preencher com os artigos já reservados no inventário deste evento"
+                    title="Preencher com os artigos reservados e artigos personalizados deste evento"
                   >
                     <Package className="w-3 h-3 text-[#007aff]" />
-                    <span>Importar Artigos Reservados ({allocations.length})</span>
+                    <span>
+                      Importar Artigos ({allocations.length + customItems.length}
+                      {customItems.length > 0 ? ` · ${customItems.length} exclus.` : ""})
+                    </span>
                   </button>
                 )}
                 <button

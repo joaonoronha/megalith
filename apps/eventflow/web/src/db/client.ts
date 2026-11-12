@@ -90,6 +90,21 @@ export async function ensureDbMigrated(): Promise<void> {
         size INTEGER NOT NULL,
         created_at INTEGER NOT NULL
       )`,
+
+      // 7. Event Custom Items (Bespoke items specific to 1 event, added to quota)
+      `CREATE TABLE IF NOT EXISTS event_custom_items (
+        id TEXT PRIMARY KEY,
+        event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'Personalizado',
+        quantity INTEGER NOT NULL DEFAULT 1,
+        unit_cost REAL NOT NULL DEFAULT 0,
+        unit_price REAL NOT NULL DEFAULT 0,
+        supplier TEXT,
+        notes TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER
+      )`,
     ];
 
     for (const sql of migrationStatements) {

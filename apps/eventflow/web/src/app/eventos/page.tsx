@@ -19,6 +19,7 @@ export default async function EventosPage() {
       initialAlerts={data.allAlerts}
       initialLocations={data.allLocations}
       initialAllocations={data.allAllocations}
+      initialCustomItems={data.allCustomItems}
       initialTab="events"
     />
   );
