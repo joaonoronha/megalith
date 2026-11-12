@@ -440,6 +440,9 @@ export default function EventFlowApp({
                               >
                                 {evt.name}
                               </Link>
+                              <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0] flex-shrink-0">
+                                #{evt.id}
+                              </span>
                               {evt.theme && (
                                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#fef7e0] text-[#b06000] border border-[#feefc3] flex items-center gap-1 flex-shrink-0">
                                   <Sparkles className="w-2.5 h-2.5" />
@@ -641,8 +644,13 @@ export default function EventFlowApp({
                             {icon}
                           </div>
                           <div className="min-w-0">
-                            <div className="text-[14px] font-bold text-[#111111] truncate">
-                              {item.name}
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[14px] font-bold text-[#111111] truncate">
+                                {item.name}
+                              </span>
+                              <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0] flex-shrink-0">
+                                #{item.id}
+                              </span>
                             </div>
                             <div className="text-[12px] text-[#8e8e93] mt-0.5 truncate">
                               {item.totalQuantity - (item.damagedQuantity || 0)} disponíveis de{" "}
@@ -809,7 +817,14 @@ export default function EventFlowApp({
                       </div>
 
                       <div>
-                        <div className="font-bold text-sm text-[#111]">{e.name}</div>
+                        <div className="flex items-center gap-2">
+                          <Link href={`/eventos/${e.id}`} className="font-bold text-sm text-[#111] hover:text-[#007aff] transition">
+                            {e.name}
+                          </Link>
+                          <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0]">
+                            #{e.id}
+                          </span>
+                        </div>
                         <div className="text-xs text-[#8e8e93] mt-0.5">
                           {formatEventByline(e.startDate, e.venue)}
                         </div>
@@ -894,6 +909,9 @@ export default function EventFlowApp({
                           >
                             {e.name}
                           </Link>
+                          <span className="font-mono text-[10px] text-[#8e8e93] bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#e5e5ea]">
+                            #{e.id}
+                          </span>
                           {e.category && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f2f2f5] text-[#48484a]">
                               {e.category}
@@ -1024,9 +1042,14 @@ export default function EventFlowApp({
                   >
                     <div>
                       <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-wider">
-                          {item.sku}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-wider">
+                            {item.sku}
+                          </span>
+                          <span className="font-mono text-[10px] text-[#8e8e93] bg-white px-1.5 py-0.5 rounded border border-[#ececf0]">
+                            #{item.id}
+                          </span>
+                        </div>
                         {damaged > 0 ? (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">
                             {damaged} Danificado(s)
@@ -1173,8 +1196,13 @@ export default function EventFlowApp({
                         {u.name.slice(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <div className="font-bold text-sm text-[#111111]">
-                          {u.name}
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-[#111111]">
+                            {u.name}
+                          </span>
+                          <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0]">
+                            #{u.id}
+                          </span>
                         </div>
                         <div className="text-[11px] text-[#8e8e93]">{u.email}</div>
                       </div>
@@ -1218,7 +1246,12 @@ export default function EventFlowApp({
                     className="p-3.5 bg-white flex items-center justify-between text-xs"
                   >
                     <div>
-                      <div className="font-bold text-sm text-[#111]">{client.name}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-[#111]">{client.name}</span>
+                        <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0]">
+                          #{client.id}
+                        </span>
+                      </div>
                       <div className="text-[11px] text-[#8e8e93]">
                         {client.contactName ? `${client.contactName} · ` : ""}
                         {client.email || "Sem email"} · {client.phone || "Sem telefone"}
@@ -1270,6 +1303,9 @@ export default function EventFlowApp({
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-sm text-[#111]">
                             {q.quoteNumber}
+                          </span>
+                          <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0]">
+                            #{q.id}
                           </span>
                           <span
                             className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -1976,6 +2012,7 @@ function ItemWizardModal({
   onCreated: (item: any) => void;
 }) {
   const [sku, setSku] = useState("");
+  const [customId, setCustomId] = useState("");
   const [name, setName] = useState("");
   const [category, setCategory] = useState("Mobiliário");
   const [totalQuantity, setTotalQuantity] = useState("50");
@@ -1993,6 +2030,7 @@ function ItemWizardModal({
     try {
       const formData = new FormData();
       formData.set("sku", sku);
+      if (customId.trim()) formData.set("customId", customId.trim());
       formData.set("name", name);
       formData.set("category", category);
       formData.set("totalQuantity", totalQuantity);
@@ -2080,6 +2118,19 @@ function ItemWizardModal({
             />
           </div>
 
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">
+              ID Único Personalizado (Opcional)
+            </label>
+            <input
+              type="text"
+              value={customId}
+              onChange={(e) => setCustomId(e.target.value)}
+              placeholder="Ex: itm-cadeira-chiavari (vazio = automático)"
+              className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
           <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="block font-bold text-[#3a3a3c] mb-1">Qtd. Total</label>
@@ -2149,6 +2200,7 @@ function ClientWizardModal({
   onCreated: (client: any) => void;
 }) {
   const [name, setName] = useState("");
+  const [customId, setCustomId] = useState("");
   const [contactName, setContactName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -2165,6 +2217,7 @@ function ClientWizardModal({
     try {
       const formData = new FormData();
       formData.set("name", name);
+      if (customId.trim()) formData.set("customId", customId.trim());
       formData.set("contactName", contactName);
       formData.set("email", email);
       formData.set("phone", phone);
@@ -2218,6 +2271,19 @@ function ClientWizardModal({
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex: Santander Portugal ou Marta Silva"
               className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">
+              ID Único Personalizado (Opcional)
+            </label>
+            <input
+              type="text"
+              value={customId}
+              onChange={(e) => setCustomId(e.target.value)}
+              placeholder="Ex: cli-santander (vazio = automático cli_...)"
+              className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
             />
           </div>
 
@@ -2391,6 +2457,7 @@ function NewUserModal({
   onCreated: (user: any) => void;
 }) {
   const [name, setName] = useState("");
+  const [customId, setCustomId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("admin");
@@ -2405,6 +2472,7 @@ function NewUserModal({
     try {
       const formData = new FormData();
       formData.set("name", name);
+      if (customId.trim()) formData.set("customId", customId.trim());
       formData.set("email", email);
       formData.set("password", password);
       formData.set("role", role);
@@ -2459,6 +2527,19 @@ function NewUserModal({
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex: Sofia Ribeiro"
               className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">
+              ID de Utilizador (Opcional)
+            </label>
+            <input
+              type="text"
+              value={customId}
+              onChange={(e) => setCustomId(e.target.value)}
+              placeholder="Ex: usr-sofia (vazio = automático usr_...)"
+              className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
             />
           </div>
 
@@ -2526,6 +2607,7 @@ function EventWizardModal({
 }) {
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
+  const [customId, setCustomId] = useState("");
   const [clientId, setClientId] = useState(clients[0]?.id || "");
   const [venue, setVenue] = useState("");
   const [category, setCategory] = useState("Aniversário Infantil");
@@ -2551,6 +2633,7 @@ function EventWizardModal({
     try {
       const formData = new FormData();
       formData.set("name", name);
+      if (customId.trim()) formData.set("customId", customId.trim());
       formData.set("clientId", clientId);
       formData.set("venue", venue);
       formData.set("category", category);
@@ -2631,6 +2714,22 @@ function EventWizardModal({
                   placeholder="Ex: Aniversário Martim · Winnie the Pooh"
                   className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                 />
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#3a3a3c] mb-1">
+                  ID Personalizado do Evento (Opcional)
+                </label>
+                <input
+                  type="text"
+                  value={customId}
+                  onChange={(e) => setCustomId(e.target.value)}
+                  placeholder="Ex: evt-aniversario-martim (vazio = automático evt_...)"
+                  className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                />
+                <span className="text-[10px] text-[#8e8e93] mt-0.5 block">
+                  Identificador único do evento no sistema. Se omitido, é gerado um ID criptográfico sem colisões.
+                </span>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

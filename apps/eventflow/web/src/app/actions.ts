@@ -15,6 +15,8 @@ import {
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import crypto from "crypto";
+import { generateId, generateReferenceCode, formatCustomId } from "@/lib/id";
 
 // 1. Create Event
 export async function createEventAction(formData: FormData) {
@@ -34,12 +36,14 @@ export async function createEventAction(formData: FormData) {
   const specialNeeds = (formData.get("specialNeeds") as string) || "";
   const notes = (formData.get("notes") as string) || "";
   const coverImageUrl = (formData.get("coverImageUrl") as string) || "";
+  const rawCustomId = (formData.get("customId") as string) || "";
 
   if (!name || !startDateStr) {
     throw new Error("Nome do evento e data de início são obrigatórios.");
   }
 
-  const id = `evt-${Date.now()}`;
+  // Generate clean, collision-free unique ID
+  const id = rawCustomId.trim() ? formatCustomId("evt", rawCustomId) : generateId("evt");
   await db.insert(events).values({
     id,
     name,
@@ -78,7 +82,7 @@ export async function updateEventStatusAction(eventId: string, newStatus: string
 
 // 3. Create Commercial Quote
 export async function createQuoteAction(formData: FormData) {
-  const quoteNumber = (formData.get("quoteNumber") as string) || `ORC-2026-${Math.floor(100 + Math.random() * 900)}`;
+  const quoteNumber = (formData.get("quoteNumber") as string) || generateReferenceCode("ORC");
   const eventId = (formData.get("eventId") as string) || null;
   const clientId = (formData.get("clientId") as string) || null;
   const validityDays = parseInt((formData.get("validityDays") as string) || "15", 10);
@@ -96,8 +100,8 @@ export async function createQuoteAction(formData: FormData) {
   const vatAmount = subtotal * (vatRate / 100);
   const total = subtotal + vatAmount;
 
-  const quoteId = `qte-${Date.now()}`;
-  const accessToken = `orc-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  const quoteId = generateId("qte");
+  const accessToken = `orc-${crypto.randomUUID()}`;
 
   await db.insert(quotes).values({
     id: quoteId,
@@ -117,7 +121,7 @@ export async function createQuoteAction(formData: FormData) {
   for (let i = 0; i < parsedLines.length; i++) {
     const line = parsedLines[i];
     await db.insert(quoteLines).values({
-      id: `ql-${Date.now()}-${i}`,
+      id: generateId("ql"),
       quoteId,
       itemId: line.itemId || null,
       description: line.description,
@@ -146,7 +150,7 @@ export async function createMovementAction(formData: FormData) {
     return { success: false, error: "Descrição e valor são obrigatórios." };
   }
 
-  const id = `mov-${Date.now()}`;
+  const id = generateId("mov");
   const movement = {
     id,
     type,
@@ -182,7 +186,8 @@ export async function createItemAction(formData: FormData) {
     return { success: false, error: "SKU, nome e categoria são obrigatórios." };
   }
 
-  const id = `itm-${Date.now()}`;
+  const rawCustomId = (formData.get("customId") as string) || "";
+  const id = rawCustomId.trim() ? formatCustomId("itm", rawCustomId) : generateId("itm");
   const item = {
     id,
     sku: sku.toUpperCase().trim(),
@@ -238,7 +243,8 @@ export async function createClientAction(formData: FormData) {
     return { success: false, error: "Nome do cliente é obrigatório." };
   }
 
-  const id = `cli-${Date.now()}`;
+  const rawCustomId = (formData.get("customId") as string) || "";
+  const id = rawCustomId.trim() ? formatCustomId("cli", rawCustomId) : generateId("cli");
   const client = {
     id,
     name,
@@ -286,12 +292,13 @@ export async function createUserAction(formData: FormData) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
   const role = (formData.get("role") as any) || "admin";
+  const customId = (formData.get("customId") as string) || undefined;
 
   if (!name || !email || !password) {
     return { success: false, error: "Nome, email e palavra-passe são obrigatórios." };
   }
 
-  const result = await createTeamUser({ name, email, password, role });
+  const result = await createTeamUser({ name, email, password, role, customId });
   revalidatePath("/");
   return result;
 }
@@ -384,7 +391,7 @@ export async function addEventAllocationAction(formData: FormData) {
     return { success: false, error: "Dados de alocação inválidos." };
   }
 
-  const id = `alc-${Date.now()}`;
+  const id = generateId("alc");
   await db.insert(eventAllocations).values({
     id,
     eventId,
@@ -428,7 +435,7 @@ export async function addEventTaskAction(eventId: string, title: string, priorit
     return { success: false, error: "Título da tarefa é obrigatório." };
   }
 
-  const id = `tsk-${Date.now()}`;
+  const id = generateId("tsk");
   await db.insert(eventTasks).values({
     id,
     eventId,

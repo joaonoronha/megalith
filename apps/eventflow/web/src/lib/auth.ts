@@ -68,9 +68,11 @@ export async function logoutUser() {
   cookieStore.delete(SESSION_COOKIE_NAME);
 }
 
-export async function createTeamUser(data: { name: string; email: string; password: string; role: "admin" | "producer" | "warehouse" }) {
+import { generateId } from "./id";
+
+export async function createTeamUser(data: { name: string; email: string; password: string; role: "admin" | "producer" | "warehouse"; customId?: string }) {
   const passwordHash = await bcrypt.hash(data.password, 10);
-  const id = `usr-${Date.now()}`;
+  const id = data.customId?.trim() ? data.customId.trim() : generateId("usr");
   await db.insert(users).values({
     id,
     name: data.name,
