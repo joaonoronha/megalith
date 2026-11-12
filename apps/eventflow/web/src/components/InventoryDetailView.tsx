@@ -19,7 +19,10 @@ import {
   Maximize2,
   Layers,
   Sparkles,
+  History,
 } from "lucide-react";
+import AuditLogModal from "@/components/AuditLogModal";
+import { formatRelativeTime } from "@/lib/date-format";
 import { updateItemAction, updateItemTriageAction } from "@/app/actions";
 
 interface InventoryItem {
@@ -36,6 +39,8 @@ interface InventoryItem {
   imageUrl: string | null;
   damagedQuantity: number | null;
   inMaintenanceQuantity: number | null;
+  updatedAt?: Date | string | null;
+  lastUpdatedByName?: string | null;
 }
 
 interface ItemAllocation {
@@ -65,6 +70,7 @@ export default function InventoryDetailView({
   const [copiedSku, setCopiedSku] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showTriageModal, setShowTriageModal] = useState(false);
+  const [showAuditModal, setShowAuditModal] = useState(false);
   const [damageQuantity, setDamageQuantity] = useState(1);
   const [isPending, startTransition] = useTransition();
 
@@ -133,6 +139,17 @@ export default function InventoryDetailView({
           </Link>
 
           <div className="flex items-center gap-2">
+            <span className="hidden sm:inline text-[11px] text-[#8e8e93]">
+              Last updated by <strong className="text-[#3a3a3c] font-semibold">{item.lastUpdatedByName || "Administrador CFM"}</strong> {formatRelativeTime(item.updatedAt, "en")}
+            </span>
+            <button
+              onClick={() => setShowAuditModal(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#007aff] hover:text-[#005bb5] bg-[#f2f2f5] hover:bg-[#e5e5ea] px-3 py-1.5 rounded-[12px] transition cursor-pointer"
+              title="Ver histórico de alterações"
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>Histórico</span>
+            </button>
             <button
               onClick={() => setShowEditModal(true)}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#111] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] px-3.5 py-1.5 rounded-[12px] shadow-2xs transition cursor-pointer"
@@ -638,6 +655,15 @@ export default function InventoryDetailView({
           </div>
         </div>
       )}
+
+      {/* Audit Log Modal */}
+      <AuditLogModal
+        isOpen={showAuditModal}
+        onClose={() => setShowAuditModal(false)}
+        entityType="inventory"
+        entityId={item.id}
+        entityTitle={item.name}
+      />
     </div>
   );
 }
