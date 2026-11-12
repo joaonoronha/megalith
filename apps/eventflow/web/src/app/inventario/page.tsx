@@ -16,6 +16,7 @@ export default async function InventarioPage() {
       initialQuotes={data.allQuotes}
       initialMovements={data.allMovements}
       initialTemplate={data.template}
+      initialAlerts={data.allAlerts}
       initialTab="inventory"
     />
   );

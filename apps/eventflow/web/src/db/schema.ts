@@ -200,3 +200,38 @@ export const auditLogs = sqliteTable("audit_logs", {
   changes: text("changes"), // JSON string
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
 });
+
+// 12. System Alerts & Notifications (Operational Intelligence & Snooze Engine)
+export const alerts = sqliteTable("alerts", {
+  id: text("id").primaryKey(),
+  fingerprint: text("fingerprint").unique().notNull(), // Unique rule identity: `${type}:${entityType}:${entityId}`
+  type: text("type", { 
+    enum: [
+      "low_stock", 
+      "damaged_stock", 
+      "event_unprepared", 
+      "payment_due", 
+      "missing_completed_payment"
+    ] 
+  }).notNull(),
+  entityType: text("entity_type", { 
+    enum: ["inventory", "event", "quote", "client"] 
+  }).notNull(),
+  entityId: text("entity_id").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  severity: text("severity", { 
+    enum: ["info", "warning", "urgent", "critical"] 
+  }).default("warning").notNull(),
+  status: text("status", { 
+    enum: ["active", "snoozed", "acknowledged", "resolved"] 
+  }).default("active").notNull(),
+  metadata: text("metadata"), // JSON payload with contextual properties
+  snoozedUntil: integer("snoozed_until", { mode: "timestamp" }),
+  lastTriggeredAt: integer("last_triggered_at", { mode: "timestamp" }).notNull(),
+  acknowledgedAt: integer("acknowledged_at", { mode: "timestamp" }),
+  acknowledgedByUserId: text("acknowledged_by_user_id").references(() => users.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+});
+

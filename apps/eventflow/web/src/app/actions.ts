@@ -13,6 +13,7 @@ import {
   financialMovements,
   quoteTemplates,
   users,
+  alerts,
 } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -337,6 +338,78 @@ export async function updateItemAction(formData: FormData) {
 
   invalidateAllCaches();
   revalidatePath(`/inventario/${itemId}`);
+  revalidatePath(`/artigos/${itemId}`);
+  return { success: true };
+}
+
+// 6.2 Partial Inline Patch for Inventory Item (Auto-Save)
+export async function updateItemPatchAction(
+  itemId: string,
+  patch: {
+    name?: string;
+    sku?: string;
+    category?: string;
+    totalQuantity?: number;
+    minStock?: number | null;
+    warehouseLocation?: string | null;
+    dimensions?: string | null;
+    unitPrice?: number;
+    replacementCost?: number | null;
+    imageUrl?: string | null;
+    damagedQuantity?: number | null;
+    inMaintenanceQuantity?: number | null;
+  }
+) {
+  if (!itemId) return { success: false, error: "ID do artigo é obrigatório." };
+
+  const updateData: Record<string, any> = {
+    updatedAt: new Date(),
+  };
+
+  if (patch.name !== undefined) updateData.name = patch.name;
+  if (patch.sku !== undefined) updateData.sku = patch.sku;
+  if (patch.category !== undefined) updateData.category = patch.category;
+  if (patch.totalQuantity !== undefined) updateData.totalQuantity = Math.max(0, patch.totalQuantity);
+  if (patch.minStock !== undefined) updateData.minStock = patch.minStock === null ? null : Math.max(0, patch.minStock);
+  if (patch.warehouseLocation !== undefined) updateData.warehouseLocation = patch.warehouseLocation || "Armazém Principal";
+  if (patch.dimensions !== undefined) updateData.dimensions = patch.dimensions || null;
+  if (patch.unitPrice !== undefined) updateData.unitPrice = Math.max(0, patch.unitPrice);
+  if (patch.replacementCost !== undefined) updateData.replacementCost = patch.replacementCost === null ? null : Math.max(0, patch.replacementCost);
+  if (patch.imageUrl !== undefined) updateData.imageUrl = patch.imageUrl || null;
+  if (patch.damagedQuantity !== undefined) updateData.damagedQuantity = patch.damagedQuantity === null ? 0 : Math.max(0, patch.damagedQuantity);
+  if (patch.inMaintenanceQuantity !== undefined) updateData.inMaintenanceQuantity = patch.inMaintenanceQuantity === null ? 0 : Math.max(0, patch.inMaintenanceQuantity);
+
+  const { getCurrentUser } = await import("@/lib/auth");
+  const user = await getCurrentUser();
+  if (user) {
+    updateData.lastUpdatedByUserId = user.id;
+    updateData.lastUpdatedByName = user.name;
+  }
+
+  await db.update(inventoryItems).set(updateData).where(eq(inventoryItems.id, itemId));
+
+  const changedKeys = Object.keys(updateData).filter(
+    (k) => k !== "updatedAt" && k !== "lastUpdatedByUserId" && k !== "lastUpdatedByName"
+  );
+  let summary = "Campos alterados";
+  if (patch.name !== undefined) summary = `Nome alterado para "${patch.name}"`;
+  else if (patch.unitPrice !== undefined) summary = `Preço diário ajustado para €${patch.unitPrice.toFixed(2)}`;
+  else if (patch.totalQuantity !== undefined) summary = `Stock total alterado para ${patch.totalQuantity} un.`;
+  else if (patch.warehouseLocation !== undefined) summary = `Localização alterada para "${patch.warehouseLocation}"`;
+  else if (patch.category !== undefined) summary = `Categoria alterada para "${patch.category}"`;
+  else if (changedKeys.length > 0) summary = `Campos atualizados: ${changedKeys.join(", ")}`;
+
+  await recordAuditLog({
+    entityType: "inventory",
+    entityId: itemId,
+    action: "atualizado",
+    title: "Alteração de artigo",
+    details: summary,
+  });
+
+  invalidateAllCaches();
+  revalidatePath(`/inventario/${itemId}`);
+  revalidatePath(`/inventory/${itemId}`);
   revalidatePath(`/artigos/${itemId}`);
   return { success: true };
 }
@@ -846,4 +919,54 @@ export async function deleteEventMediaAction(mediaId: string, eventId: string) {
   revalidatePath(`/events/${eventId}`);
   return { success: true };
 }
+
+// 21. Alert Actions (Snooze, Acknowledge, Dismiss, Sync)
+export async function snoozeAlertAction(alertId: string, hours: number) {
+  const snoozedUntil = new Date(Date.now() + hours * 60 * 60 * 1000);
+  await db
+    .update(alerts)
+    .set({
+      status: "snoozed",
+      snoozedUntil,
+      updatedAt: new Date(),
+    })
+    .where(eq(alerts.id, alertId));
+
+  invalidateAllCaches();
+  return { success: true, snoozedUntil };
+}
+
+export async function acknowledgeAlertAction(alertId: string) {
+  await db
+    .update(alerts)
+    .set({
+      acknowledgedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(alerts.id, alertId));
+
+  invalidateAllCaches();
+  return { success: true };
+}
+
+export async function dismissAlertAction(alertId: string) {
+  await db
+    .update(alerts)
+    .set({
+      status: "resolved",
+      updatedAt: new Date(),
+    })
+    .where(eq(alerts.id, alertId));
+
+  invalidateAllCaches();
+  return { success: true };
+}
+
+export async function refreshAlertsAction() {
+  const { evaluateAndSyncAlerts } = await import("@/lib/alerts");
+  const result = await evaluateAndSyncAlerts();
+  invalidateAllCaches();
+  return { success: true, alerts: result };
+}
+
 

@@ -16,6 +16,7 @@ export default async function CalendarioPage() {
       initialQuotes={data.allQuotes}
       initialMovements={data.allMovements}
       initialTemplate={data.template}
+      initialAlerts={data.allAlerts}
       initialTab="calendar"
     />
   );

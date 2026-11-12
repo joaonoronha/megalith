@@ -27,8 +27,12 @@ import {
   SlidersHorizontal,
   Filter,
   Tag,
+  Bell,
+  Clock,
+  CheckCheck,
 } from "lucide-react";
 import AuditLogModal from "@/components/AuditLogModal";
+import AlertsDrawerModal from "@/components/AlertsDrawerModal";
 import { formatRelativeTime } from "@/lib/date-format";
 import {
   createEventAction,
@@ -41,6 +45,9 @@ import {
   loginAction,
   logoutAction,
   createUserAction,
+  snoozeAlertAction,
+  acknowledgeAlertAction,
+  dismissAlertAction,
 } from "@/app/actions";
 
 interface Props {
@@ -52,6 +59,7 @@ interface Props {
   initialQuotes: any[];
   initialMovements: any[];
   initialTemplate: any;
+  initialAlerts?: any[];
   initialTab?: "home" | "calendar" | "events" | "inventory" | "more";
 }
 
@@ -136,6 +144,7 @@ export default function EventFlowApp({
   initialQuotes,
   initialMovements,
   initialTemplate,
+  initialAlerts = [],
   initialTab = "home",
 }: Props) {
   const [isPending, startTransition] = useTransition();
@@ -159,6 +168,107 @@ export default function EventFlowApp({
   const [clientsList, setClientsList] = useState(initialClients);
   const [quotesList, setQuotesList] = useState(initialQuotes);
   const [movementsList, setMovementsList] = useState(initialMovements);
+  const [alertsList, setAlertsList] = useState<any[]>(initialAlerts || []);
+  const [showAlertsDrawer, setShowAlertsDrawer] = useState(false);
+  const [homeAlertFilter, setHomeAlertFilter] = useState<"all" | "new" | "snoozed">("all");
+  const [openHomeSnoozeMenuId, setOpenHomeSnoozeMenuId] = useState<string | null>(null);
+
+  // Dynamic Alerts Computation (New vs Active vs Snoozed)
+  const nowMs = Date.now();
+  const activeAlerts = useMemo(() => {
+    return alertsList.filter((a) => {
+      if (a.status === "resolved") return false;
+      if (a.status === "snoozed") {
+        if (a.snoozedUntil && new Date(a.snoozedUntil).getTime() > nowMs) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [alertsList, nowMs]);
+
+  const snoozedAlerts = useMemo(() => {
+    return alertsList.filter((a) => {
+      return (
+        a.status === "snoozed" &&
+        a.snoozedUntil &&
+        new Date(a.snoozedUntil).getTime() > nowMs
+      );
+    });
+  }, [alertsList, nowMs]);
+
+  const newAlerts = useMemo(() => {
+    return activeAlerts.filter((a) => !a.acknowledgedAt);
+  }, [activeAlerts]);
+
+  const newAlertsCount = newAlerts.length;
+
+  const handleSnoozeAlert = async (alertId: string, hours: number) => {
+    const snoozedUntil = new Date(Date.now() + hours * 60 * 60 * 1000);
+    setAlertsList((prev) =>
+      prev.map((a) =>
+        a.id === alertId ? { ...a, status: "snoozed", snoozedUntil } : a
+      )
+    );
+    setOpenHomeSnoozeMenuId(null);
+    startTransition(async () => {
+      await snoozeAlertAction(alertId, hours);
+    });
+  };
+
+  const handleAcknowledgeAlert = async (alertId: string) => {
+    setAlertsList((prev) =>
+      prev.map((a) =>
+        a.id === alertId ? { ...a, acknowledgedAt: new Date() } : a
+      )
+    );
+    startTransition(async () => {
+      await acknowledgeAlertAction(alertId);
+    });
+  };
+
+  const handleDismissAlert = async (alertId: string) => {
+    setAlertsList((prev) =>
+      prev.map((a) =>
+        a.id === alertId ? { ...a, status: "resolved" } : a
+      )
+    );
+    setOpenHomeSnoozeMenuId(null);
+    startTransition(async () => {
+      await dismissAlertAction(alertId);
+    });
+  };
+
+  const handleMarkAllAlertsRead = async () => {
+    const idsToAck = newAlerts.map((a) => a.id);
+    setAlertsList((prev) =>
+      prev.map((a) => (idsToAck.includes(a.id) ? { ...a, acknowledgedAt: new Date() } : a))
+    );
+    startTransition(async () => {
+      for (const id of idsToAck) {
+        await acknowledgeAlertAction(id);
+      }
+    });
+  };
+
+  const handleAlertActionClick = (alert: any) => {
+    handleAcknowledgeAlert(alert.id);
+    if (alert.type === "damaged_stock") {
+      const item = itemsList.find((i) => i.id === alert.entityId);
+      if (item) {
+        setTriageItem(item);
+        setShowTriageModal(true);
+      } else {
+        router.push(`/inventario/${alert.entityId}`);
+      }
+    } else if (alert.type === "low_stock") {
+      router.push(`/inventario/${alert.entityId}`);
+    } else if (alert.type === "event_unprepared") {
+      router.push(`/eventos/${alert.entityId}`);
+    } else if (alert.type === "payment_due" || alert.type === "missing_completed_payment") {
+      setShowMovementModal(true);
+    }
+  };
 
   // Search & Navigation
   const [searchTerm, setSearchTerm] = useState("");
@@ -462,8 +572,55 @@ export default function EventFlowApp({
 
   return (
     <div className="min-h-screen bg-[#f5f5f7] text-[#111111] pb-[max(6.5rem,calc(5.5rem+env(safe-area-inset-bottom)))] font-sans antialiased">
+      {/* Top Global Header Bar */}
+      <header className="sticky top-0 z-30 bg-[#f5f5f7]/85 backdrop-blur-md border-b border-[#ececf0]/80">
+        <div className="max-w-[940px] mx-auto px-3.5 sm:px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="font-extrabold text-[15px] tracking-tight text-[#111]">CFM Eventos</span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/5 text-[#636366] uppercase tracking-wider">
+              EventFlow
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Global Notification Bell */}
+            <button
+              onClick={() => setShowAlertsDrawer(true)}
+              className="relative p-2 rounded-xl text-[#3a3a3c] hover:bg-black/5 transition cursor-pointer flex items-center justify-center"
+              title="Centro de Alertas & Notificações"
+            >
+              <Bell className="w-5 h-5" />
+              {newAlertsCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-[#ff3b30] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs animate-in zoom-in-75">
+                  {newAlertsCount}
+                </span>
+              )}
+            </button>
+
+            {user ? (
+              <div
+                onClick={() => setShowLoginModal(true)}
+                className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold cursor-pointer hover:bg-[#fafafc] transition shadow-2xs"
+              >
+                <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold">
+                  {user.name.charAt(0)}
+                </div>
+                <span className="text-[#111] hidden sm:inline">{user.name.split(" ")[0]}</span>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowLoginModal(true)}
+                className="px-3 py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold text-[#111] hover:bg-[#fafafc] transition cursor-pointer shadow-2xs"
+              >
+                Entrar
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
       {/* Main Content Area */}
-      <main className="max-w-[940px] mx-auto px-3.5 sm:px-6 pt-5 sm:pt-8 pb-10">
+      <main className="max-w-[940px] mx-auto px-3.5 sm:px-6 pt-4 sm:pt-6 pb-10">
         {/* ========================================================= */}
         {/* TAB 1: HOME */}
         {/* ========================================================= */}

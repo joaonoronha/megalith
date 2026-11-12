@@ -16,6 +16,7 @@ export default async function MorePage() {
       initialQuotes={data.allQuotes}
       initialMovements={data.allMovements}
       initialTemplate={data.template}
+      initialAlerts={data.allAlerts}
       initialTab="more"
     />
   );
