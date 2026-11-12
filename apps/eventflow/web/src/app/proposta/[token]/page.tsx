@@ -37,7 +37,37 @@ async function approveQuoteAction(formData: FormData) {
       .where(eq(events.id, quote.eventId));
   }
 
+  // 3. Record audit logs for approval
+  const { recordAuditLog } = await import("@/lib/audit");
+  await recordAuditLog({
+    entityType: "quote",
+    entityId: quote.id,
+    action: "aprovado",
+    title: "Orçamento aprovado",
+    details: `Orçamento aprovado e adjudicado digitalmente por ${signatoryName || "Cliente"}`,
+    userOverride: {
+      name: signatoryName || "Cliente (Aprovação Digital)",
+      role: "cliente",
+    },
+  });
+
+  if (quote.eventId) {
+    await recordAuditLog({
+      entityType: "event",
+      entityId: quote.eventId,
+      action: "alterou_estado",
+      title: "Confirmado via Orçamento",
+      details: `Evento confirmado automaticamente após aprovação do orçamento ${quote.quoteNumber} por ${signatoryName || "Cliente"}`,
+      userOverride: {
+        name: signatoryName || "Cliente (Aprovação Digital)",
+        role: "cliente",
+      },
+    });
+  }
+
   revalidatePath(`/proposta/${token}`);
+  revalidatePath(`/eventos/${quote.eventId}`);
+  revalidatePath(`/`);
 }
 
 export default async function PublicQuotePage({

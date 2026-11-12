@@ -11,7 +11,8 @@ export type EntityPrefix =
   | "alc"  // Event Allocations
   | "tsk"  // Event Tasks / Checklist
   | "doc"  // Documents
-  | "tpl"; // Templates
+  | "tpl"  // Templates
+  | "log"; // Audit Logs
 
 /**
  * Generates a collision-proof unique identifier with a standard entity prefix.

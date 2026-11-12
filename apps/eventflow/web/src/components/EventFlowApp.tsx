@@ -22,7 +22,10 @@ import {
   ChevronRight,
   ChevronLeft,
   Sparkles,
+  History,
 } from "lucide-react";
+import AuditLogModal from "@/components/AuditLogModal";
+import { formatRelativeTime } from "@/lib/date-format";
 import {
   createEventAction,
   updateEventStatusAction,
@@ -159,6 +162,33 @@ export default function EventFlowApp({
     "home" | "calendar" | "events" | "inventory" | "more"
   >(() => getTabFromPath(pathname));
 
+  const handleTabSwitch = (
+    tab: "home" | "calendar" | "events" | "inventory" | "more",
+    href: string,
+    e?: React.MouseEvent
+  ) => {
+    if (e) {
+      e.preventDefault();
+    }
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      if (window.location.pathname !== href) {
+        window.history.pushState({ tab }, "", href);
+      }
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window !== "undefined") {
+        setActiveTab(getTabFromPath(window.location.pathname));
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   useEffect(() => {
     setActiveTab(getTabFromPath(pathname));
   }, [pathname]);
@@ -204,6 +234,17 @@ export default function EventFlowApp({
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showNewUserModal, setShowNewUserModal] = useState(false);
   const [selectedEventForQuote, setSelectedEventForQuote] = useState<string>("");
+  const [auditModal, setAuditModal] = useState<{
+    isOpen: boolean;
+    entityType: "event" | "inventory" | "quote";
+    entityId: string;
+    entityTitle: string;
+  }>({
+    isOpen: false,
+    entityType: "event",
+    entityId: "",
+    entityTitle: "",
+  });
 
   // Copied link feedback
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
@@ -488,6 +529,7 @@ export default function EventFlowApp({
                   </h3>
                   <Link
                     href="/eventos"
+                    onClick={(e) => handleTabSwitch("events", "/eventos", e)}
                     className="text-[12px] text-[#8e8e93] hover:text-[#007aff] cursor-pointer"
                   >
                     Ver todos ({filteredEvents.length}) →
@@ -547,6 +589,28 @@ export default function EventFlowApp({
                             </div>
                             <div className="text-[12px] text-[#8e8e93] mt-0.5 truncate">
                               {formatEventByline(evt.startDate, evt.venue)}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[11px] text-[#8e8e93] mt-1">
+                              <span>
+                                Last updated by <strong className="text-[#3a3a3c] font-semibold">{evt.lastUpdatedByName || "Administrador CFM"}</strong> {formatRelativeTime(evt.updatedAt, "en")}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAuditModal({
+                                    isOpen: true,
+                                    entityType: "event",
+                                    entityId: evt.id,
+                                    entityTitle: evt.name,
+                                  });
+                                }}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-[#ececf0] text-[#007aff] transition cursor-pointer text-[10px] font-medium"
+                                title="Ver histórico de alterações"
+                              >
+                                <History className="w-3 h-3" />
+                                <span>Histórico</span>
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -637,6 +701,7 @@ export default function EventFlowApp({
                     </button>
                     <Link
                       href="/calendario"
+                      onClick={(e) => handleTabSwitch("calendar", "/calendario", e)}
                       className="text-[12px] text-[#8e8e93] hover:text-[#007aff] cursor-pointer ml-1"
                     >
                       Abrir →
@@ -779,6 +844,7 @@ export default function EventFlowApp({
                   </h3>
                   <Link
                     href="/inventario"
+                    onClick={(e) => handleTabSwitch("inventory", "/inventario", e)}
                     className="text-[12px] text-[#8e8e93] hover:text-[#007aff] cursor-pointer"
                   >
                     Abrir inventário ({filteredItems.length}) →
@@ -832,6 +898,28 @@ export default function EventFlowApp({
                               {item.totalQuantity}
                               {hasDamage && ` (${item.damagedQuantity} danificados)`}
                             </div>
+                            <div className="flex items-center gap-1.5 text-[11px] text-[#8e8e93] mt-1">
+                              <span>
+                                Last updated by <strong className="text-[#3a3a3c] font-semibold">{item.lastUpdatedByName || "Administrador CFM"}</strong> {formatRelativeTime(item.updatedAt, "en")}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAuditModal({
+                                    isOpen: true,
+                                    entityType: "inventory",
+                                    entityId: item.id,
+                                    entityTitle: item.name,
+                                  });
+                                }}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-[#ececf0] text-[#007aff] transition cursor-pointer text-[10px] font-medium"
+                                title="Ver histórico de alterações"
+                              >
+                                <History className="w-3 h-3" />
+                                <span>Histórico</span>
+                              </button>
+                            </div>
                           </div>
                         </div>
 
@@ -881,6 +969,7 @@ export default function EventFlowApp({
                   {/* Alert 1: Low stock */}
                   <Link
                     href="/inventario"
+                    onClick={(e) => handleTabSwitch("inventory", "/inventario", e)}
                     className="cursor-pointer bg-[#ff9f0a]/[0.115] border border-[#ff9f0a]/[0.17] text-[#845000] rounded-[15px] p-3.5 flex items-center gap-3 transition hover:opacity-90 block"
                   >
                     <div className="flex items-center gap-3">
@@ -927,6 +1016,7 @@ export default function EventFlowApp({
                   {/* Alert 3: Event in prep */}
                   <Link
                     href="/eventos"
+                    onClick={(e) => handleTabSwitch("events", "/eventos", e)}
                     className="cursor-pointer bg-[#ff9f0a]/[0.115] border border-[#ff9f0a]/[0.17] text-[#845000] rounded-[15px] p-3.5 flex items-center gap-3 transition hover:opacity-90 block"
                   >
                     <div className="flex items-center gap-3">
@@ -1273,6 +1363,29 @@ export default function EventFlowApp({
                             Orçamento: €{(e.totalBudget || 0).toLocaleString("pt-PT")}
                           </span>
                         </div>
+
+                        <div className="flex items-center gap-2 text-[11px] text-[#8e8e93] mt-2">
+                          <span>
+                            Last updated by <strong className="text-[#3a3a3c] font-semibold">{e.lastUpdatedByName || "Administrador CFM"}</strong> {formatRelativeTime(e.updatedAt, "en")}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              setAuditModal({
+                                isOpen: true,
+                                entityType: "event",
+                                entityId: e.id,
+                                entityTitle: e.name,
+                              });
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[#007aff] transition cursor-pointer text-[10px] font-semibold shadow-2xs"
+                            title="Ver histórico de alterações"
+                          >
+                            <History className="w-3 h-3" />
+                            <span>Histórico de Alterações</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -1409,6 +1522,28 @@ export default function EventFlowApp({
                           <span className="text-[#8e8e93]">Total:</span>{" "}
                           <strong className="text-[#111]">{item.totalQuantity} un.</strong>
                         </div>
+                      </div>
+
+                      <div className="mt-2.5 pt-2 border-t border-[#ececf0]/70 flex items-center justify-between text-[11px] text-[#8e8e93]">
+                        <span className="truncate">
+                          Last updated by <strong className="text-[#3a3a3c] font-semibold">{item.lastUpdatedByName || "Administrador CFM"}</strong> {formatRelativeTime(item.updatedAt, "en")}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuditModal({
+                              isOpen: true,
+                              entityType: "inventory",
+                              entityId: item.id,
+                              entityTitle: item.name,
+                            });
+                          }}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-[#ececf0] text-[#007aff] transition cursor-pointer text-[10px] font-semibold flex-shrink-0"
+                          title="Ver histórico de alterações"
+                        >
+                          <History className="w-3 h-3" />
+                          <span>Histórico</span>
+                        </button>
                       </div>
                     </div>
 
@@ -1676,6 +1811,27 @@ export default function EventFlowApp({
                             minimumFractionDigits: 2,
                           })}
                         </div>
+                        <div className="flex items-center gap-1.5 text-[11px] text-[#8e8e93] mt-1">
+                          <span>
+                            Last updated by <strong className="text-[#3a3a3c] font-semibold">{q.lastUpdatedByName || "Administrador CFM"}</strong> {formatRelativeTime(q.updatedAt, "en")}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAuditModal({
+                                isOpen: true,
+                                entityType: "quote",
+                                entityId: q.id,
+                                entityTitle: `Orçamento ${q.quoteNumber}`,
+                              });
+                            }}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-[#ececf0] text-[#007aff] transition cursor-pointer text-[10px] font-medium"
+                            title="Ver histórico do orçamento"
+                          >
+                            <History className="w-3 h-3" />
+                            <span>Histórico</span>
+                          </button>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -1742,7 +1898,7 @@ export default function EventFlowApp({
           {/* 1. Início */}
           <Link
             href="/"
-            onClick={() => setActiveTab("home")}
+            onClick={(e) => handleTabSwitch("home", "/", e)}
             className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
             style={{
               backgroundColor:
@@ -1769,7 +1925,7 @@ export default function EventFlowApp({
           {/* 2. Calendário */}
           <Link
             href="/calendario"
-            onClick={() => setActiveTab("calendar")}
+            onClick={(e) => handleTabSwitch("calendar", "/calendario", e)}
             className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
             style={{
               backgroundColor:
@@ -1798,7 +1954,7 @@ export default function EventFlowApp({
           {/* 3. Eventos */}
           <Link
             href="/eventos"
-            onClick={() => setActiveTab("events")}
+            onClick={(e) => handleTabSwitch("events", "/eventos", e)}
             className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
             style={{
               backgroundColor:
@@ -1830,7 +1986,7 @@ export default function EventFlowApp({
           {/* 4. Stock */}
           <Link
             href="/inventario"
-            onClick={() => setActiveTab("inventory")}
+            onClick={(e) => handleTabSwitch("inventory", "/inventario", e)}
             className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
             style={{
               backgroundColor:
@@ -1859,7 +2015,7 @@ export default function EventFlowApp({
           {/* 5. Mais */}
           <Link
             href="/mais"
-            onClick={() => setActiveTab("more")}
+            onClick={(e) => handleTabSwitch("more", "/mais", e)}
             className="w-[44px] h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
             style={{
               backgroundColor:
@@ -1889,6 +2045,15 @@ export default function EventFlowApp({
       {/* ========================================================= */}
       {/* MODALS */}
       {/* ========================================================= */}
+
+      {/* AUDIT LOG MODAL */}
+      <AuditLogModal
+        isOpen={auditModal.isOpen}
+        onClose={() => setAuditModal((prev) => ({ ...prev, isOpen: false }))}
+        entityType={auditModal.entityType}
+        entityId={auditModal.entityId}
+        entityTitle={auditModal.entityTitle}
+      />
 
       {/* 0. CALENDAR DAY POPUP MODAL */}
       {calendarPopupDate && (

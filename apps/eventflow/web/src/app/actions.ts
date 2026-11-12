@@ -14,10 +14,20 @@ import {
   users,
 } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import crypto from "crypto";
 import { generateId, generateReferenceCode, formatCustomId } from "@/lib/id";
+import { recordAuditLog, getAuditLogsForEntity, getRecentAuditLogs } from "@/lib/audit";
+
+function invalidateAllCaches() {
+  try {
+    revalidateTag("app-data");
+  } catch {
+    // ignore outside request context
+  }
+  revalidatePath("/");
+}
 
 // 1. Create Event
 export async function createEventAction(formData: FormData) {
@@ -66,7 +76,15 @@ export async function createEventAction(formData: FormData) {
     createdAt: new Date(),
   });
 
-  revalidatePath("/");
+  await recordAuditLog({
+    entityType: "event",
+    entityId: id,
+    action: "criado",
+    title: "Evento criado",
+    details: `Evento criado com orçamento de €${totalBudget.toLocaleString("pt-PT")} para ${venue || "local a definir"}`,
+  });
+
+  invalidateAllCaches();
   return { success: true, id };
 }
 
@@ -77,7 +95,15 @@ export async function updateEventStatusAction(eventId: string, newStatus: string
     .set({ status: newStatus as any })
     .where(eq(events.id, eventId));
 
-  revalidatePath("/");
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "alterou_estado",
+    title: "Estado alterado",
+    details: `Estado alterado para "${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}"`,
+  });
+
+  invalidateAllCaches();
   return { success: true };
 }
 
@@ -132,7 +158,25 @@ export async function createQuoteAction(formData: FormData) {
     });
   }
 
-  revalidatePath("/");
+  await recordAuditLog({
+    entityType: "quote",
+    entityId: quoteId,
+    action: "criado",
+    title: "Orçamento emitido",
+    details: `Orçamento ${quoteNumber} emitido com ${parsedLines.length} linha(s) de artigos/serviços (Total: €${total.toFixed(2)})`,
+  });
+
+  if (eventId) {
+    await recordAuditLog({
+      entityType: "event",
+      entityId: eventId,
+      action: "orcamento",
+      title: "Orçamento associado",
+      details: `Associado orçamento ${quoteNumber} com valor global de €${total.toFixed(2)}`,
+    });
+  }
+
+  invalidateAllCaches();
   return { success: true, id: quoteId, accessToken };
 }
 
@@ -166,7 +210,7 @@ export async function createMovementAction(formData: FormData) {
   };
   await db.insert(financialMovements).values(movement);
 
-  revalidatePath("/");
+  invalidateAllCaches();
   return { success: true, id, movement };
 }
 
@@ -206,7 +250,15 @@ export async function createItemAction(formData: FormData) {
   };
   await db.insert(inventoryItems).values(item);
 
-  revalidatePath("/");
+  await recordAuditLog({
+    entityType: "inventory",
+    entityId: id,
+    action: "criado",
+    title: "Artigo criado",
+    details: `${name} (${sku}) adicionado ao inventário (${totalQuantity} un., €${unitPrice}/dia)`,
+  });
+
+  invalidateAllCaches();
   return { success: true, id, item };
 }
 
@@ -226,7 +278,20 @@ export async function updateItemTriageAction(itemId: string, action: "repair_all
       .where(eq(inventoryItems.id, itemId));
   }
 
-  revalidatePath("/");
+  const triageDetails =
+    action === "repair_all"
+      ? "Todas as unidades danificadas foram reparadas e repostas no stock disponível"
+      : `Registado dano em ${quantity} unidade(s)`;
+
+  await recordAuditLog({
+    entityType: "inventory",
+    entityId: itemId,
+    action: "triagem",
+    title: action === "repair_all" ? "Reparação concluída" : "Dano registado",
+    details: triageDetails,
+  });
+
+  invalidateAllCaches();
   revalidatePath(`/inventario/${itemId}`);
   revalidatePath(`/artigos/${itemId}`);
   return { success: true };
@@ -266,7 +331,15 @@ export async function updateItemAction(formData: FormData) {
     })
     .where(eq(inventoryItems.id, itemId));
 
-  revalidatePath("/");
+  await recordAuditLog({
+    entityType: "inventory",
+    entityId: itemId,
+    action: "atualizado",
+    title: "Artigo atualizado",
+    details: `Dados atualizados: ${name} (${totalQuantity} un., €${unitPrice}/dia, local: ${warehouseLocation || "Armazém Principal"})`,
+  });
+
+  invalidateAllCaches();
   revalidatePath(`/inventario/${itemId}`);
   revalidatePath(`/artigos/${itemId}`);
   return { success: true };
@@ -302,7 +375,7 @@ export async function createClientAction(formData: FormData) {
   };
   await db.insert(clients).values(client);
 
-  revalidatePath("/");
+  invalidateAllCaches();
   return { success: true, id, client };
 }
 
@@ -318,7 +391,7 @@ export async function loginAction(formData: FormData) {
 
   const result = await loginUser(email, password);
   if (result.success) {
-    revalidatePath("/");
+    invalidateAllCaches();
   }
   return result;
 }
@@ -342,7 +415,7 @@ export async function createUserAction(formData: FormData) {
   }
 
   const result = await createTeamUser({ name, email, password, role, customId });
-  revalidatePath("/");
+  invalidateAllCaches();
   return result;
 }
 
@@ -361,7 +434,7 @@ export async function updateUserAction(formData: FormData) {
     .set({ name, role: role || "admin" })
     .where(eq(users.id, userId));
 
-  revalidatePath("/");
+  invalidateAllCaches();
   revalidatePath(`/utilizadores/${userId}`);
   revalidatePath(`/users/${userId}`);
   return { success: true };
@@ -411,7 +484,15 @@ export async function updateEventDetailsAction(formData: FormData) {
     })
     .where(eq(events.id, eventId));
 
-  revalidatePath("/");
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "atualizado",
+    title: "Detalhes do evento atualizados",
+    details: `Atualização geral: ${name || "Evento"} · Local: ${venue || "N/A"} · Categoria: ${category}`,
+  });
+
+  invalidateAllCaches();
   revalidatePath(`/eventos/${eventId}`);
   return { success: true };
 }
@@ -468,7 +549,23 @@ export async function updateEventPatchAction(
 
   await db.update(events).set(updateData).where(eq(events.id, eventId));
 
-  revalidatePath("/");
+  const changedKeys = Object.keys(updateData);
+  let summary = "Campos alterados";
+  if (patch.status !== undefined) summary = `Estado alterado para ${patch.status}`;
+  else if (patch.customerPrice !== undefined) summary = `Preço cliente ajustado para €${patch.customerPrice}`;
+  else if (patch.theme !== undefined) summary = `Tema alterado para "${patch.theme}"`;
+  else if (patch.venue !== undefined) summary = `Local alterado para "${patch.venue}"`;
+  else if (changedKeys.length > 0) summary = `Campos atualizados: ${changedKeys.join(", ")}`;
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: patch.status !== undefined ? "alterou_estado" : "atualizado",
+    title: patch.status !== undefined ? "Estado alterado" : "Alteração de campo",
+    details: summary,
+  });
+
+  invalidateAllCaches();
   revalidatePath(`/eventos/${eventId}`);
   revalidatePath(`/events/${eventId}`);
   return { success: true };
@@ -484,7 +581,15 @@ export async function updateEventVibeAction(eventId: string, theme: string, vibe
     })
     .where(eq(events.id, eventId));
 
-  revalidatePath("/");
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "atualizado",
+    title: "Tema & Cores atualizados",
+    details: `Tema definido para "${theme || "Geral"}" com ${vibeColors.length} cores selecionadas`,
+  });
+
+  invalidateAllCaches();
   revalidatePath(`/eventos/${eventId}`);
   return { success: true };
 }
@@ -496,7 +601,15 @@ export async function updateCustomerPriceAction(eventId: string, customerPrice: 
     .set({ customerPrice })
     .where(eq(events.id, eventId));
 
-  revalidatePath("/");
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "atualizado",
+    title: "Preço ao cliente atualizado",
+    details: `Valor final a cobrar ao cliente atualizado para €${customerPrice.toFixed(2)}`,
+  });
+
+  invalidateAllCaches();
   revalidatePath(`/eventos/${eventId}`);
   return { success: true };
 }
@@ -508,7 +621,15 @@ export async function updateAllocationQuantityAction(allocationId: string, quant
     .set({ quantity: Math.max(1, quantity) })
     .where(eq(eventAllocations.id, allocationId));
 
-  revalidatePath("/");
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "atualizado",
+    title: "Quantidade de material ajustada",
+    details: `Quantidade alocada ajustada para ${Math.max(1, quantity)} un.`,
+  });
+
+  invalidateAllCaches();
   revalidatePath(`/eventos/${eventId}`);
   return { success: true };
 }
@@ -535,7 +656,23 @@ export async function addEventAllocationAction(formData: FormData) {
     notes: notes || null,
   });
 
-  revalidatePath("/");
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "alocou_material",
+    title: "Material alocado ao evento",
+    details: `Alocadas ${quantity} unidades do artigo #${itemId}`,
+  });
+
+  await recordAuditLog({
+    entityType: "inventory",
+    entityId: itemId,
+    action: "alocou_material",
+    title: "Material reservado",
+    details: `Reservadas ${quantity} unidades para o evento #${eventId}`,
+  });
+
+  invalidateAllCaches();
   revalidatePath(`/eventos/${eventId}`);
   return { success: true, id };
 }
@@ -547,7 +684,15 @@ export async function updateAllocationStatusAction(allocationId: string, status:
     .set({ status })
     .where(eq(eventAllocations.id, allocationId));
 
-  revalidatePath("/");
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "atualizado",
+    title: "Estado de material alterado",
+    details: `Alocação de material #${allocationId} alterada para estado "${status}"`,
+  });
+
+  invalidateAllCaches();
   revalidatePath(`/eventos/${eventId}`);
   return { success: true };
 }
@@ -558,7 +703,15 @@ export async function deleteAllocationAction(allocationId: string, eventId: stri
     .delete(eventAllocations)
     .where(eq(eventAllocations.id, allocationId));
 
-  revalidatePath("/");
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "removeu_material",
+    title: "Material removido do evento",
+    details: `Removida alocação de material #${allocationId}`,
+  });
+
+  invalidateAllCaches();
   revalidatePath(`/eventos/${eventId}`);
   return { success: true };
 }
@@ -581,7 +734,15 @@ export async function addEventTaskAction(eventId: string, title: string, priorit
     createdAt: new Date(),
   });
 
-  revalidatePath("/");
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "tarefa",
+    title: "Tarefa adicionada",
+    details: `Nova tarefa: "${title.trim()}" (prioridade: ${priority})`,
+  });
+
+  invalidateAllCaches();
   revalidatePath(`/eventos/${eventId}`);
   return { success: true, id };
 }
@@ -593,7 +754,15 @@ export async function toggleEventTaskAction(taskId: string, completed: boolean, 
     .set({ completed })
     .where(eq(eventTasks.id, taskId));
 
-  revalidatePath("/");
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "tarefa",
+    title: completed ? "Tarefa concluída" : "Tarefa reaberta",
+    details: `Tarefa #${taskId} marcada como ${completed ? "concluída" : "pendente"}`,
+  });
+
+  invalidateAllCaches();
   revalidatePath(`/eventos/${eventId}`);
   return { success: true };
 }
@@ -604,8 +773,25 @@ export async function deleteEventTaskAction(taskId: string, eventId: string) {
     .delete(eventTasks)
     .where(eq(eventTasks.id, taskId));
 
-  revalidatePath("/");
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "tarefa",
+    title: "Tarefa eliminada",
+    details: `Tarefa #${taskId} removida da checklist do evento`,
+  });
+
+  invalidateAllCaches();
   revalidatePath(`/eventos/${eventId}`);
   return { success: true };
+}
+
+// 18. Audit Log Queries
+export async function getAuditLogsAction(entityType: "event" | "inventory" | "quote", entityId: string) {
+  return await getAuditLogsForEntity(entityType, entityId);
+}
+
+export async function getRecentAuditLogsAction(limit: number = 25) {
+  return await getRecentAuditLogs(limit);
 }
 

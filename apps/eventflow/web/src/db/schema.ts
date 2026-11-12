@@ -39,6 +39,10 @@ export const inventoryItems = sqliteTable("inventory_items", {
   imageUrl: text("image_url"),
   damagedQuantity: integer("damaged_quantity").default(0),
   inMaintenanceQuantity: integer("in_maintenance_quantity").default(0),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  lastUpdatedByUserId: text("last_updated_by_user_id"),
+  lastUpdatedByName: text("last_updated_by_name"),
 });
 
 // 4. Events Lifecycle & Production Pipeline
@@ -64,6 +68,9 @@ export const events = sqliteTable("events", {
   coverImageUrl: text("cover_image_url"),
   calendlyEventUri: text("calendly_event_uri"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  lastUpdatedByUserId: text("last_updated_by_user_id"),
+  lastUpdatedByName: text("last_updated_by_name"),
 });
 
 // 4.1 Action Items & Completion Checklist per Event
@@ -110,6 +117,9 @@ export const quotes = sqliteTable("quotes", {
   signatureData: text("signature_data"),
   approvedByIp: text("approved_by_ip"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+  lastUpdatedByUserId: text("last_updated_by_user_id"),
+  lastUpdatedByName: text("last_updated_by_name"),
 });
 
 // 7. Quote Itemized Lines
@@ -159,4 +169,20 @@ export const quoteTemplates = sqliteTable("quote_templates", {
   footerNotes: text("footer_notes").default("Obrigado pela preferência."),
   brandColor: text("brand_color").default("#111111").notNull(),
   logoUrl: text("logo_url"),
+});
+
+// 11. Audit Logs / Histórico de Alterações
+export const auditLogs = sqliteTable("audit_logs", {
+  id: text("id").primaryKey(),
+  entityType: text("entity_type", { enum: ["event", "inventory", "quote"] }).notNull(),
+  entityId: text("entity_id").notNull(),
+  action: text("action").notNull(), // "criado" | "atualizado" | "alterou_estado" | "triagem" | "alocou_material" | "removeu_material" | "tarefa" | "aprovado"
+  title: text("title").notNull(),
+  details: text("details"),
+  userId: text("user_id").references(() => users.id),
+  userName: text("user_name").notNull().default("Administrador CFM"),
+  userEmail: text("user_email"),
+  userRole: text("user_role"),
+  changes: text("changes"), // JSON string
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
 });
