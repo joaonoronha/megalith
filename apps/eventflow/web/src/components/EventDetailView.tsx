@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition, useRef } from "react";
+import React, { useState, useTransition, useRef, useMemo } from "react";
 import Link from "next/link";
 import {
   Calendar,
@@ -40,6 +40,9 @@ import {
   FileImage,
   Layers,
   Trash,
+  ChevronLeft,
+  ChevronRight,
+  Video,
 } from "lucide-react";
 import AuditLogModal from "@/components/AuditLogModal";
 import { formatRelativeTime } from "@/lib/date-format";
@@ -55,6 +58,7 @@ import {
   deleteEventTaskAction,
   addEventMediaAction,
   addBatchEventMediaAction,
+  deleteMediaImageAction,
   deleteEventMediaAction,
 } from "@/app/actions";
 
@@ -143,8 +147,16 @@ interface EventData {
   specialNeeds: string | null;
   notes: string | null;
   coverImageUrl: string | null;
+  calendlyEventUri?: string | null;
   updatedAt?: Date | string | null;
   lastUpdatedByName?: string | null;
+}
+
+export interface MediaImageItem {
+  id: string;
+  url: string;
+  title?: string;
+  tag?: string;
 }
 
 export interface EventMediaItem {
@@ -154,10 +166,274 @@ export interface EventMediaItem {
   title: string;
   description: string | null;
   imageUrl: string;
+  images?: string | null | MediaImageItem[];
   tag: string | null;
   orderIndex: number | null;
   uploadedByName: string | null;
   createdAt: Date | string | null;
+}
+
+export function parseMediaImages(item: EventMediaItem): MediaImageItem[] {
+  if (item.images) {
+    try {
+      const parsed = typeof item.images === "string" ? JSON.parse(item.images) : item.images;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((img: any, idx: number) => ({
+          id: img.id || `img-${item.id}-${idx}`,
+          url: img.url || (typeof img === "string" ? img : item.imageUrl),
+          title: img.title || item.title,
+          tag: img.tag || item.tag || undefined,
+        }));
+      }
+    } catch {}
+  }
+  return [
+    {
+      id: item.id,
+      url: item.imageUrl,
+      title: item.title,
+      tag: item.tag || undefined,
+    },
+  ];
+}
+
+function MoodboardCard({
+  board,
+  onOpenLightbox,
+  onAddMorePhotos,
+  onDeleteImage,
+  onDeleteBoard,
+}: {
+  board: EventMediaItem;
+  onOpenLightbox: (board: EventMediaItem, index: number) => void;
+  onAddMorePhotos: (board: EventMediaItem) => void;
+  onDeleteImage: (boardId: string, imageId: string) => void;
+  onDeleteBoard: (boardId: string) => void;
+}) {
+  const images = useMemo(() => parseMediaImages(board), [board]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Keep active index strictly in bounds
+  const activeIndex = images.length > 0 ? Math.min(Math.max(0, currentIndex), images.length - 1) : 0;
+  const currentImage = images[activeIndex] || { id: board.id, url: board.imageUrl, title: board.title };
+
+  const handlePrev = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setCurrentIndex((prev) => (prev <= 0 ? images.length - 1 : prev - 1));
+  };
+
+  const handleNext = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setCurrentIndex((prev) => (prev >= images.length - 1 ? 0 : prev + 1));
+  };
+
+  return (
+    <div className="bg-white rounded-[22px] border border-[#ececf0] overflow-hidden hover:border-[#c7c7cc] hover:shadow-lg transition-all flex flex-col group">
+      {/* Carousel Main Stage */}
+      <div className="relative aspect-[16/10] sm:aspect-[16/9] bg-[#111] overflow-hidden select-none">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          key={currentImage.id || currentImage.url}
+          src={currentImage.url}
+          alt={currentImage.title || board.title}
+          className="w-full h-full object-cover transition-all duration-300 cursor-pointer"
+          onClick={() => onOpenLightbox(board, activeIndex)}
+          onError={(e) => {
+            (e.target as HTMLImageElement).src =
+              "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1200&q=80";
+          }}
+        />
+
+        {/* Top Badges */}
+        <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5 z-10 pointer-events-none">
+          {board.type === "idea_board" ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/95 backdrop-blur-md text-white shadow-xs">
+              <Lightbulb className="w-3 h-3" />
+              <span>Painel de Ideias</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-600/95 backdrop-blur-md text-white shadow-xs">
+              <Camera className="w-3 h-3" />
+              <span>Resultado Real</span>
+            </span>
+          )}
+
+          {board.tag && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-black/60 backdrop-blur-md text-white">
+              {board.tag}
+            </span>
+          )}
+        </div>
+
+        {/* Slide Counter Badge (Top Right) */}
+        <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10 pointer-events-none">
+          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-black/70 backdrop-blur-md text-white shadow-xs flex items-center gap-1">
+            <ImageIcon className="w-3 h-3" />
+            <span>{activeIndex + 1} / {images.length}</span>
+          </span>
+        </div>
+
+        {/* Carousel Navigation Arrow Controls (Left / Right) */}
+        {images.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={handlePrev}
+              aria-label="Imagem anterior"
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/60 hover:bg-black text-white backdrop-blur-md flex items-center justify-center transition cursor-pointer z-20 shadow-md active:scale-95"
+            >
+              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleNext}
+              aria-label="Imagem seguinte"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-black/60 hover:bg-black text-white backdrop-blur-md flex items-center justify-center transition cursor-pointer z-20 shadow-md active:scale-95"
+            >
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          </>
+        )}
+
+        {/* Bottom Floating Bar inside image */}
+        <div className="absolute bottom-2.5 inset-x-3 flex items-center justify-between z-10 pointer-events-none">
+          {/* Dot Indicators */}
+          {images.length > 1 ? (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/50 backdrop-blur-md pointer-events-auto max-w-[70%] overflow-x-auto">
+              {images.map((_: MediaImageItem, idx: number) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentIndex(idx);
+                  }}
+                  className={`transition-all rounded-full cursor-pointer ${
+                    idx === activeIndex
+                      ? "w-4 h-1.5 bg-white"
+                      : "w-1.5 h-1.5 bg-white/50 hover:bg-white/80"
+                  }`}
+                  aria-label={`Ver foto ${idx + 1}`}
+                />
+              ))}
+            </div>
+          ) : <div />}
+
+          {/* Quick Actions (Zoom & Delete Photo) */}
+          <div className="flex items-center gap-1.5 pointer-events-auto">
+            <button
+              type="button"
+              onClick={() => onOpenLightbox(board, activeIndex)}
+              title="Ver em ecrã inteiro"
+              className="p-1.5 rounded-full bg-black/60 hover:bg-black text-white backdrop-blur-md transition cursor-pointer shadow-xs"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+
+            {images.length > 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteImage(board.id, currentImage.id);
+                }}
+                title="Eliminar esta foto do moodboard"
+                className="p-1.5 rounded-full bg-black/60 hover:bg-rose-600 text-white backdrop-blur-md transition cursor-pointer shadow-xs"
+              >
+                <Trash className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Horizontal Thumbnail Strip for Quick Scrolling through the Carousel */}
+      {images.length > 1 && (
+        <div className="px-3 py-2 bg-[#fafafc] border-b border-[#ececf0] flex items-center gap-1.5 overflow-x-auto scrollbar-thin">
+          {images.map((img: MediaImageItem, idx: number) => (
+            <button
+              key={img.id || idx}
+              type="button"
+              onClick={() => setCurrentIndex(idx)}
+              className={`relative flex-shrink-0 w-12 h-12 rounded-[10px] overflow-hidden transition-all cursor-pointer ${
+                idx === activeIndex
+                  ? "ring-2 ring-[#007aff] scale-105 shadow-xs"
+                  : "opacity-60 hover:opacity-100 border border-[#ececf0]"
+              }`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={img.url}
+                alt={img.title || `Foto ${idx + 1}`}
+                className="w-full h-full object-cover"
+              />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Card Content & Details */}
+      <div className="p-4 flex flex-col flex-1 justify-between">
+        <div>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h3 className="text-base font-bold text-[#111] group-hover:text-[#007aff] transition">
+                {board.title}
+              </h3>
+              {currentImage.title && currentImage.title !== board.title && (
+                <p className="text-xs font-semibold text-[#007aff] mt-0.5 truncate">
+                  {currentImage.title}
+                </p>
+              )}
+            </div>
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#f2f2f5] text-[#636366] flex-shrink-0">
+              {images.length} {images.length === 1 ? "foto" : "fotos"}
+            </span>
+          </div>
+
+          {board.description && (
+            <p className="text-xs text-[#636366] mt-1.5 leading-relaxed">
+              {board.description}
+            </p>
+          )}
+        </div>
+
+        {/* Footer actions */}
+        <div className="mt-4 pt-3 border-t border-[#f2f2f5] flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1.5 text-[11px] text-[#8e8e93]">
+            <span>{board.uploadedByName || "Equipa CFM"}</span>
+            {board.createdAt && (
+              <>
+                <span>•</span>
+                <span>{formatRelativeTime(board.createdAt)}</span>
+              </>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onAddMorePhotos(board)}
+              className="px-2.5 py-1 rounded-lg bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#111] font-semibold text-[11px] inline-flex items-center gap-1 transition cursor-pointer"
+            >
+              <Plus className="w-3 h-3" />
+              <span>Adicionar fotos</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onDeleteBoard(board.id)}
+              className="p-1 rounded-lg text-[#8e8e93] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+              title="Eliminar moodboard completo"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export interface StagedMediaItem {
@@ -302,8 +578,11 @@ export default function EventDetailView({
   // Media state: Idea Boards & Final Outcomes
   const [mediaList, setMediaList] = useState<EventMediaItem[]>(initialMedia || []);
   const [mediaFilter, setMediaFilter] = useState<"all" | "idea_board" | "final_outcome">("all");
+  const [lightboxState, setLightboxState] = useState<{ board: EventMediaItem; imageIndex: number } | null>(null);
   const [lightboxItem, setLightboxItem] = useState<EventMediaItem | null>(null);
   const [showAddMediaModal, setShowAddMediaModal] = useState(false);
+  const [targetBoardForUpload, setTargetBoardForUpload] = useState<EventMediaItem | null>(null);
+  const [boardTitleInput, setBoardTitleInput] = useState("");
 
   // New media modal form state (interchangeable files & URLs)
   const [newMediaType, setNewMediaType] = useState<"idea_board" | "final_outcome">("idea_board");
@@ -673,6 +952,25 @@ export default function EventDetailView({
   };
 
   const handleAddMedia = (e?: React.FormEvent) => handleConfirmAddBatch(e);
+
+  const handleOpenAddMediaModal = (targetBoard?: EventMediaItem) => {
+    if (targetBoard) {
+      setTargetBoardForUpload(targetBoard);
+      setNewMediaType(targetBoard.type);
+      setNewMediaTag(targetBoard.tag || "Geral");
+      setBoardTitleInput(targetBoard.title);
+    } else {
+      setTargetBoardForUpload(null);
+      setNewMediaType(mediaFilter === "final_outcome" ? "final_outcome" : "idea_board");
+      setNewMediaTag(mediaFilter === "final_outcome" ? "Resultado Real" : "Flores & Centros");
+      setBoardTitleInput("");
+    }
+    setStagedMedia([]);
+    setUrlInputValue("");
+    setBatchDescription("");
+    setShowAddMediaModal(true);
+  };
+
   const handleConfirmAddBatch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
@@ -700,28 +998,66 @@ export default function EventDetailView({
 
     setIsUploadingMedia(true);
 
-    // Optimistic additions in the UI
-    const optimisticItems: EventMediaItem[] = currentQueue.map((staged, idx) => ({
-      id: "temp-" + Date.now() + "-" + idx,
-      eventId: event.id,
-      type: newMediaType,
-      title: staged.title || (newMediaType === "idea_board" ? "Ideia / Conceito" : "Foto Real do Evento"),
-      description: batchDescription.trim() || null,
-      imageUrl: staged.previewUrl,
+    const chosenTitle =
+      boardTitleInput.trim() ||
+      newMediaTitle.trim() ||
+      (targetBoardForUpload
+        ? targetBoardForUpload.title
+        : newMediaType === "idea_board"
+        ? "Painel de Ideias / Moodboard"
+        : "Resultados Finais do Evento");
+
+    const optimisticImages: MediaImageItem[] = currentQueue.map((staged, idx) => ({
+      id: "temp-img-" + Date.now() + "-" + idx,
+      url: staged.previewUrl,
+      title: staged.title || (newMediaType === "idea_board" ? `Imagem ${idx + 1}` : `Fotografia ${idx + 1}`),
       tag: staged.tag || newMediaTag,
-      orderIndex: Date.now() + idx,
-      uploadedByName: currentUser?.name || "Administrador CFM",
-      createdAt: new Date(),
     }));
 
-    setMediaList((prev) => [...optimisticItems, ...prev]);
+    if (targetBoardForUpload) {
+      // Optimistically append to existing board
+      const targetId = targetBoardForUpload.id;
+      setMediaList((prev) =>
+        prev.map((b) => {
+          if (b.id !== targetId) return b;
+          const currentImgs = parseMediaImages(b);
+          const combined = [...currentImgs, ...optimisticImages];
+          return {
+            ...b,
+            images: JSON.stringify(combined),
+            imageUrl: combined[0]?.url || b.imageUrl,
+          };
+        })
+      );
+    } else {
+      // Optimistically create 1 single new moodboard with all uploaded pictures!
+      const optimisticBoard: EventMediaItem = {
+        id: "temp-board-" + Date.now(),
+        eventId: event.id,
+        type: newMediaType,
+        title: chosenTitle,
+        description: batchDescription.trim() || null,
+        imageUrl: optimisticImages[0]?.url || "",
+        images: JSON.stringify(optimisticImages),
+        tag: newMediaTag,
+        orderIndex: Date.now(),
+        uploadedByName: currentUser?.name || "Administrador CFM",
+        createdAt: new Date(),
+      };
+      setMediaList((prev) => [optimisticBoard, ...prev]);
+    }
+
     setShowAddMediaModal(false);
 
     const formData = new FormData();
     formData.append("eventId", event.id);
     formData.append("type", newMediaType);
+    formData.append("boardTitle", chosenTitle);
     formData.append("tag", newMediaTag);
     formData.append("description", batchDescription.trim());
+    if (targetBoardForUpload) {
+      formData.append("targetMediaId", targetBoardForUpload.id);
+    }
 
     currentQueue.forEach((item) => {
       if (item.sourceType === "file" && item.file) {
@@ -740,15 +1076,20 @@ export default function EventDetailView({
     setUrlInputValue("");
     setBatchDescription("");
     setNewMediaTitle("");
+    setBoardTitleInput("");
+    setTargetBoardForUpload(null);
 
     startTransition(async () => {
       try {
         const res = await addBatchEventMediaAction(formData);
-        if (res.success && "mediaList" in res && Array.isArray(res.mediaList)) {
-          const list = res.mediaList;
+        if (res.success && "media" in res && res.media) {
+          const updatedRecord = res.media as EventMediaItem;
           setMediaList((prev) => {
+            if (res.mode === "appended") {
+              return prev.map((m) => (m.id === updatedRecord.id ? updatedRecord : m));
+            }
             const nonTemps = prev.filter((m) => !m.id.startsWith("temp-"));
-            return [...list, ...nonTemps];
+            return [updatedRecord, ...nonTemps];
           });
         }
       } catch (err) {
@@ -759,12 +1100,42 @@ export default function EventDetailView({
     });
   };
 
+  const handleDeleteImage = async (boardId: string, imageId: string) => {
+    if (!confirm("Tem a certeza que deseja remover esta foto do moodboard?")) return;
+
+    // Optimistic update
+    setMediaList((prev) => {
+      return prev
+        .map((b) => {
+          if (b.id !== boardId) return b;
+          const currentImgs = parseMediaImages(b);
+          const remaining = currentImgs.filter((img) => img.id !== imageId && img.url !== imageId);
+          if (remaining.length === 0) return null;
+          return {
+            ...b,
+            images: JSON.stringify(remaining),
+            imageUrl: remaining[0]?.url || b.imageUrl,
+          };
+        })
+        .filter(Boolean) as EventMediaItem[];
+    });
+
+    try {
+      const res = await deleteMediaImageAction(boardId, imageId, event.id);
+      if (res.boardDeleted) {
+        setMediaList((prev) => prev.filter((b) => b.id !== boardId));
+      }
+    } catch (err) {
+      console.error("Erro ao eliminar foto:", err);
+    }
+  };
+
   const handleDeleteMedia = async (mediaId: string) => {
-    if (!confirm("Tem a certeza que deseja remover esta imagem?")) return;
+    if (!confirm("Tem a certeza que deseja eliminar este moodboard/painel e todas as suas imagens?")) return;
 
     setMediaList((prev) => prev.filter((m) => m.id !== mediaId));
-    if (lightboxItem?.id === mediaId) {
-      setLightboxItem(null);
+    if (lightboxState?.board.id === mediaId) {
+      setLightboxState(null);
     }
 
     startTransition(async () => {
@@ -918,6 +1289,7 @@ export default function EventDetailView({
                   className="px-3 py-1 rounded-full text-xs font-bold bg-white/95 text-[#111] shadow-xs border-0 outline-none cursor-pointer hover:bg-white transition"
                   title="Alterar categoria do evento"
                 >
+                  <option value="Reunião Calendly">Reunião Calendly</option>
                   <option value="Aniversário Infantil">Aniversário Infantil</option>
                   <option value="Casamento">Casamento</option>
                   <option value="Gala Corporativa">Gala Corporativa</option>
@@ -926,6 +1298,13 @@ export default function EventDetailView({
                   <option value="Batizado">Batizado</option>
                   <option value="Geral">Geral</option>
                 </select>
+
+                {(event.category === "Reunião Calendly" || event.calendlyEventUri) && (
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#6366f1] text-white flex items-center gap-1.5 shadow-md">
+                    <Video className="w-3.5 h-3.5" />
+                    <span>Reunião Calendly · Briefing</span>
+                  </span>
+                )}
 
                 {/* Event Unique ID Badge */}
                 <button
@@ -1428,11 +1807,11 @@ export default function EventDetailView({
 
                 <button
                   type="button"
-                  onClick={() => setShowAddMediaModal(true)}
+                  onClick={() => handleOpenAddMediaModal()}
                   className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 transition self-start sm:self-auto shadow-xs cursor-pointer flex-shrink-0"
                 >
-                  <UploadCloud className="w-4 h-4" />
-                  <span>Adicionar Imagens</span>
+                  <Plus className="w-4 h-4" />
+                  <span>Novo Moodboard / Painel</span>
                 </button>
               </div>
 
@@ -1500,106 +1879,28 @@ export default function EventDetailView({
                       : "Galeria de imagens vazia"}
                   </h4>
                   <p className="text-xs text-[#8e8e93] max-w-md mx-auto mt-1 mb-4">
-                    Adicione referências visuais de inspiração para a equipa e o cliente, ou registe as fotografias finais do evento concluído.
+                    Adicione referências visuais de inspiração num moodboard com fotos em carrossel, ou registe as fotografias reais do evento concluído.
                   </p>
                   <button
                     type="button"
-                    onClick={() => setShowAddMediaModal(true)}
+                    onClick={() => handleOpenAddMediaModal()}
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold hover:bg-black transition shadow-xs cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Adicionar primeira imagem</span>
+                    <span>Criar primeiro painel</span>
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                   {filteredMedia.map((item) => (
-                    <div
+                    <MoodboardCard
                       key={item.id}
-                      className="group bg-white rounded-[18px] border border-[#ececf0] overflow-hidden hover:border-[#c7c7cc] hover:shadow-md transition-all flex flex-col"
-                    >
-                      {/* Image Thumbnail Container */}
-                      <div className="relative aspect-[16/10] bg-[#f2f2f5] overflow-hidden">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={item.imageUrl}
-                          alt={item.title}
-                          className="w-full h-full object-cover transition duration-300 group-hover:scale-105 cursor-pointer"
-                          onClick={() => setLightboxItem(item)}
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1200&q=80";
-                          }}
-                        />
-
-                        {/* Top Badges */}
-                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10 pointer-events-none">
-                          {item.type === "idea_board" ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/90 backdrop-blur-md text-white shadow-xs">
-                              <Lightbulb className="w-3 h-3" />
-                              <span>Ideia & Conceito</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-600/90 backdrop-blur-md text-white shadow-xs">
-                              <Camera className="w-3 h-3" />
-                              <span>Resultado Real</span>
-                            </span>
-                          )}
-
-                          {item.tag && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-black/60 backdrop-blur-md text-white">
-                              {item.tag}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Hover Overlay Action Buttons */}
-                        <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                          <button
-                            type="button"
-                            onClick={() => setLightboxItem(item)}
-                            title="Ver em tamanho grande"
-                            className="p-1.5 rounded-full bg-black/70 hover:bg-black text-white backdrop-blur-md transition cursor-pointer"
-                          >
-                            <ZoomIn className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteMedia(item.id)}
-                            title="Eliminar imagem"
-                            className="p-1.5 rounded-full bg-rose-600/80 hover:bg-rose-700 text-white backdrop-blur-md transition cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Card Content */}
-                      <div className="p-3.5 flex flex-col flex-1 justify-between">
-                        <div>
-                          <h4 className="text-sm font-bold text-[#111] line-clamp-1 group-hover:text-[#007aff] transition">
-                            {item.title}
-                          </h4>
-                          {item.description && (
-                            <p className="text-xs text-[#636366] mt-1 line-clamp-2 leading-relaxed">
-                              {item.description}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="mt-3 pt-2.5 border-t border-[#f2f2f5] flex items-center justify-between text-[11px] text-[#8e8e93]">
-                          <span>{item.uploadedByName || "Equipa CFM"}</span>
-                          <button
-                            type="button"
-                            onClick={() => setLightboxItem(item)}
-                            className="text-[#007aff] hover:underline font-medium inline-flex items-center gap-0.5 cursor-pointer"
-                          >
-                            <span>Ampliar</span>
-                            <ZoomIn className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                      board={item}
+                      onOpenLightbox={(board, idx) => setLightboxState({ board, imageIndex: idx })}
+                      onAddMorePhotos={(board) => handleOpenAddMediaModal(board)}
+                      onDeleteImage={handleDeleteImage}
+                      onDeleteBoard={handleDeleteMedia}
+                    />
                   ))}
                 </div>
               )}
@@ -2077,95 +2378,177 @@ export default function EventDetailView({
         </div>
       )}
 
-      {/* Lightbox Modal */}
-      {lightboxItem && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
-          onClick={() => setLightboxItem(null)}
-        >
+      {/* Lightbox Modal with Carousel Navigation */}
+      {lightboxState && (() => {
+        const { board, imageIndex } = lightboxState;
+        const images = parseMediaImages(board);
+        const activeIdx = Math.min(Math.max(0, imageIndex), Math.max(0, images.length - 1));
+        const activeImg = images[activeIdx] || { id: board.id, url: board.imageUrl, title: board.title };
+
+        const prevLightbox = () => {
+          setLightboxState({
+            board,
+            imageIndex: activeIdx <= 0 ? images.length - 1 : activeIdx - 1,
+          });
+        };
+
+        const nextLightbox = () => {
+          setLightboxState({
+            board,
+            imageIndex: activeIdx >= images.length - 1 ? 0 : activeIdx + 1,
+          });
+        };
+
+        return (
           <div
-            className="relative max-w-4xl w-full max-h-[92vh] flex flex-col bg-[#1c1c1e] text-white rounded-[24px] overflow-hidden shadow-2xl border border-white/10"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 select-none"
+            onClick={() => setLightboxState(null)}
           >
-            {/* Header */}
-            <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between bg-black/40">
-              <div className="flex items-center gap-2">
-                {lightboxItem.type === "idea_board" ? (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white">
-                    <Lightbulb className="w-3.5 h-3.5" />
-                    <span>Ideia & Conceito</span>
+            <div
+              className="relative max-w-5xl w-full max-h-[95vh] flex flex-col bg-[#1c1c1e] text-white rounded-[24px] overflow-hidden shadow-2xl border border-white/10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between bg-black/40 flex-shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  {board.type === "idea_board" ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white flex-shrink-0">
+                      <Lightbulb className="w-3.5 h-3.5" />
+                      <span>Painel de Ideias</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white flex-shrink-0">
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Resultado Real</span>
+                    </span>
+                  )}
+                  {board.tag && (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs bg-white/10 text-white/90 flex-shrink-0">
+                      {board.tag}
+                    </span>
+                  )}
+                  <h3 className="text-sm font-bold text-white truncate ml-1">{board.title}</h3>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-white/15 text-white/90 flex-shrink-0">
+                    {activeIdx + 1} de {images.length}
                   </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white">
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>Resultado Final</span>
-                  </span>
-                )}
-                {lightboxItem.tag && (
-                  <span className="px-2.5 py-0.5 rounded-full text-xs bg-white/10 text-white/90">
-                    {lightboxItem.tag}
-                  </span>
-                )}
-              </div>
+                </div>
 
-              <div className="flex items-center gap-2">
-                <a
-                  href={lightboxItem.imageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs text-white inline-flex items-center gap-1.5 transition"
-                >
-                  <span>Abrir original</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setLightboxItem(null)}
-                  className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Image Preview Container */}
-            <div className="flex-1 overflow-auto flex items-center justify-center p-4 bg-black/60 min-h-[300px]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={lightboxItem.imageUrl}
-                alt={lightboxItem.title}
-                className="max-h-[62vh] max-w-full object-contain rounded-[14px] shadow-lg"
-              />
-            </div>
-
-            {/* Footer with details */}
-            <div className="p-5 border-t border-white/10 bg-black/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="text-base font-bold text-white">{lightboxItem.title}</h3>
-                {lightboxItem.description && (
-                  <p className="text-xs text-white/70 mt-1 max-w-xl">{lightboxItem.description}</p>
-                )}
-                <div className="text-[11px] text-white/50 mt-1">
-                  Adicionado por {lightboxItem.uploadedByName || "Administrador CFM"}
+                <div className="flex items-center gap-2">
+                  <a
+                    href={activeImg.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs text-white inline-flex items-center gap-1.5 transition"
+                  >
+                    <span>Original</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setLightboxState(null)}
+                    className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleDeleteMedia(lightboxItem.id)}
-                  className="px-3.5 py-1.5 rounded-[12px] bg-rose-600/80 hover:bg-rose-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Eliminar Imagem</span>
-                </button>
+              {/* Main Image Stage with Carousel Arrows */}
+              <div className="relative flex-1 overflow-hidden flex items-center justify-center p-3 sm:p-6 bg-black min-h-[350px]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  key={activeImg.id || activeImg.url}
+                  src={activeImg.url}
+                  alt={activeImg.title || board.title}
+                  className="max-h-[62vh] max-w-full object-contain rounded-[14px] shadow-2xl transition-all duration-200"
+                />
+
+                {images.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={prevLightbox}
+                      aria-label="Imagem anterior"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/15 hover:bg-white/30 text-white backdrop-blur-md flex items-center justify-center transition cursor-pointer shadow-lg"
+                    >
+                      <ChevronLeft className="w-6 h-6" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={nextLightbox}
+                      aria-label="Imagem seguinte"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/15 hover:bg-white/30 text-white backdrop-blur-md flex items-center justify-center transition cursor-pointer shadow-lg"
+                    >
+                      <ChevronRight className="w-6 h-6" />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Bottom Thumbnail Strip */}
+              {images.length > 1 && (
+                <div className="px-4 py-2.5 bg-black/70 border-t border-white/10 flex items-center gap-2 overflow-x-auto scrollbar-thin flex-shrink-0">
+                  {images.map((img, idx) => (
+                    <button
+                      key={img.id || idx}
+                      type="button"
+                      onClick={() => setLightboxState({ board, imageIndex: idx })}
+                      className={`relative flex-shrink-0 w-14 h-14 rounded-[8px] overflow-hidden transition-all cursor-pointer ${
+                        idx === activeIdx
+                          ? "ring-2 ring-[#007aff] scale-105"
+                          : "opacity-50 hover:opacity-90 border border-white/20"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Footer with details */}
+              <div className="p-4 sm:p-5 border-t border-white/10 bg-black/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-shrink-0">
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    {activeImg.title && activeImg.title !== board.title ? activeImg.title : board.title}
+                  </h3>
+                  {board.description && (
+                    <p className="text-xs text-white/70 mt-1 max-w-xl">{board.description}</p>
+                  )}
+                  <div className="text-[11px] text-white/50 mt-1">
+                    Adicionado por {board.uploadedByName || "Administrador CFM"}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (images.length > 1) {
+                        handleDeleteImage(board.id, activeImg.id);
+                        setLightboxState({
+                          board,
+                          imageIndex: Math.max(0, activeIdx - 1),
+                        });
+                      } else {
+                        handleDeleteMedia(board.id);
+                        setLightboxState(null);
+                      }
+                    }}
+                    className="px-3.5 py-1.5 rounded-[12px] bg-rose-600/80 hover:bg-rose-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{images.length > 1 ? "Eliminar esta Foto" : "Eliminar Moodboard"}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
-      {/* Add Media Modal (Multiple Files & URLs Interchangeably) */}
+      {/* Add Media Modal (Multiple Files & URLs to Create 1 Moodboard or Append) */}
       {showAddMediaModal && (
         <div
           className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
@@ -2184,9 +2567,17 @@ export default function EventDetailView({
                   <ImageIcon className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-[#111]">Adicionar Imagens ao Evento</h3>
+                  <h3 className="font-bold text-base text-[#111]">
+                    {targetBoardForUpload
+                      ? `Adicionar Fotos a: ${targetBoardForUpload.title}`
+                      : newMediaType === "idea_board"
+                      ? "Novo Painel de Ideias / Moodboard"
+                      : "Novas Fotografias do Resultado Real"}
+                  </h3>
                   <p className="text-[11px] text-[#8e8e93]">
-                    Carregue múltiplos ficheiros, insira links da web ou combine ambos livremente
+                    {targetBoardForUpload
+                      ? "Adicione mais imagens ao carrossel deste moodboard"
+                      : "Todas as imagens selecionadas serão reunidas num único moodboard com carrossel"}
                   </p>
                 </div>
               </div>
@@ -2202,53 +2593,75 @@ export default function EventDetailView({
 
             {/* Scrollable Modal Content */}
             <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-              {/* Target Type Selector */}
-              <div>
-                <label className="block text-xs font-bold text-[#111] mb-1.5">Destino das Imagens</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewMediaType("idea_board");
-                      if (newMediaTag === "Resultado Real") setNewMediaTag("Flores & Centros");
-                    }}
-                    className={`p-3 rounded-[14px] border text-left transition cursor-pointer ${
+              {/* Board Title Input (if creating new) */}
+              {!targetBoardForUpload && (
+                <div>
+                  <label className="block text-xs font-bold text-[#111] mb-1">
+                    Título do {newMediaType === "idea_board" ? "Moodboard" : "Álbum de Resultado"}
+                  </label>
+                  <input
+                    type="text"
+                    value={boardTitleInput}
+                    onChange={(e) => setBoardTitleInput(e.target.value)}
+                    placeholder={
                       newMediaType === "idea_board"
-                        ? "bg-amber-50 border-amber-300 ring-2 ring-amber-400/30"
-                        : "bg-[#fafafc] border-[#ececf0] hover:border-[#d2d2d7]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 mb-0.5">
-                      <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Painel de Ideias / Moodboard</span>
-                    </div>
-                    <p className="text-[11px] text-amber-700/80">
-                      Conceito, inspiração e referências visuais pré-evento.
-                    </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewMediaType("final_outcome");
-                      setNewMediaTag("Resultado Real");
-                    }}
-                    className={`p-3 rounded-[14px] border text-left transition cursor-pointer ${
-                      newMediaType === "final_outcome"
-                        ? "bg-emerald-50 border-emerald-300 ring-2 ring-emerald-400/30"
-                        : "bg-[#fafafc] border-[#ececf0] hover:border-[#d2d2d7]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 mb-0.5">
-                      <Camera className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Resultado Final (Fotos Reais)</span>
-                    </div>
-                    <p className="text-[11px] text-emerald-700/80">
-                      Fotografias reais da montagem e do evento executado.
-                    </p>
-                  </button>
+                        ? "Ex: Paleta Floral & Terracotta, Lounge Exterior, Iluminação..."
+                        : "Ex: Montagem da Cerimónia, Altar Concluído, Salão Principal..."
+                    }
+                    className="w-full px-3.5 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                  />
                 </div>
-              </div>
+              )}
+
+              {/* Target Type Selector (if creating new) */}
+              {!targetBoardForUpload && (
+                <div>
+                  <label className="block text-xs font-bold text-[#111] mb-1.5">Destino do Painel</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewMediaType("idea_board");
+                        if (newMediaTag === "Resultado Real") setNewMediaTag("Flores & Centros");
+                      }}
+                      className={`p-3 rounded-[14px] border text-left transition cursor-pointer ${
+                        newMediaType === "idea_board"
+                          ? "bg-amber-50 border-amber-300 ring-2 ring-amber-400/30"
+                          : "bg-[#fafafc] border-[#ececf0] hover:border-[#d2d2d7]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 mb-0.5">
+                        <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Painel de Ideias / Moodboard</span>
+                      </div>
+                      <p className="text-[11px] text-amber-700/80">
+                        Conceito, inspiração e referências visuais pré-evento.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewMediaType("final_outcome");
+                        setNewMediaTag("Resultado Real");
+                      }}
+                      className={`p-3 rounded-[14px] border text-left transition cursor-pointer ${
+                        newMediaType === "final_outcome"
+                          ? "bg-emerald-50 border-emerald-300 ring-2 ring-emerald-400/30"
+                          : "bg-[#fafafc] border-[#ececf0] hover:border-[#d2d2d7]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 mb-0.5">
+                        <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Resultado Final (Fotos Reais)</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-700/80">
+                        Fotografias reais da montagem e do evento executado.
+                      </p>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Input Method Switcher Tabs */}
               <div>
@@ -2257,7 +2670,7 @@ export default function EventDetailView({
                     Método de Adição (Combinável)
                   </label>
                   <span className="text-[10px] text-[#8e8e93]">
-                    Pode usar ficheiros e URLs na mesma lista
+                    Pode carregar ficheiros e colar URLs na mesma lista
                   </span>
                 </div>
 
@@ -2434,7 +2847,7 @@ export default function EventDetailView({
                   <div className="flex items-center gap-2">
                     <Layers className="w-4 h-4 text-[#111]" />
                     <span className="text-xs font-bold text-[#111]">
-                      Fila de Imagens a Adicionar ({stagedMedia.length})
+                      Fila de Imagens do Moodboard ({stagedMedia.length})
                     </span>
                   </div>
                   {stagedMedia.length > 0 && (
@@ -2450,7 +2863,7 @@ export default function EventDetailView({
 
                 {stagedMedia.length === 0 ? (
                   <div className="p-4 rounded-[14px] bg-[#fafafc] border border-dashed border-[#ececf0] text-center text-xs text-[#8e8e93]">
-                    Nenhuma imagem na fila ainda. Selecione ficheiros, insira links de imagem ou clique nas sugestões acima.
+                    Nenhuma imagem na fila ainda. Selecione múltiplos ficheiros ou insira links de imagem acima.
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
@@ -2552,7 +2965,7 @@ export default function EventDetailView({
 
                 {/* Batch Description / Notes */}
                 <div>
-                  <label className="block text-xs font-bold text-[#111] mb-1">Notas do Lote (Opcional)</label>
+                  <label className="block text-xs font-bold text-[#111] mb-1">Notas do Moodboard (Opcional)</label>
                   <input
                     type="text"
                     placeholder="Ex: Fornecedor Quinta, aprovado pelo cliente..."
@@ -2569,7 +2982,7 @@ export default function EventDetailView({
               <span className="text-xs text-[#8e8e93]">
                 {stagedMedia.length > 0 ? (
                   <>
-                    <strong className="text-[#111]">{stagedMedia.length}</strong> imagem(ns) pronta(s)
+                    <strong className="text-[#111]">{stagedMedia.length}</strong> imagem(ns) no carrossel
                   </>
                 ) : urlInputValue.trim() ? (
                   "URL inserido pronto a processar"
@@ -2598,14 +3011,15 @@ export default function EventDetailView({
                   {isUploadingMedia ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>A processar envio...</span>
+                      <span>A criar moodboard...</span>
                     </>
                   ) : (
                     <>
                       <Plus className="w-3.5 h-3.5" />
                       <span>
-                        Adicionar {stagedMedia.length > 0 ? `${stagedMedia.length} ` : ""}
-                        {newMediaType === "idea_board" ? "ao Moodboard" : "aos Resultados"}
+                        {targetBoardForUpload
+                          ? `Adicionar ${stagedMedia.length > 0 ? `${stagedMedia.length} ` : ""}ao Carrossel`
+                          : `Criar Moodboard (${stagedMedia.length > 0 ? `${stagedMedia.length} fotos` : "com fotos"})`}
                       </span>
                     </>
                   )}

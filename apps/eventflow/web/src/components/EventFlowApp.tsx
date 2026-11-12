@@ -35,6 +35,8 @@ import {
   LogOut,
   TrendingUp,
   AlertCircle,
+  RefreshCw,
+  Video,
 } from "lucide-react";
 import AuditLogModal from "@/components/AuditLogModal";
 import AlertsDrawerModal from "@/components/AlertsDrawerModal";
@@ -57,6 +59,7 @@ import {
   snoozeAlertAction,
   acknowledgeAlertAction,
   dismissAlertAction,
+  syncCalendlyMeetingsAction,
 } from "@/app/actions";
 
 interface Props {
@@ -145,6 +148,30 @@ function getStatusStyle(status: string) {
       };
   }
 }
+
+function isCalendlyMeeting(evt: any): boolean {
+  if (!evt) return false;
+  return Boolean(
+    evt.calendlyEventUri ||
+    evt.category === "Reunião Calendly" ||
+    evt.category === "Consulta / Briefing" ||
+    (typeof evt.name === "string" && evt.name.toLowerCase().startsWith("reunião")) ||
+    (typeof evt.theme === "string" && evt.theme.toLowerCase().includes("briefing"))
+  );
+}
+
+function formatMeetingTimeRange(start: any, end?: any) {
+  if (!start) return "";
+  const dStart = new Date(start);
+  const sh = String(dStart.getHours()).padStart(2, "0");
+  const sm = String(dStart.getMinutes()).padStart(2, "0");
+  if (!end) return `${sh}:${sm}`;
+  const dEnd = new Date(end);
+  const eh = String(dEnd.getHours()).padStart(2, "0");
+  const em = String(dEnd.getMinutes()).padStart(2, "0");
+  return `${sh}:${sm} – ${eh}:${em}`;
+}
+
 
 export default function EventFlowApp({
   currentUser,
@@ -324,6 +351,80 @@ export default function EventFlowApp({
   useEffect(() => {
     setActiveTab(getTabFromPath(pathname));
   }, [pathname]);
+
+  // Calendly OAuth callback notice banner
+  const [calendlyBanner, setCalendlyBanner] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const status = params.get("calendly_status");
+      const err = params.get("calendly_error");
+      if (status === "connected") {
+        setCalendlyBanner({
+          type: "success",
+          message: "Conta Calendly ligada com sucesso! Sincronização pronta.",
+        });
+      } else if (status === "code_received") {
+        setCalendlyBanner({
+          type: "success",
+          message: "Código Calendly recebido com sucesso.",
+        });
+      } else if (err || status === "error" || status === "exchange_failed") {
+        setCalendlyBanner({
+          type: "error",
+          message: `Erro na integração Calendly: ${err || status}`,
+        });
+      }
+    }
+  }, []);
+
+  // Calendly Sync state & filter
+  const [isSyncingCalendly, setIsSyncingCalendly] = useState(false);
+  const [showCalendlySyncModal, setShowCalendlySyncModal] = useState(false);
+  const [calendlyCustomToken, setCalendlyCustomToken] = useState("");
+  const [calendarFilter, setCalendarFilter] = useState<"all" | "meetings" | "events">("all");
+
+  const calendlyMeetingsCount = useMemo(() => {
+    return eventsList.filter(isCalendlyMeeting).length;
+  }, [eventsList]);
+
+  const productionEventsCount = useMemo(() => {
+    return eventsList.filter((e) => !isCalendlyMeeting(e)).length;
+  }, [eventsList]);
+
+  const handleSyncCalendly = async (token?: string) => {
+    setIsSyncingCalendly(true);
+    try {
+      const res = await syncCalendlyMeetingsAction(token);
+      if (res.success) {
+        setCalendlyBanner({
+          type: "success",
+          message: `${res.count} reuniões do Calendly sincronizadas com sucesso! Destacadas a roxo na agenda.`,
+        });
+        setShowCalendlySyncModal(false);
+        router.refresh();
+      } else {
+        setCalendlyBanner({
+          type: "error",
+          message: res.message || "Erro ao sincronizar com o Calendly.",
+        });
+        if (res.message?.includes("Nenhum token")) {
+          setShowCalendlySyncModal(true);
+        }
+      }
+    } catch (err: any) {
+      setCalendlyBanner({
+        type: "error",
+        message: "Falha na sincronização: " + (err?.message || "Erro desconhecido"),
+      });
+    } finally {
+      setIsSyncingCalendly(false);
+    }
+  };
 
   // Calendar State & Interactive Day Details Modal
   const [today] = useState(() => new Date());
@@ -601,11 +702,20 @@ export default function EventFlowApp({
     });
   };
 
-  const getEventsForCalendarDay = (day: number, month = currentCalendarMonth, year = currentCalendarYear) => {
+  const getEventsForCalendarDay = (
+    day: number,
+    month = currentCalendarMonth,
+    year = currentCalendarYear,
+    filterMode: "all" | "meetings" | "events" = "all"
+  ) => {
     return eventsList.filter((e) => {
       if (!e.startDate) return false;
       const d = new Date(e.startDate);
-      return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
+      const matchesDate = d.getFullYear() === year && d.getMonth() === month && d.getDate() === day;
+      if (!matchesDate) return false;
+      if (filterMode === "meetings") return isCalendlyMeeting(e);
+      if (filterMode === "events") return !isCalendlyMeeting(e);
+      return true;
     });
   };
 
@@ -614,6 +724,17 @@ export default function EventFlowApp({
     eventsList
       .filter((e) => {
         if (!e.startDate) return false;
+        const d = new Date(e.startDate);
+        return d.getFullYear() === currentCalendarYear && d.getMonth() === currentCalendarMonth;
+      })
+      .map((e) => new Date(e.startDate).getDate())
+  );
+
+  // Days with Calendly meetings in current calendar month
+  const calendlyEventDays = new Set(
+    eventsList
+      .filter((e) => {
+        if (!e.startDate || !isCalendlyMeeting(e)) return false;
         const d = new Date(e.startDate);
         return d.getFullYear() === currentCalendarYear && d.getMonth() === currentCalendarMonth;
       })
@@ -703,6 +824,32 @@ export default function EventFlowApp({
 
       {/* Main Content Area */}
       <main className="max-w-[940px] mx-auto px-3.5 sm:px-6 pt-4 sm:pt-6 pb-10">
+        {calendlyBanner && (
+          <div
+            className={`mb-4 p-3.5 rounded-[14px] text-xs flex items-center justify-between border ${
+              calendlyBanner.type === "success"
+                ? "bg-emerald-50 text-emerald-900 border-emerald-200"
+                : "bg-rose-50 text-rose-900 border-rose-200"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  calendlyBanner.type === "success" ? "bg-emerald-500" : "bg-rose-500"
+                }`}
+              />
+              <span className="font-semibold">{calendlyBanner.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCalendlyBanner(null)}
+              className="text-gray-400 hover:text-gray-700 p-1 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* ========================================================= */}
         {/* TAB 1: HOME */}
         {/* ========================================================= */}
@@ -1087,8 +1234,12 @@ export default function EventFlowApp({
                         <span>{day}</span>
                         {hasEvent && (
                           <span
-                            className={`w-1 h-1 rounded-full absolute bottom-1 ${
-                              isSelected ? "bg-white" : "bg-[#007aff]"
+                            className={`w-1.5 h-1.5 rounded-full absolute bottom-0.5 ${
+                              isSelected
+                                ? "bg-white"
+                                : calendlyEventDays.has(day)
+                                ? "bg-[#6366f1] ring-1 ring-purple-300"
+                                : "bg-[#007aff]"
                             }`}
                           />
                         )}
@@ -1563,20 +1714,96 @@ export default function EventFlowApp({
                   </div>
                 </div>
                 <p className="text-xs text-[#8e8e93] mt-1">
-                  Clique em qualquer dia para ver o resumo dos eventos ou criar novos eventos.
+                  Reuniões agendadas por clientes via Calendly e produções de eventos CFM em agenda única.
                 </p>
               </div>
 
-              <button
-                onClick={() => {
-                  setEventWizardInitialDate(null);
-                  setShowEventWizard(true);
-                }}
-                className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold self-start sm:self-auto flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-              >
-                <span>＋</span>
-                <span>Novo evento</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => handleSyncCalendly()}
+                  disabled={isSyncingCalendly}
+                  className="px-3.5 py-2 rounded-[12px] bg-[#eeeffe] hover:bg-[#e0e3ff] text-[#4338ca] text-xs font-bold border border-indigo-200/80 flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-60"
+                  title="Puxar reuniões agendadas pelos clientes no Calendly"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 text-[#6366f1] ${
+                      isSyncingCalendly ? "animate-spin" : ""
+                    }`}
+                  />
+                  <span>
+                    {isSyncingCalendly ? "A sincronizar..." : "Sincronizar Calendly"}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setEventWizardInitialDate(null);
+                    setShowEventWizard(true);
+                  }}
+                  className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                >
+                  <span>＋</span>
+                  <span>Novo evento</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Pills & Color Legend */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1 pb-1 border-y border-[#ececf0]">
+              {/* Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+                <button
+                  type="button"
+                  onClick={() => setCalendarFilter("all")}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer ${
+                    calendarFilter === "all"
+                      ? "bg-[#111] text-white shadow-xs"
+                      : "bg-[#f2f2f5] text-[#636366] hover:bg-[#e5e5ea]"
+                  }`}
+                >
+                  Todos ({eventsList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCalendarFilter("meetings")}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    calendarFilter === "meetings"
+                      ? "bg-[#6366f1] text-white shadow-xs"
+                      : "bg-[#eeeffe] text-[#4338ca] hover:bg-[#e0e3ff] border border-indigo-200/60"
+                  }`}
+                >
+                  <Video className="w-3 h-3 text-indigo-400" />
+                  <span>Reuniões Calendly ({calendlyMeetingsCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCalendarFilter("events")}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer ${
+                    calendarFilter === "events"
+                      ? "bg-[#111] text-white shadow-xs"
+                      : "bg-[#f2f2f5] text-[#636366] hover:bg-[#e5e5ea]"
+                  }`}
+                >
+                  Produções CFM ({productionEventsCount})
+                </button>
+              </div>
+
+              {/* Visual Legend */}
+              <div className="flex items-center gap-3 text-[11px] text-[#636366] flex-wrap">
+                <span className="flex items-center gap-1.5 font-bold text-[#4338ca]">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#6366f1] shadow-xs ring-2 ring-indigo-200" />
+                  <span>Reunião Calendly</span>
+                </span>
+                <span className="flex items-center gap-1.5 font-medium">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#24793a]" />
+                  <span>Confirmado</span>
+                </span>
+                <span className="flex items-center gap-1.5 font-medium">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#9a5b00]" />
+                  <span>Preparação / Orçamento</span>
+                </span>
+              </div>
             </div>
 
             {/* Interactive Monthly Calendar Grid */}
@@ -1598,7 +1825,12 @@ export default function EventFlowApp({
 
                 {Array.from({ length: daysInMonth }).map((_, i) => {
                   const day = i + 1;
-                  const dayEvents = getEventsForCalendarDay(day);
+                  const dayEvents = getEventsForCalendarDay(
+                    day,
+                    currentCalendarMonth,
+                    currentCalendarYear,
+                    calendarFilter
+                  );
                   const isSelected =
                     selectedDate.year === currentCalendarYear &&
                     selectedDate.month === currentCalendarMonth &&
@@ -1608,6 +1840,7 @@ export default function EventFlowApp({
                     today.getMonth() === currentCalendarMonth &&
                     today.getDate() === day;
                   const hasEvents = dayEvents.length > 0;
+                  const hasCalendlyInDay = dayEvents.some(isCalendlyMeeting);
 
                   return (
                     <div
@@ -1616,6 +1849,8 @@ export default function EventFlowApp({
                       className={`min-h-[58px] sm:min-h-[96px] p-1 sm:p-2 transition cursor-pointer flex flex-col justify-between group ${
                         isSelected
                           ? "bg-[#111]/[0.035] ring-2 ring-inset ring-[#111]"
+                          : hasCalendlyInDay
+                          ? "bg-[#faf9ff] hover:bg-[#f3f0ff]"
                           : hasEvents
                           ? "bg-white hover:bg-[#fafafc]"
                           : "bg-white/80 hover:bg-white"
@@ -1628,6 +1863,8 @@ export default function EventFlowApp({
                               ? "bg-[#111] text-white shadow-xs"
                               : isToday
                               ? "border-2 border-[#007aff] text-[#007aff] font-bold"
+                              : hasCalendlyInDay
+                              ? "bg-[#6366f1] text-white shadow-2xs"
                               : hasEvents
                               ? "bg-[#2c2c2e] text-white"
                               : "text-[#48484a] group-hover:bg-[#f0f0f3]"
@@ -1637,16 +1874,48 @@ export default function EventFlowApp({
                         </span>
 
                         {hasEvents && (
-                          <span className="text-[9px] sm:text-[10px] font-bold text-[#24793a] bg-[#eaf8ee] px-1 sm:px-1.5 py-0.5 rounded-full">
-                            <span className="hidden sm:inline">{dayEvents.length} {dayEvents.length === 1 ? "evt" : "evts"}</span>
-                            <span className="sm:hidden">{dayEvents.length}</span>
-                          </span>
+                          <div className="flex items-center gap-1">
+                            {hasCalendlyInDay && (
+                              <span className="hidden sm:inline-flex items-center gap-0.5 text-[9px] font-bold text-[#4338ca] bg-[#eeeffe] px-1 py-0.5 rounded border border-indigo-200">
+                                <Video className="w-2.5 h-2.5 text-[#6366f1]" />
+                                <span>Reunião</span>
+                              </span>
+                            )}
+                            <span
+                              className={`text-[9px] sm:text-[10px] font-bold px-1 sm:px-1.5 py-0.5 rounded-full ${
+                                hasCalendlyInDay
+                                  ? "text-[#4338ca] bg-[#eeeffe]"
+                                  : "text-[#24793a] bg-[#eaf8ee]"
+                              }`}
+                            >
+                              <span className="hidden sm:inline">
+                                {dayEvents.length} {dayEvents.length === 1 ? "agendado" : "agendados"}
+                              </span>
+                              <span className="sm:hidden">{dayEvents.length}</span>
+                            </span>
+                          </div>
                         )}
                       </div>
 
                       {/* Event pills preview on Desktop */}
                       <div className="hidden sm:block space-y-1 my-1.5 flex-1 min-w-0">
                         {dayEvents.slice(0, 2).map((evt) => {
+                          const isMeeting = isCalendlyMeeting(evt);
+                          if (isMeeting) {
+                            return (
+                              <div
+                                key={evt.id}
+                                className="px-1.5 py-0.5 rounded-[6px] text-[10px] font-bold truncate bg-gradient-to-r from-[#6366f1] to-[#4f46e5] text-white shadow-xs flex items-center gap-1 border border-indigo-700/30 ring-1 ring-indigo-400/20"
+                                title={`Reunião Calendly: ${evt.name}`}
+                              >
+                                <Video className="w-2.5 h-2.5 flex-shrink-0 text-white/90" />
+                                <span className="truncate">
+                                  {evt.name.replace(/^Reunião:\s*/i, "")}
+                                </span>
+                              </div>
+                            );
+                          }
+
                           const statusObj = getStatusStyle(evt.status);
                           return (
                             <div
@@ -1672,7 +1941,11 @@ export default function EventFlowApp({
                           {dayEvents.slice(0, 3).map((evt) => (
                             <span
                               key={evt.id}
-                              className="w-1.5 h-1.5 rounded-full bg-[#007aff]"
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                isCalendlyMeeting(evt)
+                                  ? "bg-[#6366f1] ring-1 ring-white"
+                                  : "bg-[#007aff]"
+                              }`}
                             />
                           ))}
                           {dayEvents.length > 3 && (
@@ -1692,61 +1965,128 @@ export default function EventFlowApp({
 
             {/* Event Timeline List */}
             <div className="pt-2">
-              <div className="text-[16px] font-bold text-[#111111] mb-3">
-                Cronograma de Eventos ({eventsList.length})
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-[16px] font-bold text-[#111111]">
+                  Cronograma da Agenda ({eventsList.filter((e) => {
+                    if (calendarFilter === "meetings") return isCalendlyMeeting(e);
+                    if (calendarFilter === "events") return !isCalendlyMeeting(e);
+                    return true;
+                  }).length})
+                </div>
+                {calendarFilter !== "all" && (
+                  <button
+                    onClick={() => setCalendarFilter("all")}
+                    className="text-xs text-[#6366f1] font-semibold hover:underline"
+                  >
+                    Limpar filtro (Mostrar todos)
+                  </button>
+                )}
               </div>
+
               <div className="divide-y divide-[#ececf0] border border-[#ececf0] rounded-[18px] overflow-hidden bg-white shadow-xs">
-                {eventsList.map((e) => {
-                  const statusObj = getStatusStyle(e.status);
-                  const startDate = new Date(e.startDate);
+                {eventsList
+                  .filter((e) => {
+                    if (calendarFilter === "meetings") return isCalendlyMeeting(e);
+                    if (calendarFilter === "events") return !isCalendlyMeeting(e);
+                    return true;
+                  })
+                  .map((e) => {
+                    const isMeeting = isCalendlyMeeting(e);
+                    const statusObj = getStatusStyle(e.status);
+                    const startDate = new Date(e.startDate);
 
-                  return (
-                    <div
-                      key={e.id}
-                      onClick={() => router.push(`/eventos/${e.id}`)}
-                      className="p-4 bg-white hover:bg-[#fafafa] flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-12 h-12 rounded-[12px] bg-[#f2f2f7] border border-black/5 flex flex-col items-center justify-center flex-shrink-0 group-hover:bg-[#111] group-hover:text-white transition duration-200">
-                          <span className="text-[9px] uppercase font-bold text-[#8e8e93] group-hover:text-white/80">
-                            {monthNames[startDate.getMonth()]?.slice(0, 3) || "OUT"}
-                          </span>
-                          <span className="text-base font-extrabold text-[#111] group-hover:text-white">
-                            {startDate.getDate()}
-                          </span>
-                        </div>
-
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-sm text-[#111] group-hover:text-[#007aff] transition truncate">
-                              {e.name}
+                    return (
+                      <div
+                        key={e.id}
+                        onClick={() => router.push(`/eventos/${e.id}`)}
+                        className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition cursor-pointer group ${
+                          isMeeting
+                            ? "bg-[#faf9ff] hover:bg-[#f3f0ff]"
+                            : "bg-white hover:bg-[#fafafa]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div
+                            className={`w-12 h-12 rounded-[12px] border flex flex-col items-center justify-center flex-shrink-0 transition duration-200 ${
+                              isMeeting
+                                ? "bg-gradient-to-b from-[#eeeffe] to-[#e0e3ff] border-indigo-200 text-[#4338ca] group-hover:bg-[#4338ca] group-hover:text-white"
+                                : "bg-[#f2f2f7] border-black/5 group-hover:bg-[#111] group-hover:text-white"
+                            }`}
+                          >
+                            <span
+                              className={`text-[9px] uppercase font-bold ${
+                                isMeeting
+                                  ? "text-[#6366f1] group-hover:text-white/80"
+                                  : "text-[#8e8e93] group-hover:text-white/80"
+                              }`}
+                            >
+                              {monthNames[startDate.getMonth()]?.slice(0, 3) || "OUT"}
                             </span>
-                            <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0] flex-shrink-0">
-                              #{e.id}
+                            <span
+                              className={`text-base font-extrabold ${
+                                isMeeting
+                                  ? "text-[#4338ca] group-hover:text-white"
+                                  : "text-[#111] group-hover:text-white"
+                              }`}
+                            >
+                              {startDate.getDate()}
                             </span>
                           </div>
-                          <div className="text-xs text-[#8e8e93] mt-0.5 truncate">
-                            {formatEventByline(e.startDate, e.venue)}
-                          </div>
-                          {e.notes && (
-                            <div className="text-[11px] text-[#6e6e73] mt-1 bg-[#f8f8fa] px-2 py-0.5 rounded-md inline-block truncate max-w-md">
-                              {e.notes}
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {isMeeting && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#6366f1] text-white flex items-center gap-1 shadow-2xs">
+                                  <Video className="w-2.5 h-2.5" />
+                                  <span>Reunião Calendly</span>
+                                </span>
+                              )}
+                              <span className="font-bold text-sm text-[#111] group-hover:text-[#007aff] transition truncate">
+                                {e.name}
+                              </span>
+                              <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0] flex-shrink-0">
+                                #{e.id}
+                              </span>
                             </div>
+                            <div className="text-xs text-[#8e8e93] mt-0.5 truncate flex items-center gap-1.5">
+                              {isMeeting && e.startDate && (
+                                <span className="font-bold text-[#4338ca]">
+                                  🕒 {formatMeetingTimeRange(e.startDate, e.endDate)} ·
+                                </span>
+                              )}
+                              <span>{formatEventByline(e.startDate, e.venue)}</span>
+                            </div>
+                            {e.notes && (
+                              <div
+                                className={`text-[11px] mt-1 px-2 py-0.5 rounded-md inline-block truncate max-w-md ${
+                                  isMeeting
+                                    ? "bg-indigo-50/70 text-indigo-900 border border-indigo-100/60"
+                                    : "bg-[#f8f8fa] text-[#6e6e73]"
+                                }`}
+                              >
+                                {e.notes}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          {isMeeting ? (
+                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#eeeffe] text-[#4338ca] border border-indigo-200">
+                              Briefing Marcado
+                            </span>
+                          ) : (
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-semibold ${statusObj.bg} ${statusObj.text}`}
+                            >
+                              {statusObj.label}
+                            </span>
                           )}
+                          <ChevronRight className="w-4 h-4 text-[#8e8e93] group-hover:text-[#111] group-hover:translate-x-0.5 transition" />
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${statusObj.bg} ${statusObj.text}`}
-                        >
-                          {statusObj.label}
-                        </span>
-                        <ChevronRight className="w-4 h-4 text-[#8e8e93] group-hover:text-[#111] group-hover:translate-x-0.5 transition" />
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             </div>
           </section>
@@ -2758,17 +3098,50 @@ export default function EventFlowApp({
             </div>
 
             {/* Calendly Integration Notice */}
-            <div className="p-4 rounded-[16px] bg-[#f8f8fa] border border-[#ececf0] text-xs space-y-1.5">
-              <div className="flex items-center gap-2 font-bold text-[#111]">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                <span>Integração Calendly Ativa</span>
+            <div className="p-4 rounded-[16px] bg-[#f8f8fa] border border-[#ececf0] text-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-[#111]">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                  <span>Integração Calendly</span>
+                </div>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full">
+                  OAuth & Webhooks Ativos
+                </span>
               </div>
               <p className="text-[#6e6e73]">
                 Reuniões marcadas via Calendly são transformadas automaticamente em
                 clientes CRM e eventos no estado <em>Planeamento</em>.
               </p>
-              <div className="pt-1 text-[11px] text-[#8e8e93]">
-                Webhook Endpoint: <code className="bg-white px-1.5 py-0.5 rounded border border-[#ececf0]">/api/webhooks/calendly</code>
+              <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-[#ececf0]">
+                <div className="space-y-1 text-[11px] text-[#8e8e93]">
+                  <div>Webhook: <code className="bg-white px-1.5 py-0.5 rounded border border-[#ececf0] text-[#111]">/api/webhooks/calendly</code></div>
+                  <div>Callback: <code className="bg-white px-1.5 py-0.5 rounded border border-[#ececf0] text-[#111]">/api/auth/callback/calendly</code></div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleSyncCalendly()}
+                    disabled={isSyncingCalendly}
+                    className="px-3.5 py-2 rounded-[12px] bg-[#eeeffe] hover:bg-[#e0e3ff] text-[#4338ca] font-bold text-xs inline-flex items-center gap-1.5 transition self-start sm:self-auto cursor-pointer border border-indigo-200"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCalendly ? "animate-spin" : ""}`} />
+                    <span>{isSyncingCalendly ? "A sincronizar..." : "Puxar Reuniões"}</span>
+                  </button>
+
+                  <a
+                    href={`https://auth.calendly.com/oauth/authorize?client_id=gi5vz5VLp5Gmtlhe3Cz24tsAB-PMkAZUL4zi5YDFbyw&response_type=code&redirect_uri=${encodeURIComponent(
+                      typeof window !== "undefined" && window.location.origin.includes("localhost")
+                        ? "http://localhost:3000/api/auth/callback/calendly"
+                        : "https://cfm-events.vercel.app/api/auth/callback/calendly"
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 rounded-[12px] bg-[#007aff] hover:bg-[#0062cc] text-white font-semibold text-xs inline-flex items-center gap-1.5 transition self-start sm:self-auto cursor-pointer shadow-xs"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Ligar / Autorizar Calendly</span>
+                  </a>
+                </div>
               </div>
             </div>
           </section>
@@ -3066,6 +3439,86 @@ export default function EventFlowApp({
           onLocationsChange={(newLocs) => setLocationsList(newLocs)}
           onSelectLocationForFilter={(locName) => setInventoryLocationFilter(locName)}
         />
+      )}
+
+      {/* CALENDLY SYNC MODAL */}
+      {showCalendlySyncModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setShowCalendlySyncModal(false)}
+        >
+          <div
+            className="bg-white rounded-[24px] max-w-md w-full p-6 shadow-2xl border border-[#ececf0] space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#ececf0] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-[#eeeffe] text-[#4338ca] flex items-center justify-center">
+                  <Video className="w-4 h-4 text-[#6366f1]" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-[#111]">Sincronizar Calendly</h3>
+                  <p className="text-[11px] text-[#8e8e93]">Puxar reuniões de clientes e briefings</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCalendlySyncModal(false)}
+                className="p-1.5 rounded-full text-[#8e8e93] hover:text-[#111] hover:bg-[#f2f2f5] transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[#6e6e73] leading-relaxed">
+              As reuniões agendadas pelos clientes no Calendly são sincronizadas para o CFM Eventos e destacadas a <strong>roxo</strong> na sua agenda.
+            </p>
+
+            <div className="space-y-3 pt-1">
+              <div>
+                <label className="block text-xs font-semibold text-[#111] mb-1">
+                  Personal Access Token (Opcional)
+                </label>
+                <input
+                  type="password"
+                  placeholder="Cole aqui o token da Calendly se não usar OAuth..."
+                  value={calendlyCustomToken}
+                  onChange={(e) => setCalendlyCustomToken(e.target.value)}
+                  className="w-full px-3.5 py-2 text-xs bg-[#fafafc] border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#6366f1]"
+                />
+                <span className="text-[10px] text-[#8e8e93] mt-0.5 block">
+                  Se autorizou via OAuth, deixe em branco.
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => handleSyncCalendly(calendlyCustomToken || undefined)}
+                  disabled={isSyncingCalendly}
+                  className="w-full py-2.5 rounded-[12px] bg-[#4338ca] hover:bg-[#3730a3] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition cursor-pointer disabled:opacity-60"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCalendly ? "animate-spin" : ""}`} />
+                  <span>{isSyncingCalendly ? "A sincronizar..." : "Sincronizar Reuniões Agora"}</span>
+                </button>
+
+                <a
+                  href={`https://auth.calendly.com/oauth/authorize?client_id=gi5vz5VLp5Gmtlhe3Cz24tsAB-PMkAZUL4zi5YDFbyw&response_type=code&redirect_uri=${encodeURIComponent(
+                    typeof window !== "undefined" && window.location.origin.includes("localhost")
+                      ? "http://localhost:3000/api/auth/callback/calendly"
+                      : "https://cfm-events.vercel.app/api/auth/callback/calendly"
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 rounded-[12px] bg-[#f5f5f7] hover:bg-[#ebebed] text-[#111] text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer border border-[#ececf0]"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Autorizar Calendly via OAuth</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 6. CLIENT WIZARD MODAL ("Novo cliente CRM") */}
@@ -5269,8 +5722,95 @@ function CalendarDayPopupModal({
 
               <div className="space-y-3">
                 {events.map((evt) => {
+                  const isMeeting = isCalendlyMeeting(evt);
                   const statusObj = getStatusStyle(evt.status);
                   const client = clients.find((c) => c.id === evt.clientId);
+
+                  if (isMeeting) {
+                    return (
+                      <div
+                        key={evt.id}
+                        className="p-4 rounded-[18px] border border-indigo-200 bg-gradient-to-b from-[#faf9ff] to-white shadow-xs space-y-3 ring-1 ring-indigo-400/20"
+                      >
+                        {/* Header badge */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-[#6366f1] to-[#4338ca] text-white flex items-center gap-1.5 shadow-2xs">
+                            <Video className="w-3 h-3" />
+                            <span>Reunião Calendly · Briefing de Cliente</span>
+                          </span>
+                          <span className="text-xs font-bold text-[#4338ca] bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-[#6366f1]" />
+                            <span>{formatMeetingTimeRange(evt.startDate, evt.endDate)}</span>
+                          </span>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="w-14 h-14 rounded-[12px] bg-cover bg-center flex-shrink-0 border border-indigo-200 overflow-hidden shadow-2xs"
+                            style={{
+                              backgroundImage: `url("${
+                                evt.coverImageUrl ||
+                                "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=600&q=80"
+                              }")`,
+                            }}
+                          />
+
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-bold text-[15px] text-[#111] leading-tight">
+                              {evt.name}
+                            </h3>
+                            <div className="text-xs text-[#6366f1] font-semibold mt-1 flex items-center gap-1">
+                              <MapPin className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">{evt.venue || "Google Meet (Online)"}</span>
+                            </div>
+                            <div className="text-[11px] text-[#8e8e93] mt-0.5 font-mono">
+                              ID: #{evt.id}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Client details & purpose */}
+                        <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-indigo-100">
+                          {client && (
+                            <div className="text-[#636366]">
+                              <span className="text-[#8e8e93] block text-[10px] uppercase font-semibold">Cliente / Lead</span>
+                              <span className="font-semibold text-indigo-950 truncate block">{client.name}</span>
+                              {client.email && (
+                                <span className="text-[10px] text-gray-500 truncate block">{client.email}</span>
+                              )}
+                            </div>
+                          )}
+                          <div className="text-[#636366]">
+                            <span className="text-[#8e8e93] block text-[10px] uppercase font-semibold">Objetivo da Reunião</span>
+                            <span className="font-medium text-indigo-950 truncate block">Discussão de Evento & Decoração</span>
+                          </div>
+                        </div>
+
+                        {evt.notes && (
+                          <div className="p-3 rounded-[12px] bg-indigo-50/70 border border-indigo-100 text-xs text-indigo-950 space-y-1">
+                            <span className="text-[10px] uppercase font-bold text-[#4338ca] block">
+                              Respostas do Cliente / Notas de Briefing:
+                            </span>
+                            <p className="whitespace-pre-line text-indigo-900 leading-relaxed font-normal text-[11px]">
+                              {evt.notes}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Action buttons */}
+                        <div className="pt-1 flex items-center gap-2">
+                          <Link
+                            href={`/eventos/${evt.id}`}
+                            onClick={onClose}
+                            className="flex-1 py-2.5 px-3 rounded-[12px] bg-[#4338ca] hover:bg-[#3730a3] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-2xs cursor-pointer"
+                          >
+                            <span>Ver Ficha da Reunião</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  }
 
                   return (
                     <div

@@ -37,6 +37,14 @@ function invalidateAllCaches() {
   }
 }
 
+function safeRevalidate(path: string) {
+  try {
+    revalidatePath(path);
+  } catch {
+    // Ignore outside Next request context
+  }
+}
+
 // 1. Create Event
 export async function createEventAction(formData: FormData) {
   const name = formData.get("name") as string;
@@ -1193,8 +1201,10 @@ export async function addEventMediaAction(formData: FormData) {
 export async function addBatchEventMediaAction(formData: FormData) {
   const eventId = formData.get("eventId") as string;
   const type = (formData.get("type") as "idea_board" | "final_outcome") || "idea_board";
+  const boardTitle = (formData.get("boardTitle") as string)?.trim();
   const defaultTag = (formData.get("tag") as string)?.trim() || "Geral";
   const defaultDescription = (formData.get("description") as string)?.trim() || "";
+  const targetMediaId = (formData.get("targetMediaId") as string)?.trim() || "";
 
   if (!eventId) {
     return { success: false, error: "ID do evento é obrigatório." };
@@ -1207,7 +1217,12 @@ export async function addBatchEventMediaAction(formData: FormData) {
   const uploadsDir = path.join(process.cwd(), "public", "uploads");
   await fs.mkdir(uploadsDir, { recursive: true });
 
-  const insertedMedia: any[] = [];
+  const collectedImages: Array<{
+    id: string;
+    url: string;
+    title: string;
+    tag: string;
+  }> = [];
 
   // 1. Process local file uploads (multiple files)
   const files = formData.getAll("files") as File[];
@@ -1226,25 +1241,16 @@ export async function addBatchEventMediaAction(formData: FormData) {
       await fs.writeFile(filePath, buffer);
 
       const imageUrl = `/api/uploads/${uniqueName}`;
-      const mediaId = generateId("med");
-      const title = fileTitles[i]?.trim() || file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ") || (type === "idea_board" ? "Ideia / Conceito" : "Foto Real do Evento");
+      const imgId = generateId("img");
+      const title = fileTitles[i]?.trim() || file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ") || (type === "idea_board" ? `Imagem ${i + 1}` : `Fotografia ${i + 1}`);
       const tag = fileTags[i]?.trim() || defaultTag;
 
-      const mediaRecord = {
-        id: mediaId,
-        eventId,
-        type,
+      collectedImages.push({
+        id: imgId,
+        url: imageUrl,
         title,
-        description: defaultDescription || null,
-        imageUrl,
         tag,
-        orderIndex: Date.now() + i,
-        uploadedByName: authorName,
-        createdAt: new Date(),
-      };
-
-      await db.insert(eventMedia).values(mediaRecord);
-      insertedMedia.push(mediaRecord);
+      });
     }
   }
 
@@ -1256,49 +1262,181 @@ export async function addBatchEventMediaAction(formData: FormData) {
   for (let j = 0; j < urls.length; j++) {
     const rawUrl = urls[j]?.trim();
     if (rawUrl) {
-      const mediaId = generateId("med");
+      const imgId = generateId("img");
       const title = urlTitles[j]?.trim() || (type === "idea_board" ? `Referência Visual ${j + 1}` : `Fotografia Real ${j + 1}`);
       const tag = urlTags[j]?.trim() || defaultTag;
 
-      const mediaRecord = {
-        id: mediaId,
-        eventId,
-        type,
+      collectedImages.push({
+        id: imgId,
+        url: rawUrl,
         title,
-        description: defaultDescription || null,
-        imageUrl: rawUrl,
         tag,
-        orderIndex: Date.now() + files.length + j,
-        uploadedByName: authorName,
-        createdAt: new Date(),
-      };
-
-      await db.insert(eventMedia).values(mediaRecord);
-      insertedMedia.push(mediaRecord);
+      });
     }
   }
 
-  // 3. Record Audit Log for the batch
-  if (insertedMedia.length > 0) {
-    const actionLabel = type === "idea_board" ? "painel_ideias" : "resultado_final";
-    const titleLabel = type === "idea_board"
-      ? `${insertedMedia.length} imagens adicionadas ao Moodboard`
-      : `${insertedMedia.length} fotos reais adicionadas ao resultado`;
+  if (collectedImages.length === 0) {
+    return { success: false, error: "Nenhuma imagem foi adicionada." };
+  }
 
-    await recordAuditLog({
-      entityType: "event",
-      entityId: eventId,
-      action: actionLabel,
-      title: titleLabel,
-      details: `${files.length} ficheiros locais, ${urls.length} URLs web`,
+  // 3. CASE A: Appending images to an existing moodboard / outcome board
+  if (targetMediaId) {
+    const [existingBoard] = await db.select().from(eventMedia).where(eq(eventMedia.id, targetMediaId));
+    if (existingBoard) {
+      let existingImages: Array<{ id: string; url: string; title: string; tag: string }> = [];
+      if (existingBoard.images) {
+        try {
+          const parsed = JSON.parse(existingBoard.images);
+          if (Array.isArray(parsed)) existingImages = parsed;
+        } catch {
+          existingImages = [];
+        }
+      }
+      if (existingImages.length === 0 && existingBoard.imageUrl) {
+        existingImages.push({
+          id: existingBoard.id,
+          url: existingBoard.imageUrl,
+          title: existingBoard.title,
+          tag: existingBoard.tag || defaultTag,
+        });
+      }
+
+      const mergedImages = [...existingImages, ...collectedImages];
+
+      await db
+        .update(eventMedia)
+        .set({
+          images: JSON.stringify(mergedImages),
+          imageUrl: mergedImages[0]?.url || existingBoard.imageUrl,
+        })
+        .where(eq(eventMedia.id, targetMediaId));
+
+      await recordAuditLog({
+        entityType: "event",
+        entityId: eventId,
+        action: "adicionou_media",
+        title: `${collectedImages.length} imagem(ns) adicionada(s) ao Moodboard`,
+        details: `Moodboard "${existingBoard.title}" tem agora ${mergedImages.length} imagens`,
+      });
+
+      invalidateAllCaches();
+      safeRevalidate(`/eventos/${eventId}`);
+      safeRevalidate(`/events/${eventId}`);
+
+      const updatedRecord = {
+        ...existingBoard,
+        images: JSON.stringify(mergedImages),
+        imageUrl: mergedImages[0]?.url || existingBoard.imageUrl,
+      };
+
+      return {
+        success: true,
+        mode: "appended",
+        media: updatedRecord,
+        mediaList: [updatedRecord],
+      };
+    }
+  }
+
+  // 4. CASE B: Creating ONE single Moodboard with ALL uploaded pictures
+  const mediaId = generateId("med");
+  const coverUrl = collectedImages[0]?.url || "";
+  const finalTitle = boardTitle || (type === "idea_board" ? "Painel de Ideias / Moodboard" : "Resultados Finais do Evento");
+
+  const mediaRecord = {
+    id: mediaId,
+    eventId,
+    type,
+    title: finalTitle,
+    description: defaultDescription || null,
+    imageUrl: coverUrl,
+    images: JSON.stringify(collectedImages),
+    tag: defaultTag,
+    orderIndex: Date.now(),
+    uploadedByName: authorName,
+    createdAt: new Date(),
+  };
+
+  await db.insert(eventMedia).values(mediaRecord);
+
+  // 5. Record Audit Log for the single board created
+  const actionLabel = type === "idea_board" ? "painel_ideias" : "resultado_final";
+  const titleLabel = type === "idea_board"
+    ? `Moodboard criado com ${collectedImages.length} imagens`
+    : `Resultado Real registado com ${collectedImages.length} fotos`;
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: actionLabel,
+    title: titleLabel,
+    details: `"${finalTitle}" com ${files.length} ficheiros locais e ${urls.length} links web`,
+  });
+
+  invalidateAllCaches();
+  safeRevalidate(`/eventos/${eventId}`);
+  safeRevalidate(`/events/${eventId}`);
+
+  return {
+    success: true,
+    mode: "created",
+    media: mediaRecord,
+    mediaList: [mediaRecord],
+  };
+}
+
+export async function deleteMediaImageAction(mediaId: string, imageId: string, eventId: string) {
+  const [board] = await db.select().from(eventMedia).where(eq(eventMedia.id, mediaId));
+  if (!board) return { success: false, error: "Registo não encontrado." };
+
+  let currentImages: Array<{ id: string; url: string; title?: string; tag?: string }> = [];
+  if (board.images) {
+    try {
+      const parsed = JSON.parse(board.images);
+      if (Array.isArray(parsed)) currentImages = parsed;
+    } catch {
+      currentImages = [];
+    }
+  }
+  if (currentImages.length === 0 && board.imageUrl) {
+    currentImages.push({
+      id: board.id,
+      url: board.imageUrl,
+      title: board.title,
+      tag: board.tag || undefined,
     });
   }
 
-  invalidateAllCaches();
-  revalidatePath(`/eventos/${eventId}`);
-  revalidatePath(`/events/${eventId}`);
+  const remainingImages = currentImages.filter((img) => img.id !== imageId && img.url !== imageId);
 
-  return { success: true, count: insertedMedia.length, mediaList: insertedMedia };
+  if (remainingImages.length === 0) {
+    // If no images left in the moodboard, delete the moodboard itself
+    await db.delete(eventMedia).where(eq(eventMedia.id, mediaId));
+    invalidateAllCaches();
+    safeRevalidate(`/eventos/${eventId}`);
+    safeRevalidate(`/events/${eventId}`);
+    return { success: true, boardDeleted: true };
+  } else {
+    const newCover = remainingImages[0]?.url || board.imageUrl;
+    await db
+      .update(eventMedia)
+      .set({
+        images: JSON.stringify(remainingImages),
+        imageUrl: newCover,
+      })
+      .where(eq(eventMedia.id, mediaId));
+
+    invalidateAllCaches();
+    safeRevalidate(`/eventos/${eventId}`);
+    safeRevalidate(`/events/${eventId}`);
+    return {
+      success: true,
+      boardDeleted: false,
+      remainingCount: remainingImages.length,
+      updatedImages: remainingImages,
+      newCoverUrl: newCover,
+    };
+  }
 }
 
 export async function deleteEventMediaAction(mediaId: string, eventId: string) {
@@ -1308,13 +1446,13 @@ export async function deleteEventMediaAction(mediaId: string, eventId: string) {
     entityType: "event",
     entityId: eventId,
     action: "removeu_media",
-    title: "Imagem removida da galeria",
-    details: `Imagem #${mediaId} eliminada do evento`,
+    title: "Moodboard / Imagem removida da galeria",
+    details: `Registo #${mediaId} eliminado do evento`,
   });
 
   invalidateAllCaches();
-  revalidatePath(`/eventos/${eventId}`);
-  revalidatePath(`/events/${eventId}`);
+  safeRevalidate(`/eventos/${eventId}`);
+  safeRevalidate(`/events/${eventId}`);
   return { success: true };
 }
 
@@ -1365,6 +1503,39 @@ export async function refreshAlertsAction() {
   const result = await evaluateAndSyncAlerts();
   invalidateAllCaches();
   return { success: true, alerts: result };
+}
+
+// 18. Calendly Meetings Sync Action
+export async function syncCalendlyMeetingsAction(providedToken?: string) {
+  const { pullCalendlyMeetings } = await import("@/lib/calendly-sync");
+  const result = await pullCalendlyMeetings(providedToken);
+  invalidateAllCaches();
+  try {
+    revalidatePath("/calendario");
+    revalidatePath("/calendar");
+    revalidatePath("/eventos");
+    revalidatePath("/events");
+  } catch {}
+  return result;
+}
+
+export async function getCalendlyIntegrationStatusAction() {
+  const { db } = await import("@/db/client");
+  const { integrations } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+
+  const integration = await db.query.integrations.findFirst({
+    where: eq(integrations.id, "calendly"),
+  });
+
+  return {
+    isConnected: Boolean(integration?.accessToken || process.env.CALENDLY_ACCESS_TOKEN),
+    ownerName: integration?.ownerName || null,
+    ownerEmail: integration?.ownerEmail || null,
+    lastSyncedAt: integration?.lastSyncedAt ? integration.lastSyncedAt.toISOString() : null,
+    syncStatus: integration?.syncStatus || "idle",
+    syncError: integration?.syncError || null,
+  };
 }
 
 
