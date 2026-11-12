@@ -37,6 +37,10 @@ export async function ensureDbMigrated(): Promise<void> {
       "ALTER TABLE event_media ADD COLUMN order_index INTEGER",
       "ALTER TABLE event_media ADD COLUMN uploaded_by_name TEXT",
 
+      // 2.1 Inventory Items columns
+      "ALTER TABLE inventory_items ADD COLUMN purchase_status TEXT DEFAULT 'bought'",
+      "ALTER TABLE inventory_items ADD COLUMN purchase_cost REAL DEFAULT 0",
+
       // 3. Moodboard Comments table
       `CREATE TABLE IF NOT EXISTS moodboard_comments (
         id TEXT PRIMARY KEY,
