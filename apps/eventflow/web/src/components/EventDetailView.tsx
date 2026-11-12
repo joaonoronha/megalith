@@ -31,7 +31,10 @@ import {
   Loader2,
   Camera,
   Minus,
+  History,
 } from "lucide-react";
+import AuditLogModal from "@/components/AuditLogModal";
+import { formatRelativeTime } from "@/lib/date-format";
 import {
   updateEventPatchAction,
   updateEventStatusAction,
@@ -129,6 +132,8 @@ interface EventData {
   specialNeeds: string | null;
   notes: string | null;
   coverImageUrl: string | null;
+  updatedAt?: Date | string | null;
+  lastUpdatedByName?: string | null;
 }
 
 interface Props {
@@ -206,6 +211,7 @@ export default function EventDetailView({
   // Modals for adding items
   const [showAddAllocationModal, setShowAddAllocationModal] = useState(false);
   const [showCoverPicker, setShowCoverPicker] = useState(false);
+  const [showAuditModal, setShowAuditModal] = useState(false);
 
   // New task inline state
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -545,6 +551,22 @@ export default function EventDetailView({
                 <option value="concluido">Concluído</option>
                 <option value="cancelado">Cancelado</option>
               </select>
+            </div>
+
+            {/* Auditing Log & Last Updated */}
+            <div className="flex items-center gap-2 pl-2 border-l border-[#ececf0]">
+              <span className="hidden lg:inline text-[11px] text-[#8e8e93]">
+                Last updated by <strong className="text-[#3a3a3c] font-semibold">{event.lastUpdatedByName || "Administrador CFM"}</strong> {formatRelativeTime(event.updatedAt, "en")}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAuditModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#007aff] hover:text-[#005bb5] font-semibold text-xs transition cursor-pointer"
+                title="Ver histórico de alterações do evento"
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>Histórico</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1519,6 +1541,15 @@ export default function EventDetailView({
           </div>
         </div>
       )}
+
+      {/* Audit Log Modal */}
+      <AuditLogModal
+        isOpen={showAuditModal}
+        onClose={() => setShowAuditModal(false)}
+        entityType="event"
+        entityId={event.id}
+        entityTitle={event.name}
+      />
     </div>
   );
 }
