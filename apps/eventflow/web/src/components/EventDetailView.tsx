@@ -164,7 +164,8 @@ interface Allocation {
 
 interface Task {
   id: string;
-  eventId: string;
+  eventId: string | null;
+  meetingId?: string | null;
   title: string;
   completed: boolean;
   dueDate: Date | null;
@@ -2038,28 +2039,90 @@ export default function EventDetailView({
   };
 
   // Media handlers (Multiple files, URLs, and Presets interchangeably)
-  const handleFilesSelected = (files: FileList | File[]) => {
-    const newItems: StagedMediaItem[] = [];
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith("image/")) return;
+  const compressImageFile = async (file: File, maxWidth = 1600, quality = 0.85): Promise<File> => {
+    if (
+      typeof window === "undefined" ||
+      !file.type.startsWith("image/") ||
+      file.type.includes("svg") ||
+      file.type.includes("gif")
+    ) {
+      return file;
+    }
+    return new Promise((resolve) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        let { width, height } = img;
+        if (width <= maxWidth && height <= maxWidth && file.size < 400 * 1024) {
+          resolve(file);
+          return;
+        }
+        if (width > maxWidth || height > maxWidth) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxWidth) / height);
+            height = maxWidth;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob || blob.size >= file.size) {
+              resolve(file);
+            } else {
+              const compressed = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+                type: "image/jpeg",
+                lastModified: Date.now(),
+              });
+              resolve(compressed);
+            }
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(file);
+      };
+      img.src = objectUrl;
+    });
+  };
+
+  const handleFilesSelected = async (files: FileList | File[]) => {
+    const fileList = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (fileList.length === 0) return;
+
+    for (const rawFile of fileList) {
+      const file = await compressImageFile(rawFile);
       const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
       const previewUrl = URL.createObjectURL(file);
       const sizeKB = Math.round(file.size / 1024);
       const sizeFormatted = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB} KB`;
 
-      newItems.push({
-        id: "staged-f-" + Math.random().toString(36).slice(2, 9),
-        sourceType: "file",
-        file,
-        previewUrl,
-        title: cleanName,
-        tag: newMediaTag,
-        fileSizeFormatted: sizeFormatted,
-      });
-    });
-
-    if (newItems.length > 0) {
-      setStagedMedia((prev) => [...prev, ...newItems]);
+      setStagedMedia((prev) => [
+        ...prev,
+        {
+          id: "staged-f-" + Math.random().toString(36).slice(2, 9),
+          sourceType: "file",
+          file,
+          previewUrl,
+          title: cleanName,
+          tag: newMediaTag,
+          fileSizeFormatted: sizeFormatted,
+        },
+      ]);
     }
   };
 
@@ -2255,9 +2318,10 @@ export default function EventDetailView({
           setMediaList((prev) => prev.filter((m) => !m.id.startsWith("temp-")));
           alert(res.error || "Erro ao guardar o moodboard.");
         }
-      } catch (err) {
+      } catch (err: any) {
         setMediaList((prev) => prev.filter((m) => !m.id.startsWith("temp-")));
         console.error("Erro no envio de imagens:", err);
+        alert(err?.message || "Ocorreu um erro no envio de imagens. Por favor tente novamente.");
       } finally {
         setIsUploadingMedia(false);
       }

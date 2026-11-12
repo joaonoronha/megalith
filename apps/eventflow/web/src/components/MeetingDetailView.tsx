@@ -35,8 +35,8 @@ import {
   Tag,
 } from "lucide-react";
 import {
-  updateEventPatchAction,
-  updateEventStatusAction,
+  updateMeetingStatusAction,
+  updateMeetingDetailsAction,
   addEventTaskAction,
   toggleEventTaskAction,
   deleteEventTaskAction,
@@ -79,10 +79,34 @@ interface EventData {
   category?: string | null;
   theme?: string | null;
   notes: string | null;
+  createdAt: Date;
+  updatedAt?: Date | null;
+  lastUpdatedByName?: string | null;
+}
+
+export interface MeetingData {
+  id: string;
+  title: string;
+  name?: string; // fallback alias
+  eventId?: string | null;
+  linkedEventId?: string | null; // fallback alias
+  clientId: string | null;
+  venue?: string | null;
+  location?: string | null;
+  meetUrl?: string | null;
+  type?: "google_meet" | "presencial" | "outro" | string;
+  startDate: Date;
+  endDate: Date | null;
+  status: string;
+  notes: string | null;
   meetingSummary?: string | null;
   meetingParticipants?: string | null;
-  linkedEventId?: string | null;
+  source?: string;
+  calendlyUri?: string | null;
   calendlyEventUri?: string | null;
+  clientContactName?: string | null;
+  clientContactEmail?: string | null;
+  clientContactPhone?: string | null;
   createdAt: Date;
   updatedAt?: Date | null;
   lastUpdatedByName?: string | null;
@@ -103,7 +127,7 @@ interface Participant {
 }
 
 interface MeetingDetailViewProps {
-  meeting: EventData;
+  meeting: MeetingData;
   client: Client | null;
   linkedEvent: EventData | null;
   allProductionEvents: EventData[];
@@ -197,20 +221,26 @@ export default function MeetingDetailView({
       ? new Date(meeting.endDate).toISOString().slice(0, 16)
       : new Date(new Date(meeting.startDate).getTime() + 45 * 60 * 1000).toISOString().slice(0, 16)
   );
-  const [editVenue, setEditVenue] = useState(meeting.venue || "Google Meet (Online)");
+  const initialVenue = meeting.location || meeting.venue || "Google Meet (Online)";
+  const [editVenue, setEditVenue] = useState(initialVenue);
   const [copiedId, setCopiedId] = useState(false);
 
   // Check if online meet
   const isMeet = Boolean(
-    meeting.venue?.toLowerCase().includes("meet") ||
+    meeting.type === "google_meet" ||
+    meeting.meetUrl ||
+    initialVenue.toLowerCase().includes("meet") ||
     meeting.notes?.toLowerCase().includes("meet") ||
+    meeting.calendlyUri ||
     meeting.calendlyEventUri
   );
-  const meetUrl = isMeet
-    ? meeting.venue?.includes("meet.google.com")
-      ? meeting.venue
-      : `https://meet.google.com/cfm-${meeting.id.slice(-6)}`
-    : null;
+  const meetUrl =
+    meeting.meetUrl ||
+    (isMeet
+      ? initialVenue.includes("meet.google.com")
+        ? initialVenue
+        : `https://meet.google.com/cfm-${meeting.id.slice(-6)}`
+      : null);
 
   // Format dates
   const startDate = new Date(meeting.startDate);
@@ -387,7 +417,7 @@ export default function MeetingDetailView({
     setStatus(newStatus);
     setMeeting((prev) => ({ ...prev, status: newStatus }));
     try {
-      await updateEventStatusAction(meeting.id, newStatus);
+      await updateMeetingStatusAction(meeting.id, newStatus as any);
     } catch (err) {
       console.error("Erro ao mudar estado:", err);
     }
@@ -396,16 +426,17 @@ export default function MeetingDetailView({
   // 6. Save Time & Venue
   const handleSaveTimeVenue = async () => {
     try {
-      await updateEventPatchAction(meeting.id, {
+      await updateMeetingDetailsAction(meeting.id, {
         startDate: editStartDate,
         endDate: editEndDate,
-        venue: editVenue,
+        location: editVenue,
       });
       setMeeting((prev) => ({
         ...prev,
         startDate: new Date(editStartDate),
         endDate: new Date(editEndDate),
         venue: editVenue,
+        location: editVenue,
       }));
       setIsEditingTime(false);
     } catch (err) {
@@ -492,7 +523,7 @@ export default function MeetingDetailView({
                 )}
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-[#111111] tracking-tight">
-                {meeting.name}
+                {meeting.title || meeting.name}
               </h1>
             </div>
 
@@ -551,7 +582,7 @@ export default function MeetingDetailView({
                   ) : (
                     <>
                       <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span className="truncate">{meeting.venue || "Presencial"}</span>
+                      <span className="truncate">{meeting.location || meeting.venue || "Presencial"}</span>
                     </>
                   )}
                 </div>

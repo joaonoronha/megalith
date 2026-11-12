@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { db, ensureDbMigrated } from "@/db/client";
 import {
   events,
@@ -15,7 +15,6 @@ import {
 import { eq, desc, asc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import EventDetailView from "@/components/EventDetailView";
-import MeetingDetailView from "@/components/MeetingDetailView";
 import { isMeetingEvent } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +31,20 @@ export default async function EventPage({ params }: PageProps) {
     where: eq(events.id, id),
   });
 
+  // If someone accesses a meeting id through /eventos/[id], redirect to dedicated /reunioes/[id] endpoint
   if (!event) {
+    const meeting = await db.query.eventMeetings.findFirst({
+      where: eq(eventMeetings.id, id),
+    });
+    if (meeting) {
+      redirect(`/reunioes/${id}`);
+    }
     notFound();
+  }
+
+  // If a legacy row in events is flagged as a meeting, redirect to /reunioes
+  if (isMeetingEvent(event)) {
+    redirect(`/reunioes/${event.id}`);
   }
 
   // 1. Client
@@ -55,42 +66,6 @@ export default async function EventPage({ params }: PageProps) {
 
   // Auth User
   const currentUser = await getCurrentUser();
-
-  // If this entity is a Meeting (Calendly briefing, consulta, etc.), render the dedicated MeetingDetailView
-  // which focuses on conversation summary (ata), action items checklist, participants, schedule/Meet, and linking to an event.
-  // Meetings NEVER receive commercial quotes/quotas.
-  if (isMeetingEvent(event)) {
-    const linkedEvent = event.linkedEventId
-      ? await db.query.events.findFirst({
-          where: eq(events.id, event.linkedEventId),
-        })
-      : null;
-
-    const allEvents = await db.query.events.findMany({
-      orderBy: [desc(events.startDate)],
-    });
-
-    const allProductionEvents = allEvents.filter(
-      (e) => e.id !== event.id && !isMeetingEvent(e)
-    );
-
-    const actionItems = await db.query.eventTasks.findMany({
-      where: eq(eventTasks.eventId, id),
-      orderBy: [asc(eventTasks.orderIndex), asc(eventTasks.createdAt)],
-    });
-
-    return (
-      <MeetingDetailView
-        meeting={event}
-        client={client || null}
-        linkedEvent={linkedEvent || null}
-        allProductionEvents={allProductionEvents}
-        actionItems={actionItems}
-        teamUsers={teamUsers}
-        currentUser={currentUser}
-      />
-    );
-  }
 
   // 2. All Clients
   const allClients = await db.query.clients.findMany({

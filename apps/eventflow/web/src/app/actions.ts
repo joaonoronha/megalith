@@ -17,6 +17,7 @@ import {
   quoteTemplates,
   users,
   alerts,
+  appUploads,
 } from "@/db/schema";
 import { eq, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -1163,22 +1164,24 @@ export async function deleteAllocationAction(allocationId: string, eventId: stri
   return { success: true };
 }
 
-// 15. Add Event Action Item (Task)
+// 15. Add Event or Meeting Action Item (Task)
 export async function addEventTaskAction(
-  eventId: string,
+  targetId: string,
   title: string,
   priority: "baixa" | "media" | "alta" | "urgente" = "media",
   dueDateStr?: string,
   assignedTo?: string
 ) {
-  if (!eventId || !title.trim()) {
+  if (!targetId || !title.trim()) {
     return { success: false, error: "Título da tarefa é obrigatório." };
   }
 
+  const isMeeting = targetId.startsWith("mtg-");
   const id = generateId("tsk");
   await db.insert(eventTasks).values({
     id,
-    eventId,
+    eventId: isMeeting ? null : targetId,
+    meetingId: isMeeting ? targetId : null,
     title: title.trim(),
     completed: false,
     priority,
@@ -1190,19 +1193,25 @@ export async function addEventTaskAction(
 
   await recordAuditLog({
     entityType: "event",
-    entityId: eventId,
+    entityId: targetId,
     action: "tarefa",
     title: "Tarefa adicionada",
     details: `Nova tarefa: "${title.trim()}" (prioridade: ${priority})`,
   });
 
   invalidateAllCaches();
-  revalidatePath(`/eventos/${eventId}`);
+  if (isMeeting) {
+    safeRevalidate(`/reunioes/${targetId}`);
+    safeRevalidate(`/meetings/${targetId}`);
+  } else {
+    safeRevalidate(`/eventos/${targetId}`);
+    safeRevalidate(`/events/${targetId}`);
+  }
   return { success: true, id };
 }
 
-// 16. Toggle Event Task Completion
-export async function toggleEventTaskAction(taskId: string, completed: boolean, eventId: string) {
+// 16. Toggle Event or Meeting Task Completion
+export async function toggleEventTaskAction(taskId: string, completed: boolean, targetId: string) {
   await db
     .update(eventTasks)
     .set({ completed })
@@ -1210,33 +1219,35 @@ export async function toggleEventTaskAction(taskId: string, completed: boolean, 
 
   await recordAuditLog({
     entityType: "event",
-    entityId: eventId,
+    entityId: targetId,
     action: "tarefa",
     title: completed ? "Tarefa concluída" : "Tarefa reaberta",
     details: `Tarefa #${taskId} marcada como ${completed ? "concluída" : "pendente"}`,
   });
 
   invalidateAllCaches();
-  revalidatePath(`/eventos/${eventId}`);
+  safeRevalidate(`/eventos/${targetId}`);
+  safeRevalidate(`/reunioes/${targetId}`);
   return { success: true };
 }
 
-// 17. Delete Event Task
-export async function deleteEventTaskAction(taskId: string, eventId: string) {
+// 17. Delete Event or Meeting Task
+export async function deleteEventTaskAction(taskId: string, targetId: string) {
   await db
     .delete(eventTasks)
     .where(eq(eventTasks.id, taskId));
 
   await recordAuditLog({
     entityType: "event",
-    entityId: eventId,
+    entityId: targetId,
     action: "tarefa",
     title: "Tarefa eliminada",
-    details: `Tarefa #${taskId} removida da checklist do evento`,
+    details: `Tarefa #${taskId} removida`,
   });
 
   invalidateAllCaches();
-  revalidatePath(`/eventos/${eventId}`);
+  safeRevalidate(`/eventos/${targetId}`);
+  safeRevalidate(`/reunioes/${targetId}`);
   return { success: true };
 }
 
@@ -1293,190 +1304,217 @@ export async function addEventMediaAction(formData: FormData) {
 }
 
 export async function addBatchEventMediaAction(formData: FormData) {
-  const eventId = formData.get("eventId") as string;
-  const type = (formData.get("type") as "idea_board" | "final_outcome") || "idea_board";
-  const boardTitle = (formData.get("boardTitle") as string)?.trim();
-  const defaultTag = (formData.get("tag") as string)?.trim() || "Geral";
-  const defaultDescription = (formData.get("description") as string)?.trim() || "";
-  const targetMediaId = (formData.get("targetMediaId") as string)?.trim() || "";
+  try {
+    await ensureDbMigrated();
+    const eventId = formData.get("eventId") as string;
+    const type = (formData.get("type") as "idea_board" | "final_outcome") || "idea_board";
+    const boardTitle = (formData.get("boardTitle") as string)?.trim();
+    const defaultTag = (formData.get("tag") as string)?.trim() || "Geral";
+    const defaultDescription = (formData.get("description") as string)?.trim() || "";
+    const targetMediaId = (formData.get("targetMediaId") as string)?.trim() || "";
 
-  if (!eventId) {
-    return { success: false, error: "ID do evento é obrigatório." };
-  }
-
-  const { getCurrentUser } = await import("@/lib/auth");
-  const user = await getCurrentUser();
-  const authorName = user?.name || "Administrador CFM";
-
-  const uploadsDir = path.join(process.cwd(), "public", "uploads");
-  await fs.mkdir(uploadsDir, { recursive: true });
-
-  const collectedImages: Array<{
-    id: string;
-    url: string;
-    title: string;
-    tag: string;
-  }> = [];
-
-  // 1. Process local file uploads (multiple files)
-  const files = formData.getAll("files") as File[];
-  const fileTitles = formData.getAll("fileTitles") as string[];
-  const fileTags = formData.getAll("fileTags") as string[];
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    if (file && typeof file.arrayBuffer === "function" && file.size > 0) {
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const rawExt = path.extname(file.name || "").toLowerCase() || ".jpg";
-      const sanitizedBase = path.basename(file.name || "imagem", rawExt).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
-      const uniqueName = `${Date.now()}-${generateId("f")}-${sanitizedBase}${rawExt}`;
-      const filePath = path.join(uploadsDir, uniqueName);
-
-      await fs.writeFile(filePath, buffer);
-
-      const imageUrl = `/api/uploads/${uniqueName}`;
-      const imgId = generateId("img");
-      const title = fileTitles[i]?.trim() || file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ") || (type === "idea_board" ? `Imagem ${i + 1}` : `Fotografia ${i + 1}`);
-      const tag = fileTags[i]?.trim() || defaultTag;
-
-      collectedImages.push({
-        id: imgId,
-        url: imageUrl,
-        title,
-        tag,
-      });
+    if (!eventId) {
+      return { success: false, error: "ID do evento é obrigatório." };
     }
-  }
 
-  // 2. Process web URLs (multiple URLs or presets)
-  const urls = formData.getAll("urls") as string[];
-  const urlTitles = formData.getAll("urlTitles") as string[];
-  const urlTags = formData.getAll("urlTags") as string[];
+    const { getCurrentUser } = await import("@/lib/auth");
+    const user = await getCurrentUser();
+    const authorName = user?.name || "Administrador CFM";
 
-  for (let j = 0; j < urls.length; j++) {
-    const rawUrl = urls[j]?.trim();
-    if (rawUrl) {
-      const imgId = generateId("img");
-      const title = urlTitles[j]?.trim() || (type === "idea_board" ? `Referência Visual ${j + 1}` : `Fotografia Real ${j + 1}`);
-      const tag = urlTags[j]?.trim() || defaultTag;
+    const collectedImages: Array<{
+      id: string;
+      url: string;
+      title: string;
+      tag: string;
+    }> = [];
 
-      collectedImages.push({
-        id: imgId,
-        url: rawUrl,
-        title,
-        tag,
-      });
-    }
-  }
+    // 1. Process local file uploads (multiple files)
+    const files = formData.getAll("files") as File[];
+    const fileTitles = formData.getAll("fileTitles") as string[];
+    const fileTags = formData.getAll("fileTags") as string[];
 
-  if (collectedImages.length === 0) {
-    return { success: false, error: "Nenhuma imagem foi adicionada." };
-  }
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file && typeof file.arrayBuffer === "function" && file.size > 0) {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const rawExt = path.extname(file.name || "").toLowerCase() || ".jpg";
+        const sanitizedBase = path.basename(file.name || "imagem", rawExt).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
+        const uniqueName = `${Date.now()}-${generateId("f")}-${sanitizedBase}${rawExt}`;
+        const mime = file.type || (rawExt === ".png" ? "image/png" : rawExt === ".webp" ? "image/webp" : "image/jpeg");
 
-  // 3. CASE A: Appending images to an existing moodboard / outcome board
-  if (targetMediaId) {
-    const [existingBoard] = await db.select().from(eventMedia).where(eq(eventMedia.id, targetMediaId));
-    if (existingBoard) {
-      let existingImages: Array<{ id: string; url: string; title: string; tag: string }> = [];
-      if (existingBoard.images) {
+        // 1. Persist to Turso DB so it works seamlessly on serverless / Vercel
         try {
-          const parsed = JSON.parse(existingBoard.images);
-          if (Array.isArray(parsed)) existingImages = parsed;
-        } catch {
-          existingImages = [];
+          await db.insert(appUploads).values({
+            id: generateId("upl"),
+            filename: uniqueName,
+            mimeType: mime,
+            dataBase64: buffer.toString("base64"),
+            size: buffer.length,
+            createdAt: new Date(),
+          }).onConflictDoNothing();
+        } catch (dbUploadErr) {
+          console.error("Erro ao gravar upload na base de dados:", dbUploadErr);
         }
-      }
-      if (existingImages.length === 0 && existingBoard.imageUrl) {
-        existingImages.push({
-          id: existingBoard.id,
-          url: existingBoard.imageUrl,
-          title: existingBoard.title,
-          tag: existingBoard.tag || defaultTag,
+
+        // 2. Best-effort cache to local disk if directory is writable (works in local dev)
+        try {
+          const uploadsDir = path.join(process.cwd(), "public", "uploads");
+          await fs.mkdir(uploadsDir, { recursive: true });
+          await fs.writeFile(path.join(uploadsDir, uniqueName), buffer);
+        } catch {
+          // Read-only filesystem in Vercel serverless environment - safely handled by appUploads DB!
+        }
+
+        const imageUrl = `/api/uploads/${uniqueName}`;
+        const imgId = generateId("img");
+        const title = fileTitles[i]?.trim() || file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ") || (type === "idea_board" ? `Imagem ${i + 1}` : `Fotografia ${i + 1}`);
+        const tag = fileTags[i]?.trim() || defaultTag;
+
+        collectedImages.push({
+          id: imgId,
+          url: imageUrl,
+          title,
+          tag,
         });
       }
+    }
 
-      const mergedImages = [...existingImages, ...collectedImages];
+    // 2. Process web URLs (multiple URLs or presets)
+    const urls = formData.getAll("urls") as string[];
+    const urlTitles = formData.getAll("urlTitles") as string[];
+    const urlTags = formData.getAll("urlTags") as string[];
 
-      await db
-        .update(eventMedia)
-        .set({
+    for (let j = 0; j < urls.length; j++) {
+      const rawUrl = urls[j]?.trim();
+      if (rawUrl) {
+        const imgId = generateId("img");
+        const title = urlTitles[j]?.trim() || (type === "idea_board" ? `Referência Visual ${j + 1}` : `Fotografia Real ${j + 1}`);
+        const tag = urlTags[j]?.trim() || defaultTag;
+
+        collectedImages.push({
+          id: imgId,
+          url: rawUrl,
+          title,
+          tag,
+        });
+      }
+    }
+
+    if (collectedImages.length === 0) {
+      return { success: false, error: "Nenhuma imagem foi adicionada." };
+    }
+
+    // 3. CASE A: Appending images to an existing moodboard / outcome board
+    if (targetMediaId) {
+      const [existingBoard] = await db.select().from(eventMedia).where(eq(eventMedia.id, targetMediaId));
+      if (existingBoard) {
+        let existingImages: Array<{ id: string; url: string; title: string; tag: string }> = [];
+        if (existingBoard.images) {
+          try {
+            const parsed = JSON.parse(existingBoard.images);
+            if (Array.isArray(parsed)) existingImages = parsed;
+          } catch {
+            existingImages = [];
+          }
+        }
+        if (existingImages.length === 0 && existingBoard.imageUrl) {
+          existingImages.push({
+            id: existingBoard.id,
+            url: existingBoard.imageUrl,
+            title: existingBoard.title,
+            tag: existingBoard.tag || defaultTag,
+          });
+        }
+
+        const mergedImages = [...existingImages, ...collectedImages];
+
+        await db
+          .update(eventMedia)
+          .set({
+            images: JSON.stringify(mergedImages),
+            imageUrl: mergedImages[0]?.url || existingBoard.imageUrl,
+          })
+          .where(eq(eventMedia.id, targetMediaId));
+
+        await recordAuditLog({
+          entityType: "event",
+          entityId: eventId,
+          action: "adicionou_media",
+          title: `${collectedImages.length} imagem(ns) adicionada(s) ao Moodboard`,
+          details: `Moodboard "${existingBoard.title}" tem agora ${mergedImages.length} imagens`,
+        });
+
+        invalidateAllCaches();
+        safeRevalidate(`/eventos/${eventId}`);
+        safeRevalidate(`/events/${eventId}`);
+
+        const updatedRecord = {
+          ...existingBoard,
           images: JSON.stringify(mergedImages),
           imageUrl: mergedImages[0]?.url || existingBoard.imageUrl,
-        })
-        .where(eq(eventMedia.id, targetMediaId));
+        };
 
-      await recordAuditLog({
-        entityType: "event",
-        entityId: eventId,
-        action: "adicionou_media",
-        title: `${collectedImages.length} imagem(ns) adicionada(s) ao Moodboard`,
-        details: `Moodboard "${existingBoard.title}" tem agora ${mergedImages.length} imagens`,
-      });
-
-      invalidateAllCaches();
-      safeRevalidate(`/eventos/${eventId}`);
-      safeRevalidate(`/events/${eventId}`);
-
-      const updatedRecord = {
-        ...existingBoard,
-        images: JSON.stringify(mergedImages),
-        imageUrl: mergedImages[0]?.url || existingBoard.imageUrl,
-      };
-
-      return {
-        success: true,
-        mode: "appended",
-        media: updatedRecord,
-        mediaList: [updatedRecord],
-      };
+        return {
+          success: true,
+          mode: "appended",
+          media: updatedRecord,
+          mediaList: [updatedRecord],
+        };
+      }
     }
+
+    // 4. CASE B: Creating ONE single Moodboard with ALL uploaded pictures
+    const mediaId = generateId("med");
+    const coverUrl = collectedImages[0]?.url || "";
+    const finalTitle = boardTitle || (type === "idea_board" ? "Painel de Ideias / Moodboard" : "Resultados Finais do Evento");
+
+    const mediaRecord = {
+      id: mediaId,
+      eventId,
+      type,
+      title: finalTitle,
+      description: defaultDescription || null,
+      imageUrl: coverUrl,
+      images: JSON.stringify(collectedImages),
+      tag: defaultTag,
+      orderIndex: Date.now(),
+      uploadedByName: authorName,
+      createdAt: new Date(),
+    };
+
+    await db.insert(eventMedia).values(mediaRecord);
+
+    // 5. Record Audit Log for the single board created
+    const actionLabel = type === "idea_board" ? "painel_ideias" : "resultado_final";
+    const titleLabel = type === "idea_board"
+      ? `Moodboard criado com ${collectedImages.length} imagens`
+      : `Resultado Real registado com ${collectedImages.length} fotos`;
+
+    await recordAuditLog({
+      entityType: "event",
+      entityId: eventId,
+      action: actionLabel,
+      title: titleLabel,
+      details: `"${finalTitle}" com ${files.length} ficheiros locais e ${urls.length} links web`,
+    });
+
+    invalidateAllCaches();
+    safeRevalidate(`/eventos/${eventId}`);
+    safeRevalidate(`/events/${eventId}`);
+
+    return {
+      success: true,
+      mode: "created",
+      media: mediaRecord,
+      mediaList: [mediaRecord],
+    };
+  } catch (err: any) {
+    console.error("Erro em addBatchEventMediaAction:", err);
+    return {
+      success: false,
+      error: err?.message || "Ocorreu um erro ao guardar o moodboard. Por favor tente novamente.",
+    };
   }
-
-  // 4. CASE B: Creating ONE single Moodboard with ALL uploaded pictures
-  const mediaId = generateId("med");
-  const coverUrl = collectedImages[0]?.url || "";
-  const finalTitle = boardTitle || (type === "idea_board" ? "Painel de Ideias / Moodboard" : "Resultados Finais do Evento");
-
-  const mediaRecord = {
-    id: mediaId,
-    eventId,
-    type,
-    title: finalTitle,
-    description: defaultDescription || null,
-    imageUrl: coverUrl,
-    images: JSON.stringify(collectedImages),
-    tag: defaultTag,
-    orderIndex: Date.now(),
-    uploadedByName: authorName,
-    createdAt: new Date(),
-  };
-
-  await db.insert(eventMedia).values(mediaRecord);
-
-  // 5. Record Audit Log for the single board created
-  const actionLabel = type === "idea_board" ? "painel_ideias" : "resultado_final";
-  const titleLabel = type === "idea_board"
-    ? `Moodboard criado com ${collectedImages.length} imagens`
-    : `Resultado Real registado com ${collectedImages.length} fotos`;
-
-  await recordAuditLog({
-    entityType: "event",
-    entityId: eventId,
-    action: actionLabel,
-    title: titleLabel,
-    details: `"${finalTitle}" com ${files.length} ficheiros locais e ${urls.length} links web`,
-  });
-
-  invalidateAllCaches();
-  safeRevalidate(`/eventos/${eventId}`);
-  safeRevalidate(`/events/${eventId}`);
-
-  return {
-    success: true,
-    mode: "created",
-    media: mediaRecord,
-    mediaList: [mediaRecord],
-  };
 }
 
 export async function deleteMediaImageAction(mediaId: string, imageId: string, eventId: string) {
@@ -1582,9 +1620,7 @@ export async function addMoodboardCommentAction(formData: FormData) {
   const imageFile = formData.get("imageFile") as File | null;
   if (imageFile && typeof imageFile.arrayBuffer === "function" && imageFile.size > 0) {
     try {
-      const uploadsDir = path.join(process.cwd(), "public", "uploads");
-      await fs.mkdir(uploadsDir, { recursive: true });
-
+      await ensureDbMigrated();
       const buffer = Buffer.from(await imageFile.arrayBuffer());
       const rawExt = path.extname(imageFile.name || "").toLowerCase() || ".jpg";
       const sanitizedBase = path
@@ -1592,12 +1628,34 @@ export async function addMoodboardCommentAction(formData: FormData) {
         .replace(/[^a-zA-Z0-9_-]/g, "_")
         .slice(0, 30);
       const uniqueName = `cmt-${Date.now()}-${generateId("f")}-${sanitizedBase}${rawExt}`;
-      const filePath = path.join(uploadsDir, uniqueName);
+      const mime = imageFile.type || (rawExt === ".png" ? "image/png" : rawExt === ".webp" ? "image/webp" : "image/jpeg");
 
-      await fs.writeFile(filePath, buffer);
+      // 1. Persist to Turso DB so it works in serverless
+      try {
+        await db.insert(appUploads).values({
+          id: generateId("upl"),
+          filename: uniqueName,
+          mimeType: mime,
+          dataBase64: buffer.toString("base64"),
+          size: buffer.length,
+          createdAt: new Date(),
+        }).onConflictDoNothing();
+      } catch (dbErr) {
+        console.error("Erro ao gravar anexo na base de dados:", dbErr);
+      }
+
+      // 2. Best-effort write to local filesystem
+      try {
+        const uploadsDir = path.join(process.cwd(), "public", "uploads");
+        await fs.mkdir(uploadsDir, { recursive: true });
+        await fs.writeFile(path.join(uploadsDir, uniqueName), buffer);
+      } catch {
+        // Ignored on read-only serverless
+      }
+
       imageUrl = `/api/uploads/${uniqueName}`;
     } catch (uploadErr) {
-      console.error("Erro ao gravar anexo de comentário:", uploadErr);
+      console.error("Erro ao processar anexo de comentário:", uploadErr);
     }
   }
 
@@ -1760,23 +1818,29 @@ export async function syncCalendlyMeetingsAction(providedToken?: string) {
     revalidatePath("/calendar");
     revalidatePath("/eventos");
     revalidatePath("/events");
+    revalidatePath("/reunioes");
+    revalidatePath("/meetings");
   } catch {}
 
   const { db } = await import("@/db/client");
-  const { events, clients } = await import("@/db/schema");
-  const { desc } = await import("drizzle-orm");
+  const { events, clients, eventMeetings } = await import("@/db/schema");
+  const { desc, asc } = await import("drizzle-orm");
 
-  const [allEvents, allClients] = await Promise.all([
+  const [allEvents, allClients, allMeetings] = await Promise.all([
     db.query.events.findMany({
       orderBy: [desc(events.startDate)],
     }).catch(() => []),
     db.query.clients.findMany().catch(() => []),
+    db.query.eventMeetings.findMany({
+      orderBy: [asc(eventMeetings.startDate)],
+    }).catch(() => []),
   ]);
 
   return {
     ...result,
-    events: allEvents,
+    events: allEvents.filter((e) => e.category !== "Reunião Calendly" && !e.calendlyEventUri),
     clients: allClients,
+    meetings: allMeetings,
   };
 }
 
@@ -2141,40 +2205,34 @@ export async function updateMeetingConversationAction(data: {
   meetingId: string;
   summary: string;
 }) {
-  const meeting = await db.query.events.findFirst({
-    where: eq(events.id, data.meetingId),
+  await ensureDbMigrated().catch(() => {});
+  const meeting = await db.query.eventMeetings.findFirst({
+    where: eq(eventMeetings.id, data.meetingId),
   });
   if (!meeting) throw new Error("Reunião não encontrada.");
 
   await db
-    .update(events)
+    .update(eventMeetings)
     .set({
       meetingSummary: data.summary,
       notes: data.summary,
       updatedAt: new Date(),
     })
-    .where(eq(events.id, data.meetingId));
-
-  // If this meeting has a linked eventMeetings record, update it too
-  await db
-    .update(eventMeetings)
-    .set({
-      notes: data.summary,
-      updatedAt: new Date(),
-    })
-    .where(eq(eventMeetings.linkedEventRowId, data.meetingId));
+    .where(eq(eventMeetings.id, data.meetingId));
 
   await recordAuditLog({
     entityType: "event",
     entityId: data.meetingId,
     action: "atualizado",
-    title: "Resumo da Conversa Atualizado",
-    details: `Resumo e ata da conversa atualizados para a reunião "${meeting.name}".`,
+    title: "Resumo da Reunião Atualizado",
+    details: `Resumo e ata da conversa atualizados para a reunião "${meeting.title}".`,
   });
 
-  safeRevalidate(`/eventos/${data.meetingId}`);
-  if (meeting.linkedEventId) {
-    safeRevalidate(`/eventos/${meeting.linkedEventId}`);
+  safeRevalidate(`/reunioes/${data.meetingId}`);
+  safeRevalidate(`/meetings/${data.meetingId}`);
+  if (meeting.eventId) {
+    safeRevalidate(`/eventos/${meeting.eventId}`);
+    safeRevalidate(`/events/${meeting.eventId}`);
   }
   return { success: true };
 }
@@ -2183,26 +2241,29 @@ export async function updateMeetingParticipantsAction(data: {
   meetingId: string;
   participantsJson: string;
 }) {
-  const meeting = await db.query.events.findFirst({
-    where: eq(events.id, data.meetingId),
+  await ensureDbMigrated().catch(() => {});
+  const meeting = await db.query.eventMeetings.findFirst({
+    where: eq(eventMeetings.id, data.meetingId),
   });
   if (!meeting) throw new Error("Reunião não encontrada.");
 
   await db
-    .update(events)
+    .update(eventMeetings)
     .set({
       meetingParticipants: data.participantsJson,
       updatedAt: new Date(),
     })
-    .where(eq(events.id, data.meetingId));
+    .where(eq(eventMeetings.id, data.meetingId));
 
-  safeRevalidate(`/eventos/${data.meetingId}`);
+  safeRevalidate(`/reunioes/${data.meetingId}`);
+  safeRevalidate(`/meetings/${data.meetingId}`);
   return { success: true };
 }
 
 export async function linkMeetingDirectAction(meetingId: string, targetEventId: string) {
-  const meeting = await db.query.events.findFirst({
-    where: eq(events.id, meetingId),
+  await ensureDbMigrated().catch(() => {});
+  const meeting = await db.query.eventMeetings.findFirst({
+    where: eq(eventMeetings.id, meetingId),
   });
   if (!meeting) throw new Error("Reunião não encontrada.");
 
@@ -2212,93 +2273,47 @@ export async function linkMeetingDirectAction(meetingId: string, targetEventId: 
   if (!targetEvent) throw new Error("Evento não encontrado.");
 
   await db
-    .update(events)
+    .update(eventMeetings)
     .set({
-      linkedEventId: targetEventId,
+      eventId: targetEventId,
       clientId: meeting.clientId || targetEvent.clientId,
       updatedAt: new Date(),
     })
-    .where(eq(events.id, meetingId));
-
-  const isMeet = Boolean(
-    meeting.venue?.toLowerCase().includes("meet") ||
-    meeting.notes?.toLowerCase().includes("meet") ||
-    meeting.calendlyEventUri
-  );
-
-  const meetUrl = isMeet
-    ? meeting.venue?.includes("meet.google.com")
-      ? meeting.venue
-      : `https://meet.google.com/cfm-${meetingId.slice(-6)}`
-    : null;
-
-  const existingLink = await db.query.eventMeetings.findFirst({
-    where: eq(eventMeetings.linkedEventRowId, meetingId),
-  });
-
-  if (existingLink) {
-    await db
-      .update(eventMeetings)
-      .set({
-        eventId: targetEventId,
-        updatedAt: new Date(),
-      })
-      .where(eq(eventMeetings.id, existingLink.id));
-  } else {
-    await db.insert(eventMeetings).values({
-      id: generateId("mtg"),
-      eventId: targetEventId,
-      clientId: targetEvent.clientId || meeting.clientId,
-      title: meeting.name,
-      type: (isMeet ? "google_meet" : "presencial") as any,
-      status: "agendada",
-      startDate: meeting.startDate,
-      endDate: meeting.endDate || new Date(meeting.startDate.getTime() + 45 * 60 * 1000),
-      location: meeting.venue,
-      meetUrl,
-      notes: meeting.meetingSummary || meeting.notes,
-      hostName: "Equipa CFM",
-      source: "calendly",
-      calendlyUri: meeting.calendlyEventUri,
-      linkedEventRowId: meeting.id,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-  }
+    .where(eq(eventMeetings.id, meetingId));
 
   await recordAuditLog({
     entityType: "event",
     entityId: targetEventId,
     action: "atualizado",
     title: "Reunião Vinculada",
-    details: `Reunião "${meeting.name}" vinculada ao evento "${targetEvent.name}".`,
+    details: `Reunião "${meeting.title}" vinculada ao evento "${targetEvent.name}".`,
   });
 
-  safeRevalidate(`/eventos/${meetingId}`);
+  safeRevalidate(`/reunioes/${meetingId}`);
+  safeRevalidate(`/meetings/${meetingId}`);
   safeRevalidate(`/eventos/${targetEventId}`);
+  safeRevalidate(`/events/${targetEventId}`);
   safeRevalidate("/calendario");
+  safeRevalidate("/calendar");
   return { success: true };
 }
 
 export async function unlinkMeetingFromEventAction(meetingId: string) {
-  const meeting = await db.query.events.findFirst({
-    where: eq(events.id, meetingId),
+  await ensureDbMigrated().catch(() => {});
+  const meeting = await db.query.eventMeetings.findFirst({
+    where: eq(eventMeetings.id, meetingId),
   });
   if (!meeting) throw new Error("Reunião não encontrada.");
 
-  const previousEventId = meeting.linkedEventId;
+  const previousEventId = meeting.eventId;
 
   await db
-    .update(events)
+    .update(eventMeetings)
     .set({
-      linkedEventId: null,
+      eventId: null,
       updatedAt: new Date(),
     })
-    .where(eq(events.id, meetingId));
-
-  await db
-    .delete(eventMeetings)
-    .where(eq(eventMeetings.linkedEventRowId, meetingId));
+    .where(eq(eventMeetings.id, meetingId));
 
   if (previousEventId) {
     await recordAuditLog({
@@ -2306,13 +2321,201 @@ export async function unlinkMeetingFromEventAction(meetingId: string) {
       entityId: previousEventId,
       action: "atualizado",
       title: "Reunião Desvinculada",
-      details: `Reunião "${meeting.name}" desvinculada do evento.`,
+      details: `Reunião "${meeting.title}" desvinculada do evento.`,
     });
     safeRevalidate(`/eventos/${previousEventId}`);
+    safeRevalidate(`/events/${previousEventId}`);
   }
 
-  safeRevalidate(`/eventos/${meetingId}`);
+  safeRevalidate(`/reunioes/${meetingId}`);
+  safeRevalidate(`/meetings/${meetingId}`);
   safeRevalidate("/calendario");
+  safeRevalidate("/calendar");
+  return { success: true };
+}
+
+export async function updateMeetingStatusAction(
+  meetingId: string,
+  newStatus: "agendada" | "realizada" | "cancelada"
+) {
+  await ensureDbMigrated().catch(() => {});
+  const meeting = await db.query.eventMeetings.findFirst({
+    where: eq(eventMeetings.id, meetingId),
+  });
+  if (!meeting) throw new Error("Reunião não encontrada.");
+
+  await db
+    .update(eventMeetings)
+    .set({
+      status: newStatus,
+      updatedAt: new Date(),
+    })
+    .where(eq(eventMeetings.id, meetingId));
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: meetingId,
+    action: "alterou_estado",
+    title: "Estado da Reunião Alterado",
+    details: `Reunião "${meeting.title}" alterada para "${newStatus}".`,
+  });
+
+  safeRevalidate(`/reunioes/${meetingId}`);
+  safeRevalidate(`/meetings/${meetingId}`);
+  safeRevalidate("/reunioes");
+  safeRevalidate("/meetings");
+  safeRevalidate("/calendario");
+  safeRevalidate("/calendar");
+  return { success: true };
+}
+
+export async function updateMeetingDetailsAction(
+  meetingId: string,
+  patch: {
+    title?: string;
+    startDate?: string;
+    endDate?: string | null;
+    location?: string | null;
+    meetUrl?: string | null;
+    notes?: string | null;
+    type?: "google_meet" | "presencial" | "outro";
+    status?: "agendada" | "realizada" | "cancelada";
+    clientContactName?: string | null;
+    clientContactEmail?: string | null;
+    clientContactPhone?: string | null;
+  }
+) {
+  await ensureDbMigrated().catch(() => {});
+  const meeting = await db.query.eventMeetings.findFirst({
+    where: eq(eventMeetings.id, meetingId),
+  });
+  if (!meeting) throw new Error("Reunião não encontrada.");
+
+  const updateData: any = { updatedAt: new Date() };
+  if (patch.title !== undefined) updateData.title = patch.title.trim();
+  if (patch.startDate !== undefined) updateData.startDate = new Date(patch.startDate);
+  if (patch.endDate !== undefined) updateData.endDate = patch.endDate ? new Date(patch.endDate) : null;
+  if (patch.location !== undefined) updateData.location = patch.location;
+  if (patch.meetUrl !== undefined) updateData.meetUrl = patch.meetUrl;
+  if (patch.notes !== undefined) updateData.notes = patch.notes;
+  if (patch.type !== undefined) updateData.type = patch.type;
+  if (patch.status !== undefined) updateData.status = patch.status;
+  if (patch.clientContactName !== undefined) updateData.clientContactName = patch.clientContactName;
+  if (patch.clientContactEmail !== undefined) updateData.clientContactEmail = patch.clientContactEmail;
+  if (patch.clientContactPhone !== undefined) updateData.clientContactPhone = patch.clientContactPhone;
+
+  await db
+    .update(eventMeetings)
+    .set(updateData)
+    .where(eq(eventMeetings.id, meetingId));
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: meetingId,
+    action: "atualizado",
+    title: "Detalhes da Reunião Atualizados",
+    details: `Reunião #${meetingId} atualizada.`,
+  });
+
+  safeRevalidate(`/reunioes/${meetingId}`);
+  safeRevalidate(`/meetings/${meetingId}`);
+  safeRevalidate("/reunioes");
+  safeRevalidate("/meetings");
+  safeRevalidate("/calendario");
+  safeRevalidate("/calendar");
+  return { success: true };
+}
+
+export async function createMeetingAction(data: {
+  title: string;
+  clientId?: string | null;
+  eventId?: string | null;
+  type?: "google_meet" | "presencial" | "outro";
+  status?: "agendada" | "realizada" | "cancelada";
+  startDate: string;
+  endDate?: string | null;
+  location?: string | null;
+  meetUrl?: string | null;
+  notes?: string | null;
+  hostName?: string | null;
+  clientContactName?: string | null;
+  clientContactEmail?: string | null;
+  clientContactPhone?: string | null;
+}) {
+  await ensureDbMigrated().catch(() => {});
+  if (!data.title?.trim()) {
+    return { success: false, error: "Título da reunião é obrigatório." };
+  }
+  if (!data.startDate) {
+    return { success: false, error: "Data da reunião é obrigatória." };
+  }
+
+  const id = generateId("mtg");
+  const type = data.type || "google_meet";
+  const meetUrl =
+    data.meetUrl ||
+    (type === "google_meet"
+      ? `https://meet.google.com/cfm-${id.slice(-6)}`
+      : null);
+
+  await db.insert(eventMeetings).values({
+    id,
+    eventId: data.eventId || null,
+    clientId: data.clientId || null,
+    title: data.title.trim(),
+    type,
+    status: data.status || "agendada",
+    startDate: new Date(data.startDate),
+    endDate: data.endDate ? new Date(data.endDate) : null,
+    location: data.location || (type === "google_meet" ? "Google Meet" : "Presencial"),
+    meetUrl,
+    notes: data.notes || null,
+    hostName: data.hostName || "Equipa CFM",
+    clientContactName: data.clientContactName || null,
+    clientContactEmail: data.clientContactEmail || null,
+    clientContactPhone: data.clientContactPhone || null,
+    source: "manual",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: id,
+    action: "criado",
+    title: "Nova Reunião Criada",
+    details: `Reunião "${data.title.trim()}" agendada para ${new Date(data.startDate).toLocaleDateString("pt-PT")}.`,
+  });
+
+  safeRevalidate("/reunioes");
+  safeRevalidate("/meetings");
+  safeRevalidate("/calendario");
+  safeRevalidate("/calendar");
+  return { success: true, id };
+}
+
+export async function deleteMeetingAction(meetingId: string) {
+  await ensureDbMigrated().catch(() => {});
+  const meeting = await db.query.eventMeetings.findFirst({
+    where: eq(eventMeetings.id, meetingId),
+  });
+  if (!meeting) return { success: false, error: "Reunião não encontrada." };
+
+  await db.delete(eventTasks).where(eq(eventTasks.meetingId, meetingId));
+  await db.delete(eventMeetings).where(eq(eventMeetings.id, meetingId));
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: meetingId,
+    action: "removido",
+    title: "Reunião Eliminada",
+    details: `Reunião "${meeting.title}" foi removida do sistema.`,
+  });
+
+  safeRevalidate("/reunioes");
+  safeRevalidate("/meetings");
+  safeRevalidate("/calendario");
+  safeRevalidate("/calendar");
   return { success: true };
 }
 

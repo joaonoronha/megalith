@@ -103,8 +103,10 @@ export async function evaluateAndSyncAlerts() {
   // RULE 3: Upcoming event unprepared, tied to prepDate field
   // -------------------------------------------------------------
   const tasksByEventId = tasks.reduce((acc, t) => {
-    if (!acc[t.eventId]) acc[t.eventId] = [];
-    acc[t.eventId].push(t);
+    if (t.eventId) {
+      if (!acc[t.eventId]) acc[t.eventId] = [];
+      acc[t.eventId].push(t);
+    }
     return acc;
   }, {} as Record<string, typeof tasks>);
 

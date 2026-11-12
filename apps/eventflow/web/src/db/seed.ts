@@ -403,23 +403,6 @@ export async function seed() {
     eventColecaoSep,
     eventNovGala,
     eventNovAniversario,
-    {
-      id: "evt-cal-marta",
-      name: "Reunião: Marta Almeida (Briefing de Decoração)",
-      clientId: clientMarta.id,
-      venue: "Google Meet · meet.google.com/cfm-briefing-marta",
-      startDate: new Date("2026-11-18T10:30:00Z"),
-      endDate: new Date("2026-11-18T11:15:00Z"),
-      status: "planeamento" as const,
-      totalBudget: 0,
-      customerPrice: 0,
-      category: "Reunião Calendly",
-      theme: "Briefing & Consulta de Evento",
-      coverImageUrl: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=600&q=80",
-      notes: "Agendado via Calendly para discutir detalhes de flores e centros de mesa para o casamento.\n\n• Número estimado de convidados: 120 pessoas\n• Local previsto: Sintra",
-      calendlyEventUri: "https://api.calendly.com/scheduled_events/evt-cal-seed-001",
-      createdAt: new Date("2026-11-10"),
-    },
   ]).onConflictDoUpdate({
     target: events.id,
     set: {
@@ -944,6 +927,27 @@ export async function seed() {
 
   // 11. Event Meetings (Google Meet & In Person)
   await db.insert(eventMeetings).values([
+    {
+      id: "mtg-cal-marta",
+      eventId: eventWedding.id,
+      clientId: clientMarta.id,
+      title: "Reunião: Marta Almeida (Briefing de Decoração)",
+      type: "google_meet",
+      status: "agendada",
+      startDate: new Date("2026-11-18T10:30:00Z"),
+      endDate: new Date("2026-11-18T11:15:00Z"),
+      meetUrl: "https://meet.google.com/cfm-briefing-marta",
+      location: "Google Meet",
+      notes: "Agendado via Calendly para discutir detalhes de flores e centros de mesa para o casamento.\n\n• Número estimado de convidados: 120 pessoas\n• Local previsto: Sintra",
+      source: "calendly",
+      calendlyUri: "https://api.calendly.com/scheduled_events/evt-cal-seed-001",
+      hostName: "Administrador CFM",
+      clientContactName: "Marta Almeida",
+      clientContactEmail: "marta.almeida@gmail.com",
+      clientContactPhone: "+351 925 432 109",
+      createdAt: new Date("2026-11-10"),
+      updatedAt: new Date("2026-11-10"),
+    },
     {
       id: "mtg-w-1",
       eventId: eventWedding.id,

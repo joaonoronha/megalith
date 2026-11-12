@@ -19,6 +19,7 @@ export type EntityPrefix =
   | "img"  // Staged / Nested Media Images
   | "mtg"  // Event Meetings (Google Meet / In Person)
   | "cmt"  // Moodboard Comments & Notes
+  | "upl"  // App Uploads Storage
   | "log"; // Audit Logs
 
 
