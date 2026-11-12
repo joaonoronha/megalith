@@ -13,9 +13,7 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "posthog-js": ["node_modules/posthog-js"],
-      "react": ["node_modules/@types/react", "node_modules/react"],
-      "react-dom": ["node_modules/@types/react-dom", "node_modules/react-dom"]
+      "@megalith/analytics": ["src/analytics.ts"]
     },
     "noUnusedLocals": true,
     "noUnusedParameters": true,
