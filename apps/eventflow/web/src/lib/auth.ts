@@ -1,0 +1,83 @@
+import { cookies } from "next/headers";
+import { db } from "@/db/client";
+import { users } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
+import {
+  SESSION_COOKIE_NAME,
+  signSessionToken,
+  verifySessionToken,
+  type SessionPayload,
+} from "./session";
+
+export async function getCurrentUser() {
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  if (!sessionToken) return null;
+
+  const session = await verifySessionToken(sessionToken);
+  if (!session) return null;
+
+  return {
+    id: session.userId,
+    name: session.name,
+    email: session.email,
+    role: session.role,
+  };
+}
+
+export async function loginUser(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+  const cleanEmail = email.toLowerCase().trim();
+  const user = await db.query.users.findFirst({
+    where: eq(users.email, cleanEmail),
+  });
+
+  if (!user) {
+    return { success: false, error: "Credenciais inválidas. Verifica o email e a palavra-passe." };
+  }
+
+  const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+  if (!isValidPassword) {
+    return { success: false, error: "Credenciais inválidas. Verifica o email e a palavra-passe." };
+  }
+
+  // Session valid for 14 days
+  const expiresAt = Date.now() + 14 * 24 * 60 * 60 * 1000;
+  const token = await signSessionToken({
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    expiresAt,
+  });
+
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    expires: new Date(expiresAt),
+  });
+
+  return { success: true };
+}
+
+export async function logoutUser() {
+  const cookieStore = await cookies();
+  cookieStore.delete(SESSION_COOKIE_NAME);
+}
+
+export async function createTeamUser(data: { name: string; email: string; password: string; role: "admin" | "producer" | "warehouse" }) {
+  const passwordHash = await bcrypt.hash(data.password, 10);
+  const id = `usr-${Date.now()}`;
+  await db.insert(users).values({
+    id,
+    name: data.name,
+    email: data.email.toLowerCase().trim(),
+    passwordHash,
+    role: data.role,
+    createdAt: new Date(),
+  });
+  return { success: true, id };
+}
