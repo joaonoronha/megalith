@@ -21,7 +21,7 @@ export default function Loading() {
         {/* Text indicator */}
         <div className="text-center space-y-1">
           <p className="text-[13px] font-semibold text-[#111111] tracking-tight">
-            CFM Eventos
+            CFM Events
           </p>
           <p className="text-[11px] text-[#8e8e93]">
             A carregar...

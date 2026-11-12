@@ -3,8 +3,8 @@ import "./globals.css";
 import TopProgressBar from "@/components/TopProgressBar";
 
 export const metadata: Metadata = {
-  title: "EventFlow — CFM Eventos",
-  description: "Plataforma de gestão operacional, orçamentos e inventário para a CFM Eventos",
+  title: "EventFlow — CFM Events",
+  description: "Plataforma de gestão operacional, orçamentos e inventário para a CFM Events",
 };
 
 export const viewport: Viewport = {

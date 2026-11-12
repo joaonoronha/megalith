@@ -1,5 +1,5 @@
 /**
- * Client-safe date formatting utilities for CFM Eventos
+ * Client-safe date formatting utilities for CFM Events
  */
 
 export function formatRelativeTime(

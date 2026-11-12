@@ -22,11 +22,11 @@ export async function seed() {
   // 1. Template
   await db.insert(quoteTemplates).values({
     id: "tpl-default",
-    companyName: "CFM EVENTOS",
+    companyName: "CFM EVENTS",
     tagline: "Produção & Decoração de Eventos",
     contactInfo: "geral@cfmeventos.pt · +351 912 345 678",
     paymentTerms: "50% adjudicação · 50% desmontagem",
-    footerNotes: "Obrigado pela preferência e confiança na CFM Eventos.",
+    footerNotes: "Obrigado pela preferência e confiança na CFM Events.",
     brandColor: "#111111",
   }).onConflictDoNothing();
 

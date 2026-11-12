@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 
-// 1. CFM Eventos Team Accounts
+// 1. CFM Events Team Accounts
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -191,7 +191,7 @@ export const documents = sqliteTable("documents", {
 // 10. Quote Template Customization (Brand Settings)
 export const quoteTemplates = sqliteTable("quote_templates", {
   id: text("id").primaryKey(),
-  companyName: text("company_name").default("CFM EVENTOS").notNull(),
+  companyName: text("company_name").default("CFM EVENTS").notNull(),
   tagline: text("tagline").default("Produção & decoração de eventos"),
   contactInfo: text("contact_info").default("geral@cfmeventos.pt · +351 912 345 678"),
   paymentTerms: text("payment_terms").default("50% adjudicação · 50% na desmontagem"),

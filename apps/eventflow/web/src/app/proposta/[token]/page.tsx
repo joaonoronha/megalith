@@ -98,11 +98,11 @@ export default async function PublicQuotePage({
   });
 
   const template = (await db.query.quoteTemplates.findFirst()) || {
-    companyName: "CFM EVENTOS",
+    companyName: "CFM EVENTS",
     tagline: "Produção & Decoração de Eventos",
     contactInfo: "geral@cfmeventos.pt · +351 912 345 678",
     paymentTerms: "50% adjudicação · 50% na desmontagem",
-    footerNotes: "Obrigado pela preferência e confiança na CFM Eventos.",
+    footerNotes: "Obrigado pela preferência e confiança na CFM Events.",
     brandColor: "#111111",
   };
 
@@ -130,7 +130,7 @@ export default async function PublicQuotePage({
       <div className="w-full max-w-3xl mb-4 flex items-center justify-between text-xs text-[#8e8e93] print:hidden">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-[#007aff]"></span>
-          <span>CFM Eventos Portal do Cliente</span>
+          <span>CFM Events Portal do Cliente</span>
         </div>
         <div className="flex items-center gap-3">
           <span>Validade: {quote.validityDays} dias</span>
@@ -252,7 +252,7 @@ export default async function PublicQuotePage({
                   : "Data confirmada"}
               </div>
               <div className="text-xs text-[#24793a]/80 mt-1">
-                A equipa da CFM Eventos iniciou os preparativos operacionais.
+                A equipa da CFM Events iniciou os preparativos operacionais.
               </div>
             </div>
           ) : (
