@@ -54,12 +54,14 @@ interface UserDetailViewProps {
   user: TeamUser;
   assignedTasks: AssignedTask[];
   managedLocations?: ManagedLocation[];
+  canEdit?: boolean;
 }
 
 export default function UserDetailView({
   user: initialUser,
   assignedTasks,
   managedLocations = [],
+  canEdit = false,
 }: UserDetailViewProps) {
   const [user, setUser] = useState<TeamUser>(initialUser);
   const [copiedId, setCopiedId] = useState(false);
@@ -121,13 +123,15 @@ export default function UserDetailView({
             <span>Voltar<span className="hidden sm:inline"> à Gestão de Equipa</span></span>
           </Link>
 
-          <button
-            onClick={() => setShowEditModal(true)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#111] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] px-3 sm:px-3.5 py-1.5 rounded-[12px] shadow-2xs transition cursor-pointer flex-shrink-0"
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-            <span>Editar<span className="hidden sm:inline"> Conta</span></span>
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => setShowEditModal(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#111] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] px-3 sm:px-3.5 py-1.5 rounded-[12px] shadow-2xs transition cursor-pointer flex-shrink-0"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Editar<span className="hidden sm:inline"> Conta</span></span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -392,94 +396,165 @@ export default function UserDetailView({
       {/* EDIT USER MODAL */}
       {/* ================================================================= */}
       {showEditModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-[22px] w-full max-w-sm border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-base font-bold text-[#111]">Editar Conta de Equipa</h3>
-                <p className="text-[11px] text-[#8e8e93]">#{user.id}</p>
-              </div>
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="w-8 h-8 rounded-full hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93]"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form
-              action={async (formData) => {
-                await updateUserAction(formData);
-                setShowEditModal(false);
-                window.location.reload();
-              }}
-              className="space-y-3.5"
-            >
-              <input type="hidden" name="userId" value={user.id} />
-
-              <div>
-                <label className="block font-bold text-[#3a3a3c] mb-1">ID do Utilizador</label>
-                <input
-                  type="text"
-                  value={user.id}
-                  disabled
-                  className="w-full px-3 py-2 bg-[#f2f2f7] text-[#8e8e93] font-mono border border-[#ececf0] rounded-[10px] cursor-not-allowed select-all"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#3a3a3c] mb-1">Nome Completo *</label>
-                <input
-                  type="text"
-                  name="name"
-                  defaultValue={user.name}
-                  required
-                  className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px] text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#3a3a3c] mb-1">Email</label>
-                <input
-                  type="email"
-                  value={user.email}
-                  disabled
-                  className="w-full px-3 py-2 bg-[#f2f2f7] text-[#8e8e93] border border-[#ececf0] rounded-[10px] cursor-not-allowed text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#3a3a3c] mb-1">Nível de Acesso *</label>
-                <select
-                  name="role"
-                  defaultValue={user.role}
-                  className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px] text-xs"
-                >
-                  <option value="admin">Administrador (Total)</option>
-                  <option value="producer">Gestor / Produtor de Eventos</option>
-                  <option value="warehouse">Armazém / Logística</option>
-                </select>
-              </div>
-
-              <div className="pt-3 border-t border-[#ececf0] flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 rounded-[10px] bg-[#f2f2f5] text-[#3a3a3c] font-semibold hover:bg-[#e5e5ea]"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-[10px] bg-[#111] hover:bg-black text-white font-bold"
-                >
-                  Guardar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <EditUserModal
+          user={user}
+          onClose={() => setShowEditModal(false)}
+          onSuccess={(updated) => {
+            setUser((prev) => ({ ...prev, ...updated }));
+            setShowEditModal(false);
+          }}
+        />
       )}
     </div>
   );
 }
+
+function EditUserModal({
+  user,
+  onClose,
+  onSuccess,
+}: {
+  user: TeamUser;
+  onClose: () => void;
+  onSuccess: (updated: Partial<TeamUser>) => void;
+}) {
+  const [name, setName] = useState(user.name);
+  const [email, setEmail] = useState(user.email);
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"admin" | "producer" | "warehouse">(user.role);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.set("userId", user.id);
+      formData.set("name", name);
+      formData.set("email", email);
+      if (password.trim()) formData.set("password", password.trim());
+      formData.set("role", role);
+
+      const res = await updateUserAction(formData);
+      if (res.success) {
+        onSuccess({ name, email, role });
+      } else {
+        setError(res.error || "Erro ao atualizar utilizador.");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Erro inesperado.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-[22px] w-full max-w-sm border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-bold text-[#111]">Editar Conta de Equipa</h3>
+            <p className="text-[11px] text-[#8e8e93]">#{user.id}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-[12px] bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">ID do Utilizador</label>
+            <input
+              type="text"
+              value={user.id}
+              disabled
+              className="w-full px-3 py-2 bg-[#f2f2f7] text-[#8e8e93] font-mono border border-[#ececf0] rounded-[10px] cursor-not-allowed select-all"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">Nome Completo *</label>
+            <input
+              type="text"
+              name="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px] text-xs"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">Email *</label>
+            <input
+              type="email"
+              name="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px] text-xs"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">
+              Nova Palavra-passe (deixar vazio para manter)
+            </label>
+            <input
+              type="password"
+              name="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••••••"
+              className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px] text-xs"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">Nível de Acesso *</label>
+            <select
+              name="role"
+              value={role}
+              onChange={(e) => setRole(e.target.value as "admin" | "producer" | "warehouse")}
+              className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px] text-xs"
+            >
+              <option value="admin">Administrador (Total)</option>
+              <option value="producer">Gestor / Produtor de Eventos</option>
+              <option value="warehouse">Armazém / Logística</option>
+            </select>
+          </div>
+
+          <div className="pt-3 border-t border-[#ececf0] flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-[10px] bg-[#f2f2f5] text-[#3a3a3c] font-semibold hover:bg-[#e5e5ea] cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-4 py-2 rounded-[10px] bg-[#111] hover:bg-black text-white font-bold cursor-pointer disabled:opacity-60"
+            >
+              {isLoading ? "A guardar..." : "Guardar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+

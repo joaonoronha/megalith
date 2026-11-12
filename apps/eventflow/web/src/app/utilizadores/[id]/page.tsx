@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/db/client";
 import { users, eventTasks, events, storageLocations } from "@/db/schema";
 import { eq, or, desc, asc } from "drizzle-orm";
+import { getCurrentUser } from "@/lib/auth";
 import UserDetailView from "@/components/UserDetailView";
 
 export const dynamic = "force-dynamic";
@@ -13,9 +14,12 @@ interface PageProps {
 export default async function UserPage({ params }: PageProps) {
   const { id } = await params;
 
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, id),
-  });
+  const [user, currentUser] = await Promise.all([
+    db.query.users.findFirst({
+      where: eq(users.id, id),
+    }),
+    getCurrentUser(),
+  ]);
 
   if (!user) {
     notFound();
@@ -56,6 +60,7 @@ export default async function UserPage({ params }: PageProps) {
       }}
       assignedTasks={tasks}
       managedLocations={managedLocs}
+      canEdit={currentUser?.role === "admin"}
     />
   );
 }

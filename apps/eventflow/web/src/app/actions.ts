@@ -703,7 +703,12 @@ export async function logoutAction() {
 }
 
 export async function createUserAction(formData: FormData) {
-  const { createTeamUser } = await import("@/lib/auth");
+  const { getCurrentUser, createTeamUser } = await import("@/lib/auth");
+  const currentUser = await getCurrentUser();
+  if (!currentUser || currentUser.role !== "admin") {
+    return { success: false, error: "Apenas o Administrador pode criar novas contas de utilizador." };
+  }
+
   const name = formData.get("name") as string;
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
@@ -715,28 +720,75 @@ export async function createUserAction(formData: FormData) {
   }
 
   const result = await createTeamUser({ name, email, password, role, customId });
+  if (result.success && "id" in result) {
+    await recordAuditLog({
+      entityType: "user",
+      entityId: result.id as string,
+      action: "criado",
+      title: "Utilizador criado",
+      details: `Conta ${name} (${role}) criada por ${currentUser.name}`,
+    });
+  }
   invalidateAllCaches();
   return result;
 }
 
 // 8.1 Update User Action
 export async function updateUserAction(formData: FormData) {
+  const { getCurrentUser } = await import("@/lib/auth");
+  const currentUser = await getCurrentUser();
+  if (!currentUser || currentUser.role !== "admin") {
+    return { success: false, error: "Apenas o Administrador pode editar contas de utilizador." };
+  }
+
   const userId = formData.get("userId") as string;
   const name = formData.get("name") as string;
+  const email = (formData.get("email") as string)?.toLowerCase().trim();
+  const password = formData.get("password") as string;
   const role = formData.get("role") as "admin" | "producer" | "warehouse";
 
   if (!userId || !name) {
     return { success: false, error: "ID e Nome são obrigatórios." };
   }
 
+  const updatePayload: Record<string, any> = {
+    name,
+    role: role || "admin",
+  };
+
+  if (email) {
+    const existing = await db.query.users.findFirst({
+      where: eq(users.email, email),
+    });
+    if (existing && existing.id !== userId) {
+      return { success: false, error: "Este email já está registado noutra conta." };
+    }
+    updatePayload.email = email;
+  }
+
+  if (password && password.trim().length > 0) {
+    const bcrypt = (await import("bcryptjs")).default;
+    updatePayload.passwordHash = await bcrypt.hash(password.trim(), 10);
+  }
+
   await db
     .update(users)
-    .set({ name, role: role || "admin" })
+    .set(updatePayload)
     .where(eq(users.id, userId));
+
+  await recordAuditLog({
+    entityType: "user",
+    entityId: userId,
+    action: "editado",
+    title: "Utilizador atualizado",
+    details: `Conta ${name} (${role || "admin"}) atualizada por ${currentUser.name}`,
+  });
 
   invalidateAllCaches();
   revalidatePath(`/utilizadores/${userId}`);
   revalidatePath(`/users/${userId}`);
+  revalidatePath("/mais");
+  revalidatePath("/more");
   return { success: true };
 }
 
@@ -1104,6 +1156,10 @@ export async function addEventMediaAction(formData: FormData) {
     throw new Error("ID do evento e URL da imagem são obrigatórios.");
   }
 
+  const { getCurrentUser } = await import("@/lib/auth");
+  const user = await getCurrentUser();
+  const authorName = user?.name || "Administrador CFM";
+
   const id = generateId("med");
   const newMedia = {
     id,
@@ -1114,7 +1170,7 @@ export async function addEventMediaAction(formData: FormData) {
     imageUrl,
     tag: tag || null,
     orderIndex: Date.now(),
-    uploadedByName: "Administrador CFM",
+    uploadedByName: authorName,
     createdAt: new Date(),
   };
 

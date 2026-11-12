@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { generateId } from "@/lib/id";
 
 export interface RecordAuditParams {
-  entityType: "event" | "inventory" | "quote";
+  entityType: "event" | "inventory" | "quote" | "user";
   entityId: string;
   action:
     | "criado"
