@@ -20,6 +20,7 @@ export default async function EventosPage() {
       initialLocations={data.allLocations}
       initialAllocations={data.allAllocations}
       initialCustomItems={data.allCustomItems}
+      initialMeetings={data.allMeetings}
       initialTab="events"
     />
   );

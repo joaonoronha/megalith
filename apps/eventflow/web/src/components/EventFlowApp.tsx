@@ -1537,6 +1537,7 @@ export default function EventFlowApp({
                         <Link
                           key={e.id}
                           href={`/eventos/${e.id}`}
+                          prefetch={false}
                           className="p-2 rounded-xl bg-[#f8f8fa] hover:bg-[#f0f0f5] cursor-pointer transition flex items-center justify-between text-xs group"
                         >
                           <div className="font-semibold truncate text-[#111] group-hover:text-[#007aff]">
@@ -1617,6 +1618,7 @@ export default function EventFlowApp({
                             <div className="flex items-center gap-1.5">
                               <Link
                                 href={`/inventario/${item.id}`}
+                                prefetch={false}
                                 className="text-[14px] font-bold text-[#111111] hover:text-[#007aff] transition truncate"
                                 title="Ver ficha do artigo"
                               >
@@ -1624,6 +1626,7 @@ export default function EventFlowApp({
                               </Link>
                               <Link
                                 href={`/inventario/${item.id}`}
+                                prefetch={false}
                                 className="font-mono text-[10px] text-[#8e8e93] hover:text-[#007aff] bg-[#fafafc] hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] flex-shrink-0 transition"
                                 title="ID do Artigo"
                               >
@@ -2404,12 +2407,14 @@ export default function EventFlowApp({
                         <div className="flex flex-wrap items-center gap-2">
                           <Link
                             href={`/eventos/${e.id}`}
+                            prefetch={false}
                             className="font-bold text-[16px] text-[#111] hover:text-[#007aff] transition"
                           >
                             {e.name}
                           </Link>
                           <Link
                             href={`/eventos/${e.id}`}
+                            prefetch={false}
                             className="font-mono text-[10px] text-[#8e8e93] hover:text-[#007aff] bg-[#f2f2f5] hover:bg-[#e5e5ea] px-1.5 py-0.5 rounded border border-[#e5e5ea] transition"
                             title="ID do Evento"
                           >
@@ -2492,6 +2497,7 @@ export default function EventFlowApp({
                       {/* Direct Link to Dedicated Event Page */}
                       <Link
                         href={`/eventos/${e.id}`}
+                        prefetch={false}
                         className="px-3.5 py-1.5 rounded-[10px] bg-[#111] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition"
                       >
                         <span>Gerir Evento & Inventário</span>
@@ -2517,6 +2523,7 @@ export default function EventFlowApp({
                       {!isCalendlyMeeting(e) && (
                         <Link
                           href={`/eventos/${e.id}?action=novo-orcamento`}
+                          prefetch={false}
                           onClick={(ev) => ev.stopPropagation()}
                           className="px-3 py-1.5 rounded-lg bg-white border border-[#ececf0] text-xs font-semibold text-[#111] hover:bg-[#f2f2f5] transition flex items-center gap-1 shadow-2xs"
                           title="Abrir configuração do evento para gerar orçamento"
@@ -2839,6 +2846,7 @@ export default function EventFlowApp({
                       <div className="lg:col-span-4 flex items-center gap-3">
                         <Link
                           href={`/inventario/${item.id}`}
+                          prefetch={false}
                           className="shrink-0 relative group"
                         >
                           {item.imageUrl ? (
@@ -2858,6 +2866,7 @@ export default function EventFlowApp({
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <Link
                               href={`/inventario/${item.id}`}
+                              prefetch={false}
                               className="text-[10px] font-bold text-[#8e8e93] hover:text-[#111] uppercase tracking-wider transition"
                               title="SKU do Artigo"
                             >
@@ -2865,6 +2874,7 @@ export default function EventFlowApp({
                             </Link>
                             <Link
                               href={`/inventario/${item.id}`}
+                              prefetch={false}
                               className="font-mono text-[9px] text-[#8e8e93] hover:text-[#007aff] bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] transition"
                               title="ID único do artigo"
                             >
@@ -2875,6 +2885,7 @@ export default function EventFlowApp({
                           <div className="font-bold text-sm text-[#111] mt-0.5">
                             <Link
                               href={`/inventario/${item.id}`}
+                              prefetch={false}
                               className="hover:text-[#007aff] transition line-clamp-1"
                               title={item.name}
                             >

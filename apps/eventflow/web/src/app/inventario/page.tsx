@@ -20,6 +20,7 @@ export default async function InventarioPage() {
       initialLocations={data.allLocations}
       initialAllocations={data.allAllocations}
       initialCustomItems={data.allCustomItems}
+      initialMeetings={data.allMeetings}
       initialTab="inventory"
     />
   );

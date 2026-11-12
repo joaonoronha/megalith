@@ -62,53 +62,34 @@ export default async function ReuniaoDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  // 2. Client
-  const client = meeting.clientId
-    ? await db.query.clients.findFirst({
-        where: eq(clients.id, meeting.clientId),
-      })
-    : null;
-
-  // 3. Team Users
-  const teamUsers = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      role: users.role,
-    })
-    .from(users);
-
-  // 4. Current user
-  const currentUser = await getCurrentUser();
-
-  // 5. Linked Production Event (if any)
+  // 2. Auxiliary queries in parallel
   const linkedEventId = meeting.eventId;
-  const linkedEvent = linkedEventId
-    ? await db.query.events.findFirst({
-        where: eq(events.id, linkedEventId),
-      })
-    : null;
+  const clientId = meeting.clientId;
 
-  // 6. Production Events list (to allow linking this meeting to a production)
-  const allEvents = await db.query.events.findMany({
-    orderBy: [desc(events.startDate)],
-  });
-  const allProductionEvents = allEvents.filter((e) => !isMeetingEvent(e));
-
-  // 7. Action items / tasks for this meeting
-  const actionItems = await db.query.eventTasks.findMany({
-    where: eq(eventTasks.meetingId, id),
-    orderBy: [asc(eventTasks.orderIndex), asc(eventTasks.createdAt)],
-  });
-
-  // If no action items found under meetingId, also check legacy eventId
-  let finalActionItems = actionItems;
-  if (finalActionItems.length === 0) {
-    finalActionItems = await db.query.eventTasks.findMany({
-      where: eq(eventTasks.eventId, id),
+  const [client, teamUsers, currentUser, linkedEvent, allEvents, actionItems] = await Promise.all([
+    clientId ? db.query.clients.findFirst({ where: eq(clients.id, clientId) }).catch(() => null) : Promise.resolve(null),
+    db.select({ id: users.id, name: users.name, email: users.email, role: users.role }).from(users).catch(() => []),
+    getCurrentUser().catch(() => null),
+    linkedEventId ? db.query.events.findFirst({ where: eq(events.id, linkedEventId) }).catch(() => null) : Promise.resolve(null),
+    db.query.events.findMany({ orderBy: [desc(events.startDate)] }).catch(() => []),
+    db.query.eventTasks.findMany({
+      where: eq(eventTasks.meetingId, id),
       orderBy: [asc(eventTasks.orderIndex), asc(eventTasks.createdAt)],
-    });
+    }).catch(() => []),
+  ]);
+
+  const allProductionEvents = (allEvents || []).filter((e: any) => !isMeetingEvent(e));
+
+  let finalActionItems = actionItems || [];
+  if (finalActionItems.length === 0) {
+    try {
+      finalActionItems = await db.query.eventTasks.findMany({
+        where: eq(eventTasks.eventId, id),
+        orderBy: [asc(eventTasks.orderIndex), asc(eventTasks.createdAt)],
+      });
+    } catch {
+      finalActionItems = [];
+    }
   }
 
   return (

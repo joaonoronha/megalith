@@ -17,6 +17,10 @@ export default async function EventsPage() {
       initialMovements={data.allMovements}
       initialTemplate={data.template}
       initialAlerts={data.allAlerts}
+      initialLocations={data.allLocations}
+      initialAllocations={data.allAllocations}
+      initialCustomItems={data.allCustomItems}
+      initialMeetings={data.allMeetings}
       initialTab="events"
     />
   );
