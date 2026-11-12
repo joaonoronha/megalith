@@ -30,7 +30,7 @@ import {
 import AuditLogModal from "@/components/AuditLogModal";
 import StorageLocationsModal, { StorageLocation, TeamUser } from "@/components/StorageLocationsModal";
 import { formatRelativeTime } from "@/lib/date-format";
-import { updateItemPatchAction, updateItemTriageAction } from "@/app/actions";
+import { updateItemPatchAction, updateItemTriageAction, markItemAsBoughtAction } from "@/app/actions";
 
 interface InventoryItem {
   id: string;
@@ -44,6 +44,8 @@ interface InventoryItem {
   dimensions: string | null;
   unitPrice: number;
   replacementCost: number | null;
+  purchaseStatus?: "bought" | "not_bought";
+  purchaseCost?: number | null;
   imageUrl: string | null;
   damagedQuantity: number | null;
   inMaintenanceQuantity: number | null;
@@ -563,6 +565,67 @@ export default function InventoryDetailView({
               </button>
             </div>
           </div>
+
+          {/* Purchase Status Banner & Actions */}
+          {item.purchaseStatus === "not_bought" ? (
+            <div className="p-4 rounded-[18px] bg-amber-50/80 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-800 shrink-0 mt-0.5">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs text-amber-900">Artigo Ainda Não Comprado</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-200 text-amber-900">
+                      Pendente de Aquisição
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-800 mt-0.5">
+                    Este artigo ainda não foi contabilizado nas saídas reais de caixa. O custo de aquisição previsto de{" "}
+                    <strong>€{(Number(item.purchaseCost) > 0 ? Number(item.purchaseCost) : (Number(item.replacementCost) || 0) * (Number(item.totalQuantity) || 1)).toFixed(2)}</strong>{" "}
+                    está atualmente deduzido do Lucro Projetado em Finanças.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={async () => {
+                  const cost = Number(item.purchaseCost) > 0
+                    ? Number(item.purchaseCost)
+                    : (Number(item.replacementCost) || 0) * (Number(item.totalQuantity) || 1);
+                  setItem((prev) => ({ ...prev, purchaseStatus: "bought", purchaseCost: cost }));
+                  startTransition(async () => {
+                    await markItemAsBoughtAction(item.id, cost);
+                  });
+                }}
+                className="px-3.5 py-2 rounded-[12px] bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 shrink-0 shadow-2xs cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Marcar como Comprado & Lançar Despesa</span>
+              </button>
+            </div>
+          ) : (
+            <div className="px-4 py-2.5 rounded-[14px] bg-emerald-50/70 border border-emerald-100 flex items-center justify-between text-xs text-emerald-900">
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  <strong>Artigo Comprado & Contabilizado:</strong> Despesa de aquisição registada nas contas de Finanças da CFM Events (€{(Number(item.purchaseCost) > 0 ? Number(item.purchaseCost) : (Number(item.replacementCost) || 0) * (Number(item.totalQuantity) || 1)).toFixed(2)}).
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setItem((prev) => ({ ...prev, purchaseStatus: "not_bought" }));
+                  savePatch({ purchaseStatus: "not_bought" });
+                }}
+                className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 underline ml-2 cursor-pointer whitespace-nowrap"
+              >
+                Alterar para Não Comprado
+              </button>
+            </div>
+          )}
 
           {/* Quick Metrics Bar with Inline Stock Thresholds */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-[#ececf0]">

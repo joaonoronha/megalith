@@ -41,6 +41,7 @@ import {
 import AuditLogModal from "@/components/AuditLogModal";
 import AlertsDrawerModal from "@/components/AlertsDrawerModal";
 import StorageLocationsModal, { StorageLocation } from "@/components/StorageLocationsModal";
+import ReceiptScannerModal from "@/components/ReceiptScannerModal";
 import FinanceView from "@/components/FinanceView";
 import { formatRelativeTime } from "@/lib/date-format";
 import { isMeetingEvent, canEventReceiveQuote, countsForFinance, isCancelledEvent } from "@/lib/events";
@@ -57,6 +58,7 @@ import {
   logoutAction,
   createUserAction,
   updateUserAction,
+  markItemAsBoughtAction,
   snoozeAlertAction,
   acknowledgeAlertAction,
   dismissAlertAction,
@@ -561,6 +563,7 @@ export default function EventFlowApp({
   const [showMovementModal, setShowMovementModal] = useState(false);
   const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [showItemWizard, setShowItemWizard] = useState(false);
+  const [showReceiptScanner, setShowReceiptScanner] = useState(false);
   const [showClientWizard, setShowClientWizard] = useState(false);
   const [showTriageModal, setShowTriageModal] = useState(false);
   const [triageItem, setTriageItem] = useState<any>(null);
@@ -589,6 +592,7 @@ export default function EventFlowApp({
   const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState<string>("all");
   const [inventoryLocationFilter, setInventoryLocationFilter] = useState<string>("all");
   const [inventoryAlertFilter, setInventoryAlertFilter] = useState<"all" | "alerts" | "low" | "damaged" | "available">("all");
+  const [inventoryPurchaseFilter, setInventoryPurchaseFilter] = useState<"all" | "bought" | "not_bought">("all");
 
   // Distinct categories and warehouse locations
   const inventoryCategories = useMemo(() => {
@@ -642,6 +646,25 @@ export default function EventFlowApp({
     return { lowCount, damagedCount, totalAlerts };
   }, [itemsList]);
 
+  // Purchase status counters & costs (Bought vs Not Yet Bought)
+  const inventoryPurchaseStats = useMemo(() => {
+    let boughtCount = 0;
+    let notBoughtCount = 0;
+    let notBoughtCost = 0;
+    itemsList.forEach((item) => {
+      if (item.purchaseStatus === "not_bought") {
+        notBoughtCount += 1;
+        const cost = Number(item.purchaseCost) > 0
+          ? Number(item.purchaseCost)
+          : (Number(item.replacementCost) || 0) * (Number(item.totalQuantity) || 1);
+        notBoughtCost += cost;
+      } else {
+        boughtCount += 1;
+      }
+    });
+    return { boughtCount, notBoughtCount, notBoughtCost };
+  }, [itemsList]);
+
   // Filtered inventory list
   const processedInventoryItems = useMemo(() => {
     return itemsList.filter((item) => {
@@ -685,11 +708,15 @@ export default function EventFlowApp({
       if (inventoryAlertFilter === "damaged" && damaged <= 0) return false;
       if (inventoryAlertFilter === "available" && hasAlert) return false;
 
+      // 5. Purchase status filter (Bought vs Not Yet Bought)
+      if (inventoryPurchaseFilter === "bought" && item.purchaseStatus === "not_bought") return false;
+      if (inventoryPurchaseFilter === "not_bought" && item.purchaseStatus !== "not_bought") return false;
+
       return true;
     });
-  }, [itemsList, locationsList, inventorySearch, inventoryCategoryFilter, inventoryLocationFilter, inventoryAlertFilter]);
+  }, [itemsList, locationsList, inventorySearch, inventoryCategoryFilter, inventoryLocationFilter, inventoryAlertFilter, inventoryPurchaseFilter]);
 
-  // Financial aggregates (Realized Cash Flow)
+  // Financial aggregates (Realized Cash Flow - only bought items are in movementsList)
   const totalEntradas = movementsList
     .filter((m) => m.type === "entrada")
     .reduce((sum, m) => sum + m.amount, 0);
@@ -704,22 +731,68 @@ export default function EventFlowApp({
 
   const resultadoLiquido = totalEntradas - totalSaidas - totalInvestido;
 
+  // Pending Stock Purchases (Items with purchaseStatus === "not_bought")
+  // Only bought items can be accounted for finance (cash).
+  // Not yet bought items are deducted from the projected value.
+  const pendingStockPurchases = useMemo(() => {
+    return itemsList
+      .filter((item) => item.purchaseStatus === "not_bought")
+      .reduce((sum, item) => {
+        const cost = Number(item.purchaseCost) > 0
+          ? Number(item.purchaseCost)
+          : (Number(item.replacementCost) || 0) * (Number(item.totalQuantity) || 1);
+        return sum + cost;
+      }, 0);
+  }, [itemsList]);
+
+  const pendingStockItemsCount = useMemo(() => {
+    return itemsList.filter((item) => item.purchaseStatus === "not_bought").length;
+  }, [itemsList]);
+
   // Projected aggregates from pipeline events (excluding cancelled events)
+  // Not bought items are deducted from the projected value.
   const projectedMetrics = useMemo(() => {
     const activeEvents = eventsList.filter((e) => countsForFinance(e));
     const faturacao = activeEvents.reduce((sum, e) => sum + (Number(e.customerPrice) || 0), 0);
     const orcamentoCustos = activeEvents.reduce((sum, e) => sum + (Number(e.totalBudget) || 0), 0);
-    const lucroProjetado = faturacao - orcamentoCustos;
+    const totalCustosProjetados = orcamentoCustos + pendingStockPurchases;
+    const lucroProjetado = faturacao - totalCustosProjetados;
     const margemProjetada = faturacao > 0 ? ((lucroProjetado / faturacao) * 100).toFixed(1) : "0.0";
     const aReceber = Math.max(0, faturacao - totalEntradas);
     return {
       faturacao,
       orcamentoCustos,
+      pendingStockPurchases,
+      pendingStockItemsCount,
+      totalCustosProjetados,
       lucroProjetado,
       margemProjetada,
       aReceber,
     };
-  }, [eventsList, totalEntradas]);
+  }, [eventsList, totalEntradas, pendingStockPurchases, pendingStockItemsCount]);
+
+  // Mark Item as Bought Handler
+  const handleMarkAsBought = async (itemToBuy: any) => {
+    const cost = Number(itemToBuy.purchaseCost) > 0
+      ? Number(itemToBuy.purchaseCost)
+      : (Number(itemToBuy.replacementCost) || 0) * (Number(itemToBuy.totalQuantity) || 1);
+
+    // Optimistic update
+    setItemsList((prev) =>
+      prev.map((i) =>
+        i.id === itemToBuy.id
+          ? { ...i, purchaseStatus: "bought", purchaseCost: cost }
+          : i
+      )
+    );
+
+    startTransition(async () => {
+      const res = await markItemAsBoughtAction(itemToBuy.id, cost);
+      if (res.success && res.movement) {
+        setMovementsList((prev) => [res.movement, ...prev]);
+      }
+    });
+  };
 
   const totalFaturado = projectedMetrics.faturacao > 0
     ? projectedMetrics.faturacao
@@ -1144,11 +1217,11 @@ export default function EventFlowApp({
                 <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5 flex flex-col justify-between">
                   <div>
                     <div className="text-[12px] text-[#8e8e93] mb-1">
-                      {dashboardFinanceMode === "projected" ? "Custos Orçados" : "Saídas"}
+                      {dashboardFinanceMode === "projected" ? "Custos Previstos" : "Saídas"}
                     </div>
                     <div className="text-[24px] font-bold tracking-[-0.7px] text-[#b04a3f]">
                       €{dashboardFinanceMode === "projected"
-                        ? projectedMetrics.orcamentoCustos.toLocaleString("pt-PT")
+                        ? projectedMetrics.totalCustosProjetados.toLocaleString("pt-PT")
                         : totalSaidas.toLocaleString("pt-PT")}
                     </div>
                   </div>
@@ -1156,10 +1229,22 @@ export default function EventFlowApp({
                     {dashboardFinanceMode === "comparative" ? (
                       <div>
                         <span>Orçado: </span>
-                        <strong className="text-[#111]">€{projectedMetrics.orcamentoCustos.toLocaleString("pt-PT")}</strong>
+                        <strong className="text-[#111]">€{projectedMetrics.totalCustosProjetados.toLocaleString("pt-PT")}</strong>
+                        {projectedMetrics.pendingStockPurchases > 0 && (
+                          <div className="text-[10px] text-amber-700 mt-0.5 font-medium">
+                            (inclui €{projectedMetrics.pendingStockPurchases.toLocaleString("pt-PT")} stock a comprar)
+                          </div>
+                        )}
                       </div>
                     ) : dashboardFinanceMode === "projected" ? (
-                      "Orçamento interno previsto"
+                      <div>
+                        <span>Orçamento eventos: €{projectedMetrics.orcamentoCustos.toLocaleString("pt-PT")}</span>
+                        {projectedMetrics.pendingStockPurchases > 0 && (
+                          <div className="text-[10px] text-amber-700 font-medium mt-0.5">
+                            + €{projectedMetrics.pendingStockPurchases.toLocaleString("pt-PT")} compras pendentes stock
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       "Despesas operacionais pagas"
                     )}
@@ -1209,9 +1294,21 @@ export default function EventFlowApp({
                         <span>Lucro Projetado: </span>
                         <strong className="text-[#217a3b]">€{projectedMetrics.lucroProjetado.toLocaleString("pt-PT")}</strong>
                         <span className="text-[#8e8e93] ml-1">({projectedMetrics.margemProjetada}%)</span>
+                        {projectedMetrics.pendingStockPurchases > 0 && (
+                          <div className="text-[10px] text-[#8e8e93] mt-0.5">
+                            (deduzido €{projectedMetrics.pendingStockPurchases.toLocaleString("pt-PT")} stock a comprar)
+                          </div>
+                        )}
                       </div>
                     ) : dashboardFinanceMode === "projected" ? (
-                      `Margem prevista: ${projectedMetrics.margemProjetada}%`
+                      <div>
+                        <span>Margem prevista: {projectedMetrics.margemProjetada}%</span>
+                        {projectedMetrics.pendingStockPurchases > 0 && (
+                          <div className="text-[10px] text-[#8e8e93] mt-0.5">
+                            Deduzido €{projectedMetrics.pendingStockPurchases.toLocaleString("pt-PT")} stock a comprar
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       "Entradas − saídas − investimento"
                     )}
@@ -2588,6 +2685,16 @@ export default function EventFlowApp({
 
                 <button
                   type="button"
+                  onClick={() => setShowReceiptScanner(true)}
+                  className="px-3.5 py-2.5 rounded-[12px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-sm shadow-blue-500/20"
+                  title="Digitalizar fatura/recibo com Gemini AI para adicionar stock ou novos artigos"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Digitalizar Fatura</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setShowItemWizard(true)}
                   className="px-4 py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
                 >
@@ -2763,11 +2870,61 @@ export default function EventFlowApp({
                   </button>
                 </div>
 
+                {/* Purchase Status (Bought vs Not Yet Bought) */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
+                  <span className="text-[11px] font-semibold text-[#8e8e93] mr-1 hidden sm:inline">
+                    Aquisição:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setInventoryPurchaseFilter("all")}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
+                      inventoryPurchaseFilter === "all"
+                        ? "bg-[#111] text-white shadow-2xs"
+                        : "bg-white border border-[#ececf0] text-[#3a3a3c] hover:bg-[#f2f2f5]"
+                    }`}
+                  >
+                    Todas ({itemsList.length})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setInventoryPurchaseFilter("bought")}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition flex items-center gap-1 cursor-pointer ${
+                      inventoryPurchaseFilter === "bought"
+                        ? "bg-emerald-700 text-white shadow-2xs"
+                        : "bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100"
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>Comprados ({inventoryPurchaseStats.boughtCount})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setInventoryPurchaseFilter("not_bought")}
+                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition flex items-center gap-1 cursor-pointer ${
+                      inventoryPurchaseFilter === "not_bought"
+                        ? "bg-amber-700 text-white shadow-2xs"
+                        : "bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100"
+                    }`}
+                  >
+                    <AlertCircle className="w-3 h-3" />
+                    <span>A Comprar ({inventoryPurchaseStats.notBoughtCount})</span>
+                    {inventoryPurchaseStats.notBoughtCost > 0 && (
+                      <span className="text-[10px] opacity-80">
+                        (€{inventoryPurchaseStats.notBoughtCost.toLocaleString("pt-PT", { maximumFractionDigits: 0 })})
+                      </span>
+                    )}
+                  </button>
+                </div>
+
                 {/* Reset button if filters active */}
                 {(inventorySearch ||
                   inventoryCategoryFilter !== "all" ||
                   inventoryLocationFilter !== "all" ||
-                  inventoryAlertFilter !== "all") && (
+                  inventoryAlertFilter !== "all" ||
+                  inventoryPurchaseFilter !== "all") && (
                   <button
                     type="button"
                     onClick={() => {
@@ -2775,6 +2932,7 @@ export default function EventFlowApp({
                       setInventoryCategoryFilter("all");
                       setInventoryLocationFilter("all");
                       setInventoryAlertFilter("all");
+                      setInventoryPurchaseFilter("all");
                     }}
                     className="text-xs font-semibold text-[#007aff] hover:underline cursor-pointer flex items-center gap-1"
                   >
@@ -2936,9 +3094,27 @@ export default function EventFlowApp({
                         })()}
                       </div>
 
-                      {/* Column 4: Stock & Alert Badges */}
-                      <div className="lg:col-span-2 space-y-1">
+                      {/* Column 4: Stock & Alert Badges & Purchase Status */}
+                      <div className="lg:col-span-2 space-y-1.5">
                         <div className="flex items-center justify-between lg:justify-start gap-1.5 flex-wrap">
+                          {item.purchaseStatus === "not_bought" ? (
+                            <span
+                              className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1"
+                              title="Artigo ainda não comprado. O custo previsto está deduzido do lucro projetado."
+                            >
+                              <AlertCircle className="w-3 h-3 text-amber-700" />
+                              <span>A Comprar</span>
+                            </span>
+                          ) : (
+                            <span
+                              className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1"
+                              title="Artigo comprado e contabilizado em finanças"
+                            >
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              <span>Comprado</span>
+                            </span>
+                          )}
+
                           {damaged > 0 ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 flex items-center gap-1">
                               <AlertTriangle className="w-3 h-3" />
@@ -2950,8 +3126,8 @@ export default function EventFlowApp({
                               <span>Stock Baixo</span>
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" />
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-[#3a3a3c] flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-gray-500" />
                               <span>Disponível</span>
                             </span>
                           )}
@@ -2995,6 +3171,18 @@ export default function EventFlowApp({
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">
+                          {item.purchaseStatus === "not_bought" && (
+                            <button
+                              type="button"
+                              onClick={() => handleMarkAsBought(item)}
+                              className="px-2.5 py-1.5 rounded-[10px] bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                              title="Marcar como Comprado e lançar despesa em Finanças"
+                            >
+                              <Check className="w-3 h-3" />
+                              <span>Comprar</span>
+                            </button>
+                          )}
+
                           {damaged > 0 && (
                             <button
                               type="button"
@@ -3703,6 +3891,19 @@ export default function EventFlowApp({
         />
       )}
 
+      {/* 5.1 RECEIPT SCANNER MODAL (Gemini Receipt Reader) */}
+      {showReceiptScanner && (
+        <ReceiptScannerModal
+          onClose={() => setShowReceiptScanner(false)}
+          inventoryItems={itemsList}
+          storageLocations={locationsList}
+          onSuccess={() => {
+            setShowReceiptScanner(false);
+            window.location.reload();
+          }}
+        />
+      )}
+
       {/* STORAGE LOCATIONS & MANAGERS MODAL */}
       {showLocationsModal && (
         <StorageLocationsModal
@@ -3747,7 +3948,7 @@ export default function EventFlowApp({
             </div>
 
             <p className="text-xs text-[#6e6e73] leading-relaxed">
-              As reuniões agendadas pelos clientes no Calendly são sincronizadas para o CFM Eventos e destacadas a <strong>roxo</strong> na sua agenda.
+              As reuniões agendadas pelos clientes no Calendly são sincronizadas para o CFM Events e destacadas a <strong>roxo</strong> na sua agenda.
             </p>
 
             <div className="space-y-3 pt-1">
@@ -4261,6 +4462,7 @@ function ItemWizardModal({
   const [unitPrice, setUnitPrice] = useState("6.00");
   const [purchasePrice, setPurchasePrice] = useState("45.00");
   const [totalPurchasePrice, setTotalPurchasePrice] = useState("2250.00");
+  const [purchaseStatus, setPurchaseStatus] = useState<"bought" | "not_bought">("bought");
 
   // Location State
   const defaultLoc = locations[0];
@@ -4329,6 +4531,7 @@ function ItemWizardModal({
       formData.set("purchasePrice", purchasePrice);
       formData.set("totalPurchasePrice", totalPurchasePrice);
       formData.set("replacementCost", purchasePrice);
+      formData.set("purchaseStatus", purchaseStatus);
 
       let chosenWarehouseLocation = "Armazém Principal";
       let chosenLocationId: string | null = null;
@@ -4517,16 +4720,60 @@ function ItemWizardModal({
             </div>
           </div>
 
-          {/* Automatic Expense on Item Purchase */}
-          <div className="p-3.5 rounded-[16px] bg-[#fffbf0] border border-[#f5dfa8] space-y-2.5">
-            <div className="flex items-center gap-2 font-bold text-xs text-[#8c6417]">
-              <AlertCircle className="w-4 h-4 text-[#8c6417] shrink-0" />
-              <span>Valor de Compra / Aquisição & Lançamento de Despesa</span>
+          {/* Purchase Status & Financial Accounting */}
+          <div className={`p-4 rounded-[16px] border space-y-3 transition ${
+            purchaseStatus === "bought"
+              ? "bg-[#fffbf0] border-[#f5dfa8]"
+              : "bg-amber-50/70 border-amber-200"
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 font-bold text-xs text-[#8c6417]">
+                <AlertCircle className="w-4 h-4 text-[#8c6417] shrink-0" />
+                <span>Estado de Aquisição & Contabilidade Financeira</span>
+              </div>
             </div>
-            <p className="text-[11px] text-[#5c430e]">
-              ⚠️ <strong>Atenção:</strong> Ao adicionar este artigo, será gerada automaticamente uma despesa financeira correspondente ao valor de compra no módulo de Finanças.
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPurchaseStatus("bought")}
+                className={`py-2 px-3 rounded-[12px] text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  purchaseStatus === "bought"
+                    ? "bg-[#111] text-white shadow-2xs"
+                    : "bg-white border border-[#ececf0] text-[#3a3a3c] hover:bg-[#f2f2f5]"
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Comprado (Caixa)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPurchaseStatus("not_bought")}
+                className={`py-2 px-3 rounded-[12px] text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  purchaseStatus === "not_bought"
+                    ? "bg-amber-700 text-white shadow-2xs"
+                    : "bg-white border border-[#ececf0] text-[#3a3a3c] hover:bg-[#f2f2f5]"
+                }`}
+              >
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>Ainda Não Comprado</span>
+              </button>
+            </div>
+
+            <p className="text-[11px] text-[#5c430e] leading-relaxed">
+              {purchaseStatus === "bought" ? (
+                <>
+                  ✅ <strong>Contabilizado em Finanças:</strong> Será gerada automaticamente uma saída de caixa de €{Number(totalPurchasePrice || 0).toFixed(2)} no módulo de Finanças.
+                </>
+              ) : (
+                <>
+                  ⏳ <strong>Deduzido do Lucro Projetado:</strong> Não é gerada saída de caixa imediata. O valor de aquisição de €{Number(totalPurchasePrice || 0).toFixed(2)} fica deduzido no Lucro Projetado até que o artigo seja marcado como comprado.
+                </>
+              )}
             </p>
-            <div className="grid grid-cols-2 gap-3">
+
+            <div className="grid grid-cols-2 gap-3 pt-1">
               <div>
                 <label className="block font-bold text-[#3a3a3c] mb-1">
                   Custo Unit. Compra (€)
@@ -4549,7 +4796,7 @@ function ItemWizardModal({
               </div>
               <div>
                 <label className="block font-bold text-[#3a3a3c] mb-1">
-                  Despesa Total Gerada (€)
+                  {purchaseStatus === "bought" ? "Despesa de Caixa (€)" : "Custo Previsto (€)"}
                 </label>
                 <input
                   type="number"

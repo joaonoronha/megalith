@@ -1,6 +1,6 @@
-# EventFlow — CFM Eventos
+# EventFlow — CFM Events
 
-EventFlow is an operations management, temporal inventory allocation, digital quote approval, and financial ledger platform built for **CFM Eventos** (event production, furniture/AV rental, staging, and styling in Portugal).
+EventFlow is an operations management, temporal inventory allocation, digital quote approval, and financial ledger platform built for **CFM Events** (event production, furniture/AV rental, staging, and styling in Portugal).
 
 ## Architecture
 - **Framework**: Next.js 15 (App Router, Server Actions, Server Components)
