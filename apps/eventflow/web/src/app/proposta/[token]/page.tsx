@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
+import PrintButton from "@/components/PrintButton";
+
 async function approveQuoteAction(formData: FormData) {
   "use server";
   const token = formData.get("token") as string;
@@ -93,18 +95,21 @@ export default async function PublicQuotePage({
     : "A definir";
 
   return (
-    <div className="min-h-screen bg-[#f3f3f5] py-10 px-4 flex flex-col items-center">
+    <div className="min-h-screen bg-[#f3f3f5] py-10 px-4 flex flex-col items-center print:bg-white print:py-0 print:px-0">
       {/* Top Banner */}
-      <div className="w-full max-w-3xl mb-4 flex items-center justify-between text-xs text-[#8e8e93]">
+      <div className="w-full max-w-3xl mb-4 flex items-center justify-between text-xs text-[#8e8e93] print:hidden">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-[#007aff]"></span>
           <span>CFM Eventos Portal do Cliente</span>
         </div>
-        <div>Validade: {quote.validityDays} dias</div>
+        <div className="flex items-center gap-3">
+          <span>Validade: {quote.validityDays} dias</span>
+          <PrintButton />
+        </div>
       </div>
 
       {/* Main Quote Paper */}
-      <div className="w-full max-w-3xl bg-white border border-[#ececf0] rounded-2xl p-8 sm:p-12 shadow-sm">
+      <div className="w-full max-w-3xl bg-white border border-[#ececf0] rounded-2xl p-8 sm:p-12 shadow-sm print:border-none print:shadow-none print:p-0">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between border-b border-[#ececf0] pb-8 gap-6">
           <div>
@@ -219,7 +224,7 @@ export default async function PublicQuotePage({
               </div>
             </div>
           ) : (
-            <form action={approveQuoteAction} className="bg-[#fafafa] border border-[#ececf0] rounded-xl p-6">
+            <form action={approveQuoteAction} className="bg-[#fafafa] border border-[#ececf0] rounded-xl p-6 print:hidden">
               <input type="hidden" name="token" value={token} />
               <div className="mb-4">
                 <h3 className="text-base font-bold text-[#111111]">Aprovar e Adjudicar Proposta</h3>

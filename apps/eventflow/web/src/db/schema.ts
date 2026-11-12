@@ -54,10 +54,28 @@ export const events = sqliteTable("events", {
   status: text("status", { 
     enum: ["planeamento", "orcamento", "confirmado", "preparacao", "em_curso", "devolucao", "concluido", "cancelado"] 
   }).default("planeamento").notNull(),
-  totalBudget: real("total_budget").default(0),
+  totalBudget: real("total_budget").default(0), // Total internal production budget
+  customerPrice: real("customer_price").default(0), // Total amount customer is going to pay
+  category: text("category").default("Geral"), // e.g. "Aniversário Infantil", "Casamento", "Corporativo", "Gala"
+  theme: text("theme"), // e.g. "Winnie the Pooh", "Gatsby", "Boho Chic"
+  vibeColors: text("vibe_colors"), // JSON string array of hex codes e.g. '["#E5A93C","#C93B2B","#5A8261","#F7E7C4"]'
+  specialNeeds: text("special_needs"), // Dietary restrictions, noise limits, VIP asks, power needs
   notes: text("notes"),
   coverImageUrl: text("cover_image_url"),
   calendlyEventUri: text("calendly_event_uri"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+});
+
+// 4.1 Action Items & Completion Checklist per Event
+export const eventTasks = sqliteTable("event_tasks", {
+  id: text("id").primaryKey(),
+  eventId: text("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  title: text("title").notNull(),
+  completed: integer("completed", { mode: "boolean" }).default(false).notNull(),
+  dueDate: integer("due_date", { mode: "timestamp" }),
+  priority: text("priority", { enum: ["baixa", "media", "alta", "urgente"] }).default("media"),
+  assignedTo: text("assigned_to"),
+  orderIndex: integer("order_index").default(0),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
 });
 
