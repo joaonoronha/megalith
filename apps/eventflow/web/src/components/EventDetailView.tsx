@@ -598,55 +598,59 @@ function MoodboardCard({
           )}
         </div>
 
-        {/* Footer actions with Comment Counter */}
-        <div className="mt-4 pt-3 border-t border-[#f2f2f5] flex items-center justify-between text-xs gap-2">
-          <div className="flex items-center gap-1.5 text-[11px] text-[#8e8e93] truncate">
+        {/* Footer actions with compact icon-only controls */}
+        <div className="mt-3 pt-2.5 border-t border-[#f2f2f5] flex items-center justify-between text-xs gap-2">
+          <div className="flex items-center gap-1.5 text-[11px] text-[#8e8e93] min-w-0 truncate">
             <span className="truncate">{board.uploadedByName || "Equipa CFM"}</span>
             {board.createdAt && (
               <>
                 <span>•</span>
-                <span>{formatRelativeTime(board.createdAt)}</span>
+                <span className="shrink-0">{formatRelativeTime(board.createdAt)}</span>
               </>
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            {/* Toggle Comments Button */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Toggle Comments Button (Icon-only with badge) */}
             <button
               type="button"
               onClick={() => setShowComments(!showComments)}
-              className={`px-2.5 py-1 rounded-lg font-semibold text-[11px] inline-flex items-center gap-1.5 transition cursor-pointer ${
+              className={`p-2 rounded-xl transition cursor-pointer relative flex items-center justify-center ${
                 showComments || comments.length > 0
                   ? "bg-[#e8f2ff] text-[#007aff] hover:bg-[#d0e5ff]"
-                  : "bg-[#f2f2f5] text-[#111] hover:bg-[#e5e5ea]"
+                  : "bg-[#f2f2f5] text-[#48484a] hover:bg-[#e5e5ea] hover:text-[#111]"
               }`}
-              title="Abrir discussão e feedback deste moodboard"
+              title={`Ideias & Notas (${comments.length})`}
+              aria-label="Abrir discussão e feedback"
             >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>
-                Ideias & Notas{" "}
-                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-[#007aff] text-white">
+              <MessageSquare className="w-4 h-4" />
+              {comments.length > 0 && (
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-[#007aff] text-white shadow-2xs">
                   {comments.length}
                 </span>
-              </span>
+              )}
             </button>
 
+            {/* Add Photos Button (Icon-only) */}
             <button
               type="button"
               onClick={() => onAddMorePhotos(board)}
-              className="px-2.5 py-1 rounded-lg bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#111] font-semibold text-[11px] inline-flex items-center gap-1 transition cursor-pointer"
+              className="p-2 rounded-xl bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#48484a] hover:text-[#111] transition cursor-pointer flex items-center justify-center"
+              title="Adicionar mais fotos ao moodboard"
+              aria-label="Adicionar fotos"
             >
-              <Plus className="w-3 h-3" />
-              <span className="hidden sm:inline">Adicionar fotos</span>
+              <Plus className="w-4 h-4" />
             </button>
 
+            {/* Delete Moodboard Button (Icon-only) */}
             <button
               type="button"
               onClick={() => onDeleteBoard(board.id)}
-              className="p-1.5 rounded-lg text-[#8e8e93] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+              className="p-2 rounded-xl text-[#8e8e93] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer flex items-center justify-center"
               title="Eliminar moodboard completo"
+              aria-label="Eliminar moodboard"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -655,16 +659,16 @@ function MoodboardCard({
         {/* COLLABORATIVE COMMENTS & FEEDBACK SECTION                     */}
         {/* ------------------------------------------------------------- */}
         {showComments && (
-          <div className="mt-4 pt-3.5 border-t border-[#ececf0] flex flex-col gap-3">
+          <div className="mt-3 pt-3 border-t border-[#ececf0] flex flex-col gap-2.5 w-full min-w-0">
             {/* Filter chips & Section Header */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-[#111] flex items-center gap-1">
+            <div className="flex items-center justify-between gap-1.5 min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                <span className="text-xs font-bold text-[#111] flex items-center gap-1 shrink-0">
                   <MessageSquare className="w-3.5 h-3.5 text-[#007aff]" />
-                  <span>Discussão ({comments.length})</span>
+                  <span>Notas ({comments.length})</span>
                 </span>
                 {images.length > 1 && (
-                  <div className="flex items-center gap-1 ml-2">
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => setCommentFilter("all")}
@@ -685,7 +689,7 @@ function MoodboardCard({
                           : "bg-[#f2f2f5] text-[#636366] hover:bg-[#e5e5ea]"
                       }`}
                     >
-                      Foto atual ({photoSpecificCount})
+                      Foto {activeIndex + 1} ({photoSpecificCount})
                     </button>
                   </div>
                 )}
@@ -694,19 +698,19 @@ function MoodboardCard({
               <button
                 type="button"
                 onClick={() => setShowComments(false)}
-                className="text-[11px] text-[#8e8e93] hover:text-[#111] transition cursor-pointer"
+                className="text-[11px] text-[#8e8e93] hover:text-[#111] transition cursor-pointer shrink-0"
               >
-                Ocultar
+                Fechar
               </button>
             </div>
 
             {/* Comments List */}
-            <div className="flex flex-col gap-2.5 max-h-[320px] overflow-y-auto pr-1 scrollbar-thin">
+            <div className="flex flex-col gap-2 max-h-[260px] overflow-y-auto pr-0.5 scrollbar-thin">
               {visibleComments.length === 0 ? (
-                <div className="p-3.5 rounded-xl bg-[#f9f9fb] border border-dashed border-[#ececf0] text-center text-xs text-[#8e8e93]">
+                <div className="p-3 rounded-xl bg-[#f9f9fb] border border-dashed border-[#ececf0] text-center text-xs text-[#8e8e93]">
                   {commentFilter === "current_photo"
-                    ? "Nenhuma nota específica para a foto atual. Partilhe a sua ideia abaixo!"
-                    : "Ainda não existem notas neste moodboard. Seja o primeiro a partilhar uma ideia!"}
+                    ? "Nenhuma nota na foto atual."
+                    : "Ainda não existem notas neste moodboard."}
                 </div>
               ) : (
                 visibleComments.map((comment) => {
@@ -722,18 +726,18 @@ function MoodboardCard({
                   return (
                     <div
                       key={comment.id}
-                      className="p-3 rounded-xl bg-[#f9f9fb] border border-[#ececf0] flex flex-col gap-1.5 hover:border-[#c7c7cc] transition"
+                      className="p-2.5 rounded-xl bg-[#f9f9fb] border border-[#ececf0] flex flex-col gap-1 hover:border-[#c7c7cc] transition min-w-0"
                     >
                       {/* Comment Top Info */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-[#007aff] to-[#5856d6] text-white text-[9px] font-bold flex items-center justify-center flex-shrink-0">
+                      <div className="flex items-center justify-between gap-1.5 min-w-0">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-[#007aff] to-[#5856d6] text-white text-[9px] font-bold flex items-center justify-center shrink-0">
                             {initials}
                           </div>
-                          <span className="text-xs font-bold text-[#111]">
+                          <span className="text-xs font-bold text-[#111] truncate">
                             {comment.authorName}
                           </span>
-                          <span className="text-[10px] text-[#8e8e93]">
+                          <span className="text-[10px] text-[#8e8e93] shrink-0">
                             {formatRelativeTime(comment.createdAt)}
                           </span>
                         </div>
@@ -742,7 +746,7 @@ function MoodboardCard({
                         <button
                           type="button"
                           onClick={() => onDeleteComment(comment.id, board.id)}
-                          className="p-1 text-[#8e8e93] hover:text-rose-600 rounded transition cursor-pointer"
+                          className="p-1 text-[#8e8e93] hover:text-rose-600 rounded transition cursor-pointer shrink-0"
                           title="Eliminar nota"
                         >
                           <Trash className="w-3 h-3" />
@@ -751,7 +755,7 @@ function MoodboardCard({
 
                       {/* Photo Target Label Badge with Mini-Thumbnail */}
                       {comment.photoLabel && (
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-1 flex-wrap">
                           <button
                             type="button"
                             onClick={() => {
@@ -759,42 +763,42 @@ function MoodboardCard({
                                 setCurrentIndex(comment.photoIndex);
                               }
                             }}
-                            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold transition cursor-pointer ${
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition cursor-pointer max-w-full ${
                               isPhotoTarget
                                 ? "bg-[#e8f2ff] text-[#007aff] hover:bg-[#d0e5ff]"
                                 : "bg-[#f2f2f5] text-[#636366]"
                             }`}
-                            title="Clique para ver esta foto no carousel"
+                            title="Clique para ver esta foto no carrossel"
                           >
                             {comment.photoUrl && (
                               /* eslint-disable-next-line @next/next/no-img-element */
                               <img
                                 src={comment.photoUrl}
                                 alt=""
-                                className="w-3.5 h-3.5 rounded-full object-cover flex-shrink-0"
+                                className="w-3.5 h-3.5 rounded-full object-cover shrink-0"
                               />
                             )}
-                            <Tag className="w-2.5 h-2.5" />
-                            <span>{comment.photoLabel}</span>
+                            <Tag className="w-2.5 h-2.5 shrink-0" />
+                            <span className="truncate">{comment.photoLabel}</span>
                           </button>
                         </div>
                       )}
 
                       {/* Comment text */}
                       {comment.content && (
-                        <p className="text-xs text-[#2c2c2e] leading-relaxed whitespace-pre-line">
+                        <p className="text-xs text-[#2c2c2e] leading-relaxed whitespace-pre-line break-words">
                           {comment.content}
                         </p>
                       )}
 
                       {/* Attached Image in Comment */}
                       {comment.imageUrl && (
-                        <div className="mt-1 relative rounded-lg overflow-hidden border border-[#e5e5ea] max-w-[220px]">
+                        <div className="mt-1 relative rounded-lg overflow-hidden border border-[#e5e5ea] max-w-[200px]">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={comment.imageUrl}
                             alt="Anexo da nota"
-                            className="w-full max-h-36 object-cover cursor-pointer hover:opacity-90 transition"
+                            className="w-full max-h-32 object-cover cursor-pointer hover:opacity-90 transition"
                             onClick={() => window.open(comment.imageUrl!, "_blank")}
                           />
                         </div>
@@ -808,14 +812,14 @@ function MoodboardCard({
             {/* Comment Composer Form */}
             <form
               onSubmit={handleSubmitComment}
-              className="mt-1 p-2.5 rounded-xl bg-[#f2f2f5] flex flex-col gap-2"
+              className="mt-0.5 p-2 rounded-xl bg-[#f2f2f5] flex flex-col gap-2 min-w-0"
             >
               {/* Photo Selector Header */}
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-semibold text-[#636366] flex items-center gap-1">
+              <div className="flex items-center justify-between gap-1.5 flex-wrap min-w-0">
+                <div className="flex items-center gap-1 min-w-0 flex-1">
+                  <span className="text-[10px] font-semibold text-[#636366] flex items-center gap-1 shrink-0">
                     <Tag className="w-3 h-3 text-[#007aff]" />
-                    <span>Referente a:</span>
+                    <span>Em:</span>
                   </span>
                   <select
                     value={
@@ -835,12 +839,12 @@ function MoodboardCard({
                         setCurrentIndex(idx);
                       }
                     }}
-                    className="bg-white text-[#111] text-[11px] font-semibold py-1 px-2 rounded-lg border border-[#d1d1d6] cursor-pointer shadow-2xs focus:outline-hidden focus:ring-1 focus:ring-[#007aff]"
+                    className="w-full min-w-0 max-w-[170px] bg-white text-[#111] text-[10px] font-semibold py-1 px-1.5 rounded-lg border border-[#d1d1d6] cursor-pointer shadow-2xs truncate focus:outline-hidden focus:ring-1 focus:ring-[#007aff]"
                   >
                     <option value={`photo-${activeIndex}`}>
-                      🖼️ Foto {activeIndex + 1} ({currentImage.title || "Foto atual"})
+                      Foto {activeIndex + 1} ({currentImage.title || "Foto atual"})
                     </option>
-                    <option value="general">📌 Geral (Todo o Moodboard)</option>
+                    <option value="general">Geral (Todo o Moodboard)</option>
                     {images.map((img, idx) => (
                       <option key={img.id || idx} value={`photo-${idx}`}>
                         Foto {idx + 1}: {img.title || `Imagem ${idx + 1}`}
@@ -850,7 +854,7 @@ function MoodboardCard({
                 </div>
 
                 {/* Attach image trigger */}
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 shrink-0">
                   <input
                     type="file"
                     ref={commentFileInputRef}
@@ -861,39 +865,37 @@ function MoodboardCard({
                   <button
                     type="button"
                     onClick={() => commentFileInputRef.current?.click()}
-                    className="px-2 py-0.5 rounded-md bg-white hover:bg-[#e5e5ea] text-[#111] text-[11px] font-medium border border-[#d1d1d6] inline-flex items-center gap-1 transition cursor-pointer shadow-2xs"
-                    title="Anexar ficheiro de imagem"
+                    className="p-1.5 rounded-lg bg-white hover:bg-[#e5e5ea] text-[#111] border border-[#d1d1d6] inline-flex items-center justify-center transition cursor-pointer shadow-2xs"
+                    title="Anexar foto"
                   >
-                    <Paperclip className="w-3 h-3 text-[#007aff]" />
-                    <span>Foto</span>
+                    <Paperclip className="w-3.5 h-3.5 text-[#007aff]" />
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setShowUrlField(!showUrlField)}
-                    className="px-2 py-0.5 rounded-md bg-white hover:bg-[#e5e5ea] text-[#111] text-[11px] font-medium border border-[#d1d1d6] inline-flex items-center gap-1 transition cursor-pointer shadow-2xs"
-                    title="Anexar link web de imagem"
+                    className="p-1.5 rounded-lg bg-white hover:bg-[#e5e5ea] text-[#111] border border-[#d1d1d6] inline-flex items-center justify-center transition cursor-pointer shadow-2xs"
+                    title="Anexar link web"
                   >
-                    <Link2 className="w-3 h-3 text-[#007aff]" />
-                    <span>Link</span>
+                    <Link2 className="w-3.5 h-3.5 text-[#007aff]" />
                   </button>
                 </div>
               </div>
 
               {/* URL Input field if toggled */}
               {showUrlField && (
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 min-w-0">
                   <input
                     type="url"
                     value={commentUrlInput}
                     onChange={(e) => setCommentUrlInput(e.target.value)}
                     placeholder="https://... (URL da imagem)"
-                    className="flex-1 bg-white text-xs px-2.5 py-1 rounded-lg border border-[#d1d1d6] focus:outline-hidden focus:ring-1 focus:ring-[#007aff]"
+                    className="w-full min-w-0 flex-1 bg-white text-xs px-2.5 py-1 rounded-lg border border-[#d1d1d6] focus:outline-hidden focus:ring-1 focus:ring-[#007aff]"
                   />
                   <button
                     type="button"
                     onClick={() => setShowUrlField(false)}
-                    className="p-1 text-[#8e8e93] hover:text-[#111]"
+                    className="p-1 text-[#8e8e93] hover:text-[#111] shrink-0"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -907,31 +909,31 @@ function MoodboardCard({
                   <img
                     src={commentImagePreview || commentUrlInput}
                     alt="Pré-visualização do anexo"
-                    className="w-10 h-10 rounded-md object-cover flex-shrink-0"
+                    className="w-8 h-8 rounded-md object-cover shrink-0"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src =
                         "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=400&q=80";
                     }}
                   />
-                  <div className="text-[11px] truncate max-w-[180px]">
+                  <div className="text-[10px] truncate max-w-[140px]">
                     <span className="font-semibold text-[#111] block truncate">
                       {commentImageFile?.name || "Imagem da Web"}
                     </span>
-                    <span className="text-[#8e8e93]">Anexo pronto a enviar</span>
+                    <span className="text-[#8e8e93]">Pronto a enviar</span>
                   </div>
                   <button
                     type="button"
                     onClick={handleClearAttachedImage}
-                    className="p-1 rounded-full text-[#8e8e93] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                    className="p-1 rounded-full text-[#8e8e93] hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer shrink-0"
                     title="Remover anexo"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3 h-3" />
                   </button>
                 </div>
               )}
 
               {/* Textarea + Submit button */}
-              <div className="flex items-end gap-2">
+              <div className="flex items-end gap-1.5 min-w-0">
                 <textarea
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
@@ -941,22 +943,23 @@ function MoodboardCard({
                       handleSubmitComment();
                     }
                   }}
-                  placeholder="Escreva uma sugestão, nota ou ideia... (Enter para enviar)"
+                  placeholder="Escreva uma sugestão ou nota..."
                   rows={2}
-                  className="flex-1 bg-white text-xs px-3 py-2 rounded-xl border border-[#d1d1d6] focus:outline-hidden focus:ring-2 focus:ring-[#007aff] resize-none"
+                  className="w-full min-w-0 flex-1 bg-white text-xs px-2.5 py-1.5 rounded-xl border border-[#d1d1d6] focus:outline-hidden focus:ring-2 focus:ring-[#007aff] resize-none"
                 />
 
                 <button
                   type="submit"
                   disabled={isSubmitting || (!commentText.trim() && !commentImageFile && !commentUrlInput.trim())}
-                  className="px-3.5 py-2 rounded-xl bg-[#007aff] hover:bg-[#0062cc] disabled:opacity-40 disabled:hover:bg-[#007aff] text-white text-xs font-bold inline-flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                  className="p-2 rounded-xl bg-[#007aff] hover:bg-[#0062cc] disabled:opacity-40 disabled:hover:bg-[#007aff] text-white transition cursor-pointer shadow-xs shrink-0 flex items-center justify-center"
+                  title="Enviar nota"
+                  aria-label="Enviar nota"
                 >
                   {isSubmitting ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Send className="w-3.5 h-3.5" />
+                    <Send className="w-4 h-4" />
                   )}
-                  <span>Enviar</span>
                 </button>
               </div>
             </form>
