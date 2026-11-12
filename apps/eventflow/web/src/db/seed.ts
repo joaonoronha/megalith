@@ -1,5 +1,5 @@
 import { db } from "./client";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import {
   users,
   clients,
@@ -11,6 +11,7 @@ import {
   quoteLines,
   financialMovements,
   quoteTemplates,
+  auditLogs,
 } from "./schema";
 
 export async function seed() {
@@ -298,7 +299,257 @@ export async function seed() {
     { id: "mov-5", type: "investimento", category: "Material / Stock", description: "Aquisição de 20x Cadeiras Chiavari", amount: 2150.00, date: new Date("2026-10-02") },
   ]).onConflictDoNothing();
 
-  console.log("✅ Seeding completed successfully!");
+  // 9. Audit Logs (Histórico inicial de alterações)
+  const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+  const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+
+  // Update initial last updated metadata
+  await db.update(events).set({
+    updatedAt: twoHoursAgo,
+    lastUpdatedByName: "Administrador CFM",
+  }).where(eq(events.id, eventWedding.id));
+
+  await db.update(events).set({
+    updatedAt: fourHoursAgo,
+    lastUpdatedByName: "Sofia Ribeiro",
+  }).where(eq(events.id, eventGala.id));
+
+  await db.update(events).set({
+    updatedAt: yesterday,
+    lastUpdatedByName: "Sofia Ribeiro",
+  }).where(eq(events.id, eventPooh.id));
+
+  await db.update(events).set({
+    updatedAt: threeDaysAgo,
+    lastUpdatedByName: "Administrador CFM",
+  }).where(eq(events.id, eventLoreal.id));
+
+  await db.update(inventoryItems).set({
+    updatedAt: twoHoursAgo,
+    lastUpdatedByName: "Sofia Ribeiro",
+  }).where(eq(inventoryItems.id, chairItem.id));
+
+  await db.update(inventoryItems).set({
+    updatedAt: yesterday,
+    lastUpdatedByName: "Administrador CFM",
+  }).where(eq(inventoryItems.id, candleItem.id));
+
+  await db.update(inventoryItems).set({
+    updatedAt: twoDaysAgo,
+    lastUpdatedByName: "João Silva",
+  }).where(eq(inventoryItems.id, tableItem.id));
+
+  await db.update(inventoryItems).set({
+    updatedAt: threeDaysAgo,
+    lastUpdatedByName: "Sofia Ribeiro",
+  }).where(eq(inventoryItems.id, glassItem.id));
+
+  await db.update(quotes).set({
+    updatedAt: yesterday,
+    lastUpdatedByName: "Administrador CFM",
+  }).where(eq(quotes.id, quote104.id));
+
+  // Seed sample audit log timeline
+  await db.insert(auditLogs).values([
+    // Casamento Marta & João
+    {
+      id: "log-w-1",
+      entityType: "event",
+      entityId: eventWedding.id,
+      action: "alterou_estado",
+      title: "Estado alterado",
+      details: 'Estado alterado para "Confirmado" após recepção e validação do sinal de adjudicação.',
+      userName: "Administrador CFM",
+      userRole: "admin",
+      createdAt: twoHoursAgo,
+    },
+    {
+      id: "log-w-2",
+      entityType: "event",
+      entityId: eventWedding.id,
+      action: "alocou_material",
+      title: "Material alocado",
+      details: "Alocadas 120x Cadeiras Chiavari Douradas e 12x Mesas Redondas 180 ao evento.",
+      userName: "Sofia Ribeiro",
+      userRole: "producer",
+      createdAt: yesterday,
+    },
+    {
+      id: "log-w-3",
+      entityType: "event",
+      entityId: eventWedding.id,
+      action: "criado",
+      title: "Evento criado",
+      details: "Evento criado com orçamento base de €7.950,00 na Quinta da Serra.",
+      userName: "Administrador CFM",
+      userRole: "admin",
+      createdAt: threeDaysAgo,
+    },
+
+    // Mastercard Gala
+    {
+      id: "log-g-1",
+      entityType: "event",
+      entityId: eventGala.id,
+      action: "alterou_estado",
+      title: "Estado alterado",
+      details: 'Estado alterado para "Preparação". Equipa técnica destacada para montagem.',
+      userName: "Sofia Ribeiro",
+      userRole: "producer",
+      createdAt: fourHoursAgo,
+    },
+    {
+      id: "log-g-2",
+      entityType: "event",
+      entityId: eventGala.id,
+      action: "tarefa",
+      title: "Tarefa concluída",
+      details: 'Tarefa "Testes de projeção e áudio para a cerimónia" validada com sucesso.',
+      userName: "Sofia Ribeiro",
+      userRole: "producer",
+      createdAt: yesterday,
+    },
+    {
+      id: "log-g-3",
+      entityType: "event",
+      entityId: eventGala.id,
+      action: "orcamento",
+      title: "Orçamento emitido",
+      details: "Orçamento ORC-2026-104 (€2.730,60) associado ao evento e enviado ao cliente.",
+      userName: "Administrador CFM",
+      userRole: "admin",
+      createdAt: twoDaysAgo,
+    },
+
+    // Winnie the Pooh
+    {
+      id: "log-p-1",
+      entityType: "event",
+      entityId: eventPooh.id,
+      action: "atualizado",
+      title: "Tema & Cores atualizados",
+      details: 'Tema definido para "Winnie the Pooh" com paleta inspirada no Bosque dos Cem Acres.',
+      userName: "Sofia Ribeiro",
+      userRole: "producer",
+      createdAt: yesterday,
+    },
+    {
+      id: "log-p-2",
+      entityType: "event",
+      entityId: eventPooh.id,
+      action: "criado",
+      title: "Evento criado",
+      details: "Festa de aniversário infantil criada para 40 convidados no Jardim das Amoreiras.",
+      userName: "Administrador CFM",
+      userRole: "admin",
+      createdAt: twoDaysAgo,
+    },
+
+    // L'Oréal Brand Dinner
+    {
+      id: "log-l-1",
+      entityType: "event",
+      entityId: eventLoreal.id,
+      action: "atualizado",
+      title: "Planeamento atualizado",
+      details: "Horário ajustado para as 19h30 no Palácio do Grilo.",
+      userName: "Administrador CFM",
+      userRole: "admin",
+      createdAt: threeDaysAgo,
+    },
+
+    // Cadeira Chiavari
+    {
+      id: "log-i-1",
+      entityType: "inventory",
+      entityId: chairItem.id,
+      action: "triagem",
+      title: "Dano registado",
+      details: "3 cadeiras retiradas temporariamente para verificação e polimento.",
+      userName: "Sofia Ribeiro",
+      userRole: "producer",
+      createdAt: twoHoursAgo,
+    },
+    {
+      id: "log-i-2",
+      entityType: "inventory",
+      entityId: chairItem.id,
+      action: "atualizado",
+      title: "Stock reforçado",
+      details: "Entrada de 20 novas unidades adquiridas. Total em armazém: 60 un.",
+      userName: "Administrador CFM",
+      userRole: "admin",
+      createdAt: threeDaysAgo,
+    },
+
+    // Vela LED
+    {
+      id: "log-i-3",
+      entityType: "inventory",
+      entityId: candleItem.id,
+      action: "alocou_material",
+      title: "Reserva de material",
+      details: "72 unidades reservadas para o evento Mastercard Gala (#evt-gala).",
+      userName: "Administrador CFM",
+      userRole: "admin",
+      createdAt: yesterday,
+    },
+
+    // Mesa Redonda 180
+    {
+      id: "log-i-4",
+      entityType: "inventory",
+      entityId: tableItem.id,
+      action: "alocou_material",
+      title: "Reserva de material",
+      details: "8 unidades reservadas para o evento Mastercard Gala (#evt-gala).",
+      userName: "João Silva",
+      userRole: "producer",
+      createdAt: twoDaysAgo,
+    },
+
+    // Copo Martini
+    {
+      id: "log-i-5",
+      entityType: "inventory",
+      entityId: glassItem.id,
+      action: "alocou_material",
+      title: "Reserva de material",
+      details: "40 unidades alocadas para o evento Aniversário Martim (#evt-pooh).",
+      userName: "Sofia Ribeiro",
+      userRole: "producer",
+      createdAt: threeDaysAgo,
+    },
+
+    // Quote ORC-2026-104
+    {
+      id: "log-q-1",
+      entityType: "quote",
+      entityId: quote104.id,
+      action: "criado",
+      title: "Orçamento emitido",
+      details: "Emitido orçamento comercial ORC-2026-104 para Mastercard Portugal no valor de €2.730,60 com link público de aprovação.",
+      userName: "Administrador CFM",
+      userRole: "admin",
+      createdAt: yesterday,
+    },
+    {
+      id: "log-q-2",
+      entityType: "quote",
+      entityId: quote104.id,
+      action: "atualizado",
+      title: "Rascunho configurado",
+      details: "Inseridas linhas de mobiliário (120 cadeiras, 12 mesas) e produção técnica.",
+      userName: "Administrador CFM",
+      userRole: "admin",
+      createdAt: twoDaysAgo,
+    },
+  ]).onConflictDoNothing();
+
+  console.log("✅ Seeding completed successfully with audit logs!");
 }
 
 if (import.meta.url.endsWith(process.argv[1])) {

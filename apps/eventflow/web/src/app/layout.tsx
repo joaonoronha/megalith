@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import TopProgressBar from "@/components/TopProgressBar";
 
 export const metadata: Metadata = {
   title: "EventFlow — CFM Eventos",
@@ -14,6 +15,7 @@ export default function RootLayout({
   return (
     <html lang="pt">
       <body className="min-h-screen bg-[#f8f8fa] text-[#111111] antialiased">
+        <TopProgressBar />
         {children}
       </body>
     </html>
