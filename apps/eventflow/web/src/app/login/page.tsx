@@ -47,7 +47,7 @@ export default function LoginPage() {
             EventFlow
           </h1>
           <p className="text-xs text-[#8e8e93] mt-0.5">
-            CFM Eventos · Plataforma de Gestão
+            CFM Events · Plataforma de Gestão
           </p>
         </div>
 
@@ -98,7 +98,7 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 pt-4 border-t border-[#ececf0] text-center text-[11px] text-[#8e8e93]">
-          Acesso restrito à equipa autorizada da CFM Eventos.
+          Acesso restrito à equipa autorizada da CFM Events.
         </div>
       </div>
     </div>

@@ -103,7 +103,7 @@ export async function getAppInitialData() {
   }
 
   const template = templateRow || {
-    companyName: "CFM EVENTOS",
+    companyName: "CFM EVENTS",
     tagline: "Produção & Decoração de Eventos",
     contactInfo: "geral@cfmeventos.pt",
     paymentTerms: "50% adjudicação · 50% desmontagem",

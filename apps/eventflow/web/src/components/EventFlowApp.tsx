@@ -519,6 +519,12 @@ export default function EventFlowApp({
     return formatted.charAt(0).toUpperCase() + formatted.slice(1) + " · valores operacionais CFM";
   }, []);
 
+  const userFirstName = useMemo(() => {
+    if (!user?.name) return "CFM Events";
+    const first = user.name.trim().split(/\s+/)[0];
+    return first || "CFM Events";
+  }, [user?.name]);
+
   // Change Event Status handler
   const handleStatusChange = async (eventId: string, newStatus: string) => {
     setActiveStatusDropdown(null);
@@ -636,7 +642,7 @@ export default function EventFlowApp({
       <header className="sticky top-0 z-30 bg-[#f5f5f7]/90 backdrop-blur-md border-b border-[#ececf0]/80">
         <div className="max-w-[940px] mx-auto px-3 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="font-extrabold text-[15px] tracking-tight text-[#111]">CFM Eventos</span>
+            <span className="font-extrabold text-[15px] tracking-tight text-[#111]">CFM Events</span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/5 text-[#636366] uppercase tracking-wider hidden xs:inline">
               EventFlow
             </span>
@@ -705,7 +711,7 @@ export default function EventFlowApp({
             {/* Header Greeting */}
             <div className="mb-4">
               <h1 className="text-[28px] sm:text-[39px] font-extrabold tracking-[-1px] sm:tracking-[-1.5px] text-[#111111] leading-tight mb-3">
-                Olá CFM Eventos.
+                Olá {userFirstName}.
               </h1>
 
               {/* Search bar matching prototype */}
@@ -3460,7 +3466,7 @@ function TriageModal({
 
         <p className="text-xs text-[#555] mb-5">
           Após verificação e reparação técnica, confirme a reintegração dos
-          artigos no stock operacional disponível da CFM Eventos.
+          artigos no stock operacional disponível da CFM Events.
         </p>
 
         <div className="space-y-2">
@@ -4169,7 +4175,7 @@ function LoginModal({
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-[17px] font-bold text-[#111111]">Iniciar Sessão</h2>
-            <p className="text-[11px] text-[#8e8e93] mt-0.5">Acesso administrativo CFM Eventos</p>
+            <p className="text-[11px] text-[#8e8e93] mt-0.5">Acesso administrativo CFM Events</p>
           </div>
           <button
             onClick={onClose}

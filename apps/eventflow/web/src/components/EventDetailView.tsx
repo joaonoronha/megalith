@@ -237,7 +237,7 @@ const MEDIA_INSPIRATION_PRESETS = [
     tag: "Resultado Real",
     title: "Foto Oficial dos Noivos na Zona de Fotos",
     url: "https://images.unsplash.com/photo-1583939003579-730e3918a45a?auto=format&fit=crop&w=1200&q=80",
-    description: "Cenografia de fundo montada pela CFM Eventos totalmente aprovada pelo cliente",
+    description: "Cenografia de fundo montada pela CFM Events totalmente aprovada pelo cliente",
   },
 ];
 
@@ -800,7 +800,7 @@ export default function EventDetailView({
   const cleanPhone = client?.phone?.replace(/\D/g, "");
   const whatsappUrl = cleanPhone
     ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(
-        `Olá ${client?.contactName || client?.name || ""}, referente ao evento "${event.name}" com a CFM Eventos:`
+        `Olá ${client?.contactName || client?.name || ""}, referente ao evento "${event.name}" com a CFM Events:`
       )}`
     : null;
 
