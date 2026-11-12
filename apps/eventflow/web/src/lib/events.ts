@@ -5,6 +5,7 @@
  * 1. Meetings (Calendly syncs, consultations, briefings) do NOT receive quotas/quotes.
  * 2. Only actual production events can get quotas/quotes.
  * 3. A quota must always be generated inside an event configuration, never outside of it.
+ * 4. Cancelled events do NOT count for the finance part (projected pipeline, margin, profit, or cash flow projections).
  */
 
 export interface EventLike {
@@ -12,6 +13,7 @@ export interface EventLike {
   name?: string | null;
   category?: string | null;
   theme?: string | null;
+  status?: string | null;
   calendlyEventUri?: string | null;
 }
 
@@ -36,4 +38,23 @@ export function isMeetingEvent(evt: EventLike | null | undefined): boolean {
 export function canEventReceiveQuote(evt: EventLike | null | undefined): boolean {
   if (!evt) return false;
   return !isMeetingEvent(evt);
+}
+
+/**
+ * Checks whether an event entity has been cancelled.
+ * Cancelled events must not count towards financial reporting, profitability, or projected cash flows.
+ */
+export function isCancelledEvent(evt: EventLike | null | undefined): boolean {
+  if (!evt) return false;
+  const status = String(evt.status || "").toLowerCase().trim();
+  return status === "cancelado" || status === "cancelada";
+}
+
+/**
+ * Validates whether an event should count in financial totals and projections.
+ * Must be a real production event (not a meeting) and not cancelled.
+ */
+export function countsForFinance(evt: EventLike | null | undefined): boolean {
+  if (!evt) return false;
+  return !isMeetingEvent(evt) && !isCancelledEvent(evt);
 }

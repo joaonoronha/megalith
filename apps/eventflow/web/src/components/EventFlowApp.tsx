@@ -43,7 +43,7 @@ import AlertsDrawerModal from "@/components/AlertsDrawerModal";
 import StorageLocationsModal, { StorageLocation } from "@/components/StorageLocationsModal";
 import FinanceView from "@/components/FinanceView";
 import { formatRelativeTime } from "@/lib/date-format";
-import { isMeetingEvent, canEventReceiveQuote } from "@/lib/events";
+import { isMeetingEvent, canEventReceiveQuote, countsForFinance, isCancelledEvent } from "@/lib/events";
 import {
   createEventAction,
   updateEventStatusAction,
@@ -704,10 +704,11 @@ export default function EventFlowApp({
 
   const resultadoLiquido = totalEntradas - totalSaidas - totalInvestido;
 
-  // Projected aggregates from pipeline events
+  // Projected aggregates from pipeline events (excluding cancelled events)
   const projectedMetrics = useMemo(() => {
-    const faturacao = eventsList.reduce((sum, e) => sum + (Number(e.customerPrice) || 0), 0);
-    const orcamentoCustos = eventsList.reduce((sum, e) => sum + (Number(e.totalBudget) || 0), 0);
+    const activeEvents = eventsList.filter((e) => countsForFinance(e));
+    const faturacao = activeEvents.reduce((sum, e) => sum + (Number(e.customerPrice) || 0), 0);
+    const orcamentoCustos = activeEvents.reduce((sum, e) => sum + (Number(e.totalBudget) || 0), 0);
     const lucroProjetado = faturacao - orcamentoCustos;
     const margemProjetada = faturacao > 0 ? ((lucroProjetado / faturacao) * 100).toFixed(1) : "0.0";
     const aReceber = Math.max(0, faturacao - totalEntradas);

@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { isMeetingEvent, canEventReceiveQuote } from "./events.js";
+import { isMeetingEvent, canEventReceiveQuote, isCancelledEvent, countsForFinance } from "./events.js";
 
 describe("CFM Events: Meeting and Quota Business Rules", () => {
   test("identifies Calendly meetings by URI", () => {
@@ -110,6 +110,77 @@ describe("CFM Events: Meeting and Quota Business Rules", () => {
     assert.equal(inPersonMeet.meetUrl, null);
     assert.ok(inPersonMeet.location && inPersonMeet.location.length > 0);
     assert.equal(inPersonMeet.eventId, "evt-wedding");
+  });
+
+  test("cancelled events do not count for the finance part", () => {
+    const activeConfirmed = {
+      id: "evt-001",
+      name: "Casamento Filipa & Rui",
+      status: "confirmado",
+      customerPrice: 8500,
+      totalBudget: 4200,
+    };
+
+    const inPrep = {
+      id: "evt-002",
+      name: "Festa Corporativa Galp",
+      status: "preparacao",
+      customerPrice: 6200,
+      totalBudget: 3100,
+    };
+
+    const cancelledEvent = {
+      id: "evt-003",
+      name: "Jantar de Gala Cancelado",
+      status: "cancelado",
+      customerPrice: 15000,
+      totalBudget: 8000,
+    };
+
+    const cancelledFem = {
+      id: "evt-004",
+      name: "Sessão Fotográfica Cancelada",
+      status: "cancelada",
+      customerPrice: 3000,
+      totalBudget: 1200,
+    };
+
+    const calendlyMeeting = {
+      id: "evt-005",
+      name: "Reunião Calendly: Miguel",
+      status: "confirmado",
+      category: "Reunião Calendly",
+      customerPrice: 0,
+      totalBudget: 0,
+    };
+
+    // 1. isCancelledEvent verification
+    assert.equal(isCancelledEvent(cancelledEvent), true);
+    assert.equal(isCancelledEvent(cancelledFem), true);
+    assert.equal(isCancelledEvent(activeConfirmed), false);
+    assert.equal(isCancelledEvent(inPrep), false);
+    assert.equal(isCancelledEvent(null), false);
+
+    // 2. countsForFinance eligibility
+    assert.equal(countsForFinance(activeConfirmed), true);
+    assert.equal(countsForFinance(inPrep), true);
+    assert.equal(countsForFinance(cancelledEvent), false, "Cancelled events must NOT count for finance");
+    assert.equal(countsForFinance(cancelledFem), false, "Cancelled events must NOT count for finance");
+    assert.equal(countsForFinance(calendlyMeeting), false, "Calendly meetings must NOT count for finance");
+
+    // 3. Financial calculations simulation
+    const allEvents = [activeConfirmed, inPrep, cancelledEvent, cancelledFem, calendlyMeeting];
+    const eligibleEvents = allEvents.filter((e) => countsForFinance(e));
+
+    const totalFaturacaoProjetada = eligibleEvents.reduce((acc, e) => acc + (e.customerPrice || 0), 0);
+    const totalCustosProjetados = eligibleEvents.reduce((acc, e) => acc + (e.totalBudget || 0), 0);
+    const totalLucroProjetado = totalFaturacaoProjetada - totalCustosProjetados;
+
+    // Should only count activeConfirmed (8500, 4200) + inPrep (6200, 3100) = 14700 billing, 7300 budget, 7400 profit
+    assert.equal(eligibleEvents.length, 2);
+    assert.equal(totalFaturacaoProjetada, 14700);
+    assert.equal(totalCustosProjetados, 7300);
+    assert.equal(totalLucroProjetado, 7400);
   });
 });
 
