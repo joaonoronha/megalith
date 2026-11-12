@@ -5,6 +5,7 @@ import {
   events,
   eventAllocations,
   eventTasks,
+  eventMedia,
   quotes,
   quoteLines,
   clients,
@@ -14,18 +15,13 @@ import {
   users,
 } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import crypto from "crypto";
 import { generateId, generateReferenceCode, formatCustomId } from "@/lib/id";
 import { recordAuditLog, getAuditLogsForEntity, getRecentAuditLogs } from "@/lib/audit";
 
 function invalidateAllCaches() {
-  try {
-    revalidateTag("app-data");
-  } catch {
-    // ignore outside request context
-  }
   revalidatePath("/");
 }
 
@@ -791,7 +787,63 @@ export async function getAuditLogsAction(entityType: "event" | "inventory" | "qu
   return await getAuditLogsForEntity(entityType, entityId);
 }
 
-export async function getRecentAuditLogsAction(limit: number = 25) {
-  return await getRecentAuditLogs(limit);
+// 19. Event Media: Idea Boards & Final Outcomes
+export async function addEventMediaAction(formData: FormData) {
+  const eventId = formData.get("eventId") as string;
+  const type = (formData.get("type") as "idea_board" | "final_outcome") || "idea_board";
+  const title = (formData.get("title") as string)?.trim() || (type === "idea_board" ? "Nova Ideia / Conceito" : "Foto Real do Evento");
+  const description = (formData.get("description") as string)?.trim() || "";
+  const imageUrl = (formData.get("imageUrl") as string)?.trim();
+  const tag = (formData.get("tag") as string)?.trim() || "Geral";
+
+  if (!eventId || !imageUrl) {
+    throw new Error("ID do evento e URL da imagem são obrigatórios.");
+  }
+
+  const id = generateId("med");
+  const newMedia = {
+    id,
+    eventId,
+    type,
+    title,
+    description: description || null,
+    imageUrl,
+    tag: tag || null,
+    orderIndex: Date.now(),
+    uploadedByName: "Administrador CFM",
+    createdAt: new Date(),
+  };
+
+  await db.insert(eventMedia).values(newMedia);
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: type === "idea_board" ? "painel_ideias" : "resultado_final",
+    title: type === "idea_board" ? "Imagem adicionada ao Moodboard" : "Foto real adicionada ao resultado",
+    details: `${title} (${tag})`,
+  });
+
+  invalidateAllCaches();
+  revalidatePath(`/eventos/${eventId}`);
+  revalidatePath(`/events/${eventId}`);
+  return { success: true, media: newMedia };
+}
+
+export async function deleteEventMediaAction(mediaId: string, eventId: string) {
+  await db.delete(eventMedia).where(eq(eventMedia.id, mediaId));
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "removeu_media",
+    title: "Imagem removida da galeria",
+    details: `Imagem #${mediaId} eliminada do evento`,
+  });
+
+  invalidateAllCaches();
+  revalidatePath(`/eventos/${eventId}`);
+  revalidatePath(`/events/${eventId}`);
+  return { success: true };
 }
 

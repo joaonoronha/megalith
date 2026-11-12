@@ -32,6 +32,9 @@ import {
   Camera,
   Minus,
   History,
+  Image as ImageIcon,
+  Lightbulb,
+  ZoomIn,
 } from "lucide-react";
 import AuditLogModal from "@/components/AuditLogModal";
 import { formatRelativeTime } from "@/lib/date-format";
@@ -45,6 +48,8 @@ import {
   addEventTaskAction,
   toggleEventTaskAction,
   deleteEventTaskAction,
+  addEventMediaAction,
+  deleteEventMediaAction,
 } from "@/app/actions";
 
 interface Client {
@@ -136,6 +141,19 @@ interface EventData {
   lastUpdatedByName?: string | null;
 }
 
+export interface EventMediaItem {
+  id: string;
+  eventId: string;
+  type: "idea_board" | "final_outcome";
+  title: string;
+  description: string | null;
+  imageUrl: string;
+  tag: string | null;
+  orderIndex: number | null;
+  uploadedByName: string | null;
+  createdAt: Date | string | null;
+}
+
 interface Props {
   event: EventData;
   client: Client | null;
@@ -143,9 +161,69 @@ interface Props {
   allItems: InventoryItem[];
   initialAllocations: Allocation[];
   initialTasks: Task[];
+  initialMedia?: EventMediaItem[];
   quotes: Quote[];
   currentUser: any;
 }
+
+const MEDIA_INSPIRATION_PRESETS = [
+  {
+    type: "idea_board" as const,
+    tag: "Flores & Centros",
+    title: "Centros de Mesa em Terracotta & Eucalipto",
+    url: "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80",
+    description: "Arranjos orgânicos baixos com folhagens secas, rosas e apontamentos rústicos",
+  },
+  {
+    type: "idea_board" as const,
+    tag: "Iluminação & Ambiente",
+    title: "Varal de Micro-Lâmpadas Fairy Lights",
+    url: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1200&q=80",
+    description: "Céu estrelado sobre a zona de refeições e mesas compridas",
+  },
+  {
+    type: "idea_board" as const,
+    tag: "Cerimónia & Altar",
+    title: "Arco Floral Circular Boho Minimal",
+    url: "https://images.unsplash.com/photo-1520854221256-17451cc331bf?auto=format&fit=crop&w=1200&q=80",
+    description: "Estrutura metálica dourada com pampas grass e hortênsias brancas",
+  },
+  {
+    type: "idea_board" as const,
+    tag: "Lounge & Mobiliário",
+    title: "Zona Lounge Rústica com Sofás Chesterfield",
+    url: "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=1200&q=80",
+    description: "Conjunto exterior para convidados com tapetes persas e mesas de apoio em madeira",
+  },
+  {
+    type: "final_outcome" as const,
+    tag: "Resultado Real",
+    title: "Execução Final das Mesas dos Convidados",
+    url: "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?auto=format&fit=crop&w=1200&q=80",
+    description: "Fotografia tirada 30 min antes da abertura de portas aos convidados na Quinta",
+  },
+  {
+    type: "final_outcome" as const,
+    tag: "Resultado Real",
+    title: "Zona de Cocktail e Iluminação Noturna Ativa",
+    url: "https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=1200&q=80",
+    description: "Ambiente com velas acesas e luz quente na receção",
+  },
+  {
+    type: "idea_board" as const,
+    tag: "Bolo & Doces",
+    title: "Candy Bar e Mesa de Sobremesas Temática",
+    url: "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=1200&q=80",
+    description: "Mesa rústica de madeira com doces finos, lettering e apontamentos temáticos",
+  },
+  {
+    type: "final_outcome" as const,
+    tag: "Resultado Real",
+    title: "Foto Oficial dos Noivos na Zona de Fotos",
+    url: "https://images.unsplash.com/photo-1583939003579-730e3918a45a?auto=format&fit=crop&w=1200&q=80",
+    description: "Cenografia de fundo montada pela CFM Eventos totalmente aprovada pelo cliente",
+  },
+];
 
 const PRESET_PALETTES = [
   {
@@ -194,6 +272,7 @@ export default function EventDetailView({
   allItems,
   initialAllocations,
   initialTasks,
+  initialMedia = [],
   quotes,
   currentUser,
 }: Props) {
@@ -203,6 +282,19 @@ export default function EventDetailView({
   const [client, setClient] = useState(initialClient);
   const [allocations, setAllocations] = useState(initialAllocations);
   const [tasks, setTasks] = useState(initialTasks);
+
+  // Media state: Idea Boards & Final Outcomes
+  const [mediaList, setMediaList] = useState<EventMediaItem[]>(initialMedia || []);
+  const [mediaFilter, setMediaFilter] = useState<"all" | "idea_board" | "final_outcome">("all");
+  const [lightboxItem, setLightboxItem] = useState<EventMediaItem | null>(null);
+  const [showAddMediaModal, setShowAddMediaModal] = useState(false);
+
+  // New media modal form state
+  const [newMediaType, setNewMediaType] = useState<"idea_board" | "final_outcome">("idea_board");
+  const [newMediaTitle, setNewMediaTitle] = useState("");
+  const [newMediaTag, setNewMediaTag] = useState("Flores & Centros");
+  const [newMediaUrl, setNewMediaUrl] = useState("");
+  const [newMediaDescription, setNewMediaDescription] = useState("");
 
   // Auto-save status: "saved" | "saving" | "error"
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");

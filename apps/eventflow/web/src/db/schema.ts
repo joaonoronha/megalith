@@ -86,6 +86,20 @@ export const eventTasks = sqliteTable("event_tasks", {
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
 });
 
+// 4.2 Event Media: Idea Boards & Final Outcomes (Before/After & Execution Photos)
+export const eventMedia = sqliteTable("event_media", {
+  id: text("id").primaryKey(),
+  eventId: text("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  type: text("type", { enum: ["idea_board", "final_outcome"] }).notNull(), // 'idea_board' | 'final_outcome'
+  title: text("title").notNull(),
+  description: text("description"),
+  imageUrl: text("image_url").notNull(),
+  tag: text("tag"), // e.g. "Mesa de Honra", "Iluminação", "Flores", "Mobiliário", "Lounge"
+  orderIndex: integer("order_index").default(0),
+  uploadedByName: text("uploaded_by_name").default("Administrador CFM"),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+});
+
 // 5. Temporal Stock Reservations (Prevents Double-Booking)
 export const eventAllocations = sqliteTable("event_allocations", {
   id: text("id").primaryKey(),

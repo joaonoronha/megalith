@@ -12,6 +12,7 @@ export type EntityPrefix =
   | "tsk"  // Event Tasks / Checklist
   | "doc"  // Documents
   | "tpl"  // Templates
+  | "med"  // Media items / Photos
   | "log"; // Audit Logs
 
 /**
