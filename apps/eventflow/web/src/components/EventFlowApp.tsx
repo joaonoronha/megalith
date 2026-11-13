@@ -2891,114 +2891,70 @@ export default function EventFlowApp({
                     <div
                       key={item.id}
                       onClick={() => router.push(`/inventario/${item.id}`)}
-                      className="p-4 lg:px-5 lg:py-3.5 hover:bg-[#fafafa] transition flex flex-col lg:grid lg:grid-cols-12 lg:items-center gap-3 cursor-pointer group"
+                      className="hover:bg-[#fafafa] transition cursor-pointer group"
                     >
-                      {/* Column 1: Item Thumbnail & Name */}
-                      <div className="lg:col-span-4 flex items-center gap-3">
-                        <div className="shrink-0 relative">
-                          {item.imageUrl ? (
-                            <img
-                              src={item.imageUrl}
-                              alt={item.name}
-                              className="w-12 h-12 rounded-[12px] object-cover border border-[#ececf0] group-hover:scale-105 transition"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-[12px] bg-[#f2f2f5] border border-[#ececf0] flex items-center justify-center text-[#8e8e93] group-hover:scale-105 transition">
-                              <Package className="w-5 h-5" />
+                      {/* MOBILE ROW (< lg): Slim & Compact with Just Icons */}
+                      <div className="lg:hidden p-3 flex items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="shrink-0 relative">
+                            {item.imageUrl ? (
+                              <img
+                                src={item.imageUrl}
+                                alt={item.name}
+                                className="w-11 h-11 rounded-[10px] object-cover border border-[#ececf0] group-hover:scale-105 transition"
+                              />
+                            ) : (
+                              <div className="w-11 h-11 rounded-[10px] bg-[#f2f2f5] border border-[#ececf0] flex items-center justify-center text-[#8e8e93]">
+                                <Package className="w-5 h-5" />
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-[13px] text-[#111] group-hover:text-[#007aff] transition truncate leading-snug" title={item.name}>
+                              {item.name}
                             </div>
-                          )}
-                        </div>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="font-bold text-sm text-[#111] group-hover:text-[#007aff] transition line-clamp-1" title={item.name}>
-                            {item.name}
+                            <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[11px] text-[#8e8e93]">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#f2f2f5] text-[#3a3a3c]">
+                                {item.category || "Geral"}
+                              </span>
+                              <span>·</span>
+                              <span className="inline-flex items-center gap-0.5 text-[#636366] truncate max-w-[110px]">
+                                <MapPin className="w-2.5 h-2.5 text-[#007aff] shrink-0" />
+                                <span className="truncate">{item.warehouseLocation || "Armazém Principal"}</span>
+                              </span>
+                              <span>·</span>
+                              <span className="text-xs font-bold text-[#111]">
+                                €{(item.replacementCost || item.unitPrice || 0).toFixed(2)}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Column 2: Category */}
-                      <div className="lg:col-span-2 flex lg:block items-center justify-between text-xs">
-                        <span className="lg:hidden text-[#8e8e93] font-medium">Categoria:</span>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#f2f2f5] text-[#3a3a3c]">
-                          {item.category || "Geral"}
-                        </span>
-                      </div>
-
-                      {/* Column 3: Warehouse Location */}
-                      <div className="lg:col-span-2 flex lg:block items-center justify-between text-xs">
-                        <span className="lg:hidden text-[#8e8e93] font-medium">Localização:</span>
-                        <div className="inline-flex items-center gap-1.5 text-xs text-[#3a3a3c]">
-                          <MapPin className="w-3.5 h-3.5 text-[#007aff] shrink-0" />
-                          <span className="truncate max-w-[170px] font-medium">
-                            {item.warehouseLocation || "Armazém Principal"}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Column 4: Stock */}
-                      <div className="lg:col-span-2 flex lg:block items-center justify-between text-xs">
-                        <span className="lg:hidden text-[#8e8e93] font-medium">Stock:</span>
-                        <div
-                          className={`font-bold text-sm ${
-                            damaged > 0
-                              ? "text-rose-600"
-                              : isLow
-                              ? "text-amber-600"
-                              : "text-emerald-600"
-                          }`}
-                        >
-                          {available} un.
-                        </div>
-                      </div>
-
-                      {/* Column 5: Price */}
-                      <div className="lg:col-span-2 flex items-center justify-between lg:justify-end gap-3 pt-2 lg:pt-0 border-t lg:border-t-0 border-[#ececf0]/70">
-                        <div className="text-left lg:text-right">
-                          <div className="text-xs font-bold text-[#111]">
-                            €{(item.replacementCost || item.unitPrice || 0).toFixed(2)}
+                        {/* Right side: Stock badge + Icon-only action buttons */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <div
+                            className={`font-bold text-[11px] px-2 py-0.5 rounded-full border ${
+                              damaged > 0
+                                ? "bg-rose-50 text-rose-700 border-rose-200/60"
+                                : isLow
+                                ? "bg-amber-50 text-amber-700 border-amber-200/60"
+                                : "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                            }`}
+                          >
+                            {available} un.
                           </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAuditModal({
-                                isOpen: true,
-                                entityType: "inventory",
-                                entityId: item.id,
-                                entityTitle: item.name,
-                              });
-                            }}
-                            className="inline-flex items-center gap-1 text-[10px] text-[#007aff] hover:underline cursor-pointer"
-                            title="Ver histórico de alterações"
-                          >
-                            <History className="w-3 h-3" />
-                            <span>Histórico</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteItemClick(item);
-                            }}
-                            className="inline-flex items-center gap-1 text-[10px] text-rose-600 hover:text-rose-800 hover:underline cursor-pointer ml-2"
-                            title="Eliminar este artigo do inventário"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            <span>Eliminar</span>
-                          </button>
-                        </div>
 
-                        {(item.purchaseStatus === "not_bought" || damaged > 0) && (
-                          <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
                             {item.purchaseStatus === "not_bought" && (
                               <button
                                 type="button"
                                 onClick={() => handleMarkAsBought(item)}
-                                className="px-2.5 py-1.5 rounded-[10px] bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                                title="Marcar como Comprado e lançar despesa em Finanças"
+                                className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition flex items-center justify-center cursor-pointer shadow-2xs"
+                                title="Marcar como Comprado"
                               >
-                                <Check className="w-3 h-3" />
-                                <span>Comprar</span>
+                                <Check className="w-3.5 h-3.5" />
                               </button>
                             )}
 
@@ -3009,14 +2965,167 @@ export default function EventFlowApp({
                                   setTriageItem(item);
                                   setShowTriageModal(true);
                                 }}
-                                className="px-2.5 py-1.5 rounded-[10px] bg-[#111] hover:bg-black text-white text-[11px] font-semibold transition cursor-pointer"
-                                title="Fazer triagem do material danificado"
+                                className="p-1.5 rounded-lg bg-[#111] hover:bg-black text-white transition flex items-center justify-center cursor-pointer shadow-2xs"
+                                title="Triagem de material danificado"
                               >
-                                Triagem
+                                <Wrench className="w-3.5 h-3.5" />
                               </button>
                             )}
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAuditModal({
+                                  isOpen: true,
+                                  entityType: "inventory",
+                                  entityId: item.id,
+                                  entityTitle: item.name,
+                                });
+                              }}
+                              className="p-1.5 rounded-lg text-[#8e8e93] hover:text-[#007aff] hover:bg-[#f2f2f5] active:bg-[#e5e5ea] transition cursor-pointer"
+                              title="Histórico de alterações"
+                            >
+                              <History className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteItemClick(item)}
+                              className="p-1.5 rounded-lg text-[#8e8e93] hover:text-rose-600 hover:bg-rose-50 active:bg-rose-100 transition cursor-pointer"
+                              title="Eliminar este artigo do inventário"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
-                        )}
+                        </div>
+                      </div>
+
+                      {/* DESKTOP ROW (hidden lg:grid) */}
+                      <div className="hidden lg:grid grid-cols-12 items-center gap-3 px-5 py-3.5">
+                        {/* Column 1: Item Thumbnail & Name */}
+                        <div className="col-span-4 flex items-center gap-3">
+                          <div className="shrink-0 relative">
+                            {item.imageUrl ? (
+                              <img
+                                src={item.imageUrl}
+                                alt={item.name}
+                                className="w-12 h-12 rounded-[12px] object-cover border border-[#ececf0] group-hover:scale-105 transition"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-[12px] bg-[#f2f2f5] border border-[#ececf0] flex items-center justify-center text-[#8e8e93] group-hover:scale-105 transition">
+                                <Package className="w-5 h-5" />
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-sm text-[#111] group-hover:text-[#007aff] transition line-clamp-1" title={item.name}>
+                              {item.name}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Column 2: Category */}
+                        <div className="col-span-2 text-xs">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#f2f2f5] text-[#3a3a3c]">
+                            {item.category || "Geral"}
+                          </span>
+                        </div>
+
+                        {/* Column 3: Warehouse Location */}
+                        <div className="col-span-2 text-xs">
+                          <div className="inline-flex items-center gap-1.5 text-xs text-[#3a3a3c]">
+                            <MapPin className="w-3.5 h-3.5 text-[#007aff] shrink-0" />
+                            <span className="truncate max-w-[170px] font-medium">
+                              {item.warehouseLocation || "Armazém Principal"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Column 4: Stock */}
+                        <div className="col-span-2 text-xs">
+                          <div
+                            className={`font-bold text-sm ${
+                              damaged > 0
+                                ? "text-rose-600"
+                                : isLow
+                                ? "text-amber-600"
+                                : "text-emerald-600"
+                            }`}
+                          >
+                            {available} un.
+                          </div>
+                        </div>
+
+                        {/* Column 5: Price */}
+                        <div className="col-span-2 flex items-center justify-end gap-3">
+                          <div className="text-right">
+                            <div className="text-xs font-bold text-[#111]">
+                              €{(item.replacementCost || item.unitPrice || 0).toFixed(2)}
+                            </div>
+                            <div className="flex items-center justify-end gap-2 mt-0.5">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAuditModal({
+                                    isOpen: true,
+                                    entityType: "inventory",
+                                    entityId: item.id,
+                                    entityTitle: item.name,
+                                  });
+                                }}
+                                className="inline-flex items-center gap-1 text-[10px] text-[#007aff] hover:underline cursor-pointer"
+                                title="Ver histórico de alterações"
+                              >
+                                <History className="w-3 h-3" />
+                                <span>Histórico</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteItemClick(item);
+                                }}
+                                className="inline-flex items-center gap-1 text-[10px] text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+                                title="Eliminar este artigo do inventário"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Eliminar</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {(item.purchaseStatus === "not_bought" || damaged > 0) && (
+                            <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                              {item.purchaseStatus === "not_bought" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkAsBought(item)}
+                                  className="px-2.5 py-1.5 rounded-[10px] bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                                  title="Marcar como Comprado e lançar despesa em Finanças"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  <span>Comprar</span>
+                                </button>
+                              )}
+
+                              {damaged > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setTriageItem(item);
+                                    setShowTriageModal(true);
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-[10px] bg-[#111] hover:bg-black text-white text-[11px] font-semibold transition cursor-pointer"
+                                  title="Fazer triagem do material danificado"
+                                >
+                                  Triagem
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
