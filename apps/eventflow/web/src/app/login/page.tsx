@@ -40,13 +40,13 @@ export default function LoginPage() {
       <div className="w-full max-w-sm bg-white border border-[#ececf0] rounded-[24px] p-8 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
         {/* Brand / Logo */}
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="w-16 h-16 rounded-[20px] bg-black p-1.5 flex items-center justify-center mb-3 shadow-sm overflow-hidden border border-black/10">
+          <div className="w-16 h-16 rounded-[18px] overflow-hidden mb-3 shadow-xs">
             <img
               src="/cfm-logo.png"
               alt="CFM Events"
               width={64}
               height={64}
-              className="w-full h-full object-contain rounded-[14px]"
+              className="w-full h-full object-cover"
             />
           </div>
           <h1 className="text-[22px] font-extrabold tracking-tight text-[#111111]">
