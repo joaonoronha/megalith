@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useTransition, useMemo } from "react";
+import React, { useState, useEffect, useTransition, useMemo, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -4365,6 +4365,10 @@ function ItemWizardModal({
   const [totalQuantity, setTotalQuantity] = useState("50");
   const [minStock, setMinStock] = useState("10");
   const [purchasePrice, setPurchasePrice] = useState("45.00");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const photoCameraInputRef = useRef<HTMLInputElement | null>(null);
+  const photoFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Location State (Only existing locations)
   const defaultLoc = locations[0];
@@ -4374,6 +4378,29 @@ function ItemWizardModal({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await uploadItemPhotoAction(fd);
+      if (res.success && res.url) {
+        setImageUrl(res.url);
+      } else {
+        setError(res.error || "Não foi possível carregar a fotografia.");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Erro ao processar fotografia.");
+    } finally {
+      setIsUploadingPhoto(false);
+      e.target.value = "";
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4409,6 +4436,9 @@ function ItemWizardModal({
       formData.set("purchaseStatus", "bought");
       formData.set("isConsumable", "false");
       formData.set("packageUnits", "1");
+      if (imageUrl) {
+        formData.set("imageUrl", imageUrl);
+      }
 
       const matched = locations.find((l) => l.id === selectedLocationId);
       const chosenLocationId = matched ? matched.id : defaultLoc?.id || null;
@@ -4461,6 +4491,83 @@ function ItemWizardModal({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
+          {/* Opção de Fotografia do Artigo */}
+          <div className="p-3 rounded-[14px] bg-[#fafafc] border border-[#ececf0] space-y-2">
+            <input
+              ref={photoCameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handlePhotoUpload}
+            />
+            <input
+              ref={photoFileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoUpload}
+            />
+
+            <div className="flex items-center justify-between">
+              <label className="font-bold text-[#3a3a3c] flex items-center gap-1.5">
+                <Camera className="w-3.5 h-3.5 text-[#007aff]" />
+                <span>Fotografia do Artigo (Opcional)</span>
+              </label>
+              {isUploadingPhoto && (
+                <span className="text-[11px] text-[#007aff] font-semibold flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>A processar foto...</span>
+                </span>
+              )}
+            </div>
+
+            {imageUrl ? (
+              <div className="flex items-center gap-3 p-2 bg-white border border-[#ececf0] rounded-[12px]">
+                <img
+                  src={imageUrl}
+                  alt="Foto do Artigo"
+                  className="w-14 h-14 rounded-[10px] object-cover bg-[#f2f2f5] border border-[#ececf0] shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] uppercase font-bold text-emerald-600 block">
+                    Fotografia Anexada
+                  </span>
+                  <p className="font-medium text-xs text-[#111] truncate">{name || "Novo Artigo"}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setImageUrl(null)}
+                  className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-600 transition cursor-pointer"
+                  title="Remover foto"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => photoCameraInputRef.current?.click()}
+                  disabled={isUploadingPhoto}
+                  className="p-2.5 rounded-[12px] border border-dashed border-[#c6c6c8] hover:border-[#007aff] bg-white text-[#111] hover:text-[#007aff] flex items-center justify-center gap-1.5 text-xs font-semibold transition cursor-pointer"
+                >
+                  <Camera className="w-4 h-4 text-[#007aff]" />
+                  <span>Tirar Foto</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => photoFileInputRef.current?.click()}
+                  disabled={isUploadingPhoto}
+                  className="p-2.5 rounded-[12px] border border-dashed border-[#c6c6c8] hover:border-[#007aff] bg-white text-[#111] hover:text-[#007aff] flex items-center justify-center gap-1.5 text-xs font-semibold transition cursor-pointer"
+                >
+                  <Upload className="w-4 h-4 text-[#636366]" />
+                  <span>Carregar Imagem</span>
+                </button>
+              </div>
+            )}
+          </div>
+
           <div>
             <label className="block font-bold text-[#3a3a3c] mb-1">Nome do Artigo *</label>
             <input
