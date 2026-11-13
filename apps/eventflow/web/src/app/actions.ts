@@ -958,8 +958,10 @@ export async function uploadUserProfilePictureAction(formData: FormData) {
     }
 
     const targetUserId = (formData.get("userId") as string) || currentUser.id;
-    if (targetUserId !== currentUser.id && currentUser.role !== "admin") {
-      return { success: false, error: "Apenas administradores podem alterar a fotografia de outros membros." };
+    const isSelf = targetUserId === currentUser.id;
+    const isOwner = currentUser.role === "owner";
+    if (!isSelf && !isOwner) {
+      return { success: false, error: "Apenas o Proprietário (Owner) pode alterar a fotografia de outros membros." };
     }
 
     const file = formData.get("file") as File;
@@ -1055,8 +1057,10 @@ export async function removeUserProfilePictureAction(userId?: string) {
     }
 
     const targetUserId = userId || currentUser.id;
-    if (targetUserId !== currentUser.id && currentUser.role !== "admin") {
-      return { success: false, error: "Apenas administradores podem remover a fotografia de outros membros." };
+    const isSelf = targetUserId === currentUser.id;
+    const isOwner = currentUser.role === "owner";
+    if (!isSelf && !isOwner) {
+      return { success: false, error: "Apenas o Proprietário (Owner) pode remover a fotografia de outros membros." };
     }
 
     await db.update(users).set({ avatarUrl: null }).where(eq(users.id, targetUserId));
@@ -1168,14 +1172,14 @@ export async function logoutAction() {
 export async function createUserAction(formData: FormData) {
   const { getCurrentUser, createTeamUser } = await import("@/lib/auth");
   const currentUser = await getCurrentUser();
-  if (!currentUser || currentUser.role !== "admin") {
-    return { success: false, error: "Apenas o Administrador pode criar novas contas de utilizador." };
+  if (!currentUser || currentUser.role !== "owner") {
+    return { success: false, error: "Apenas o Proprietário (Owner) pode criar novas contas de equipa." };
   }
 
   const name = formData.get("name") as string;
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
-  const role = (formData.get("role") as any) || "admin";
+  const role = (formData.get("role") as any) || "producer";
   const customId = (formData.get("customId") as string) || undefined;
 
   if (!name || !email || !password) {
@@ -1200,18 +1204,26 @@ export async function createUserAction(formData: FormData) {
 export async function updateUserAction(formData: FormData) {
   const { getCurrentUser } = await import("@/lib/auth");
   const currentUser = await getCurrentUser();
-  if (!currentUser || currentUser.role !== "admin") {
-    return { success: false, error: "Apenas o Administrador pode editar contas de utilizador." };
+  if (!currentUser) {
+    return { success: false, error: "Não tem sessão iniciada." };
   }
 
   const userId = formData.get("userId") as string;
   const name = (formData.get("name") as string)?.trim();
   const email = (formData.get("email") as string)?.toLowerCase().trim();
   const password = formData.get("password") as string;
-  const role = formData.get("role") as "admin" | "producer" | "warehouse";
+  const requestedRole = formData.get("role") as "owner" | "admin" | "producer" | "warehouse";
 
   if (!userId || !name) {
     return { success: false, error: "ID e Nome são obrigatórios." };
+  }
+
+  const isSelf = currentUser.id === userId;
+  const isOwner = currentUser.role === "owner";
+
+  // Admins can only edit themselves and cannot edit other users' information
+  if (!isOwner && !isSelf) {
+    return { success: false, error: "Apenas o Proprietário (Owner) pode editar informações de outros utilizadores." };
   }
 
   const oldUser = await db.query.users.findFirst({
@@ -1223,9 +1235,17 @@ export async function updateUserAction(formData: FormData) {
 
   const oldName = oldUser.name;
 
+  // Role permissions:
+  // Only the Owner can change permissions/roles (including assigning or removing admin/owner permissions).
+  // Non-owners (admins, producers, warehouse) editing their own profile cannot change their role.
+  let finalRole = oldUser.role;
+  if (isOwner && requestedRole) {
+    finalRole = requestedRole;
+  }
+
   const updatePayload: Record<string, any> = {
     name,
-    role: role || "admin",
+    role: finalRole,
   };
 
   if (email) {
@@ -1271,7 +1291,8 @@ export async function updateUserAction(formData: FormData) {
       userId,
       email: updatePayload.email || oldUser.email,
       name,
-      role: (updatePayload.role || oldUser.role) as "admin" | "producer" | "warehouse",
+      role: (updatePayload.role || oldUser.role) as any,
+      avatarUrl: oldUser.avatarUrl || null,
       expiresAt,
     });
     const cookieStore = await cookies();
@@ -1289,7 +1310,7 @@ export async function updateUserAction(formData: FormData) {
     entityId: userId,
     action: "editado",
     title: "Utilizador atualizado",
-    details: `Conta ${name} (${role || "admin"}) atualizada por ${currentUser.name}`,
+    details: `Conta ${name} (${updatePayload.role || oldUser.role}) atualizada por ${currentUser.name}`,
   });
 
   invalidateAllCaches();
@@ -1315,7 +1336,8 @@ export async function updateUserAction(formData: FormData) {
       id: userId,
       name,
       email: updatePayload.email || oldUser.email,
-      role: (updatePayload.role || oldUser.role) as "admin" | "producer" | "warehouse",
+      role: (updatePayload.role || oldUser.role) as any,
+      avatarUrl: oldUser.avatarUrl || null,
     },
     isCurrentUser,
   };

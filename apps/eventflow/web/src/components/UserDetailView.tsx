@@ -35,7 +35,7 @@ interface TeamUser {
   id: string;
   name: string;
   email: string;
-  role: "admin" | "producer" | "warehouse";
+  role: "owner" | "admin" | "producer" | "warehouse";
   avatarUrl?: string | null;
   createdAt: Date;
 }
@@ -84,7 +84,10 @@ export default function UserDetailView({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
-  const canChangePhoto = canEdit || currentUserState?.id === user.id;
+  const isOwner = currentUserState?.role === "owner";
+  const isSelf = currentUserState?.id === user.id;
+  const canEditAccount = isOwner || isSelf;
+  const canChangePhoto = isOwner || isSelf;
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -178,9 +181,14 @@ export default function UserDetailView({
 
   const getRoleBadge = (role: string) => {
     switch (role) {
+      case "owner":
+        return {
+          label: "Proprietário (Owner)",
+          bg: "bg-[#f5f3ff] text-[#6d28d9] border-[#ddd6fe]",
+        };
       case "admin":
         return {
-          label: "Administrador (Total)",
+          label: "Administrador",
           bg: "bg-[#eaf8ee] text-[#24793a] border-[#cbeed4]",
         };
       case "producer":
@@ -248,14 +256,14 @@ export default function UserDetailView({
               </div>
             )}
 
-            {canEdit && (
+            {canEditAccount && (
               <button
                 onClick={() => setShowEditModal(true)}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#111] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] p-1.5 sm:px-3.5 sm:py-1.5 rounded-[12px] shadow-2xs transition cursor-pointer flex-shrink-0"
-                title="Editar Conta"
+                title={isSelf ? "Editar o meu perfil" : "Editar Conta"}
               >
                 <Edit3 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Editar Conta</span>
+                <span className="hidden sm:inline">{isSelf ? "Editar o meu perfil" : "Editar Conta"}</span>
               </button>
             )}
           </div>
@@ -604,6 +612,8 @@ export default function UserDetailView({
       {showEditModal && (
         <EditUserModal
           user={user}
+          isOwner={isOwner}
+          isSelf={isSelf}
           onClose={() => setShowEditModal(false)}
           onSuccess={(updated) => {
             setUser((prev) => ({ ...prev, ...updated }));
@@ -626,19 +636,30 @@ export default function UserDetailView({
   );
 }
 
+const roleDescriptions: Record<string, string> = {
+  owner: "Proprietário (Owner)",
+  admin: "Administrador",
+  producer: "Gestor / Produtor de Eventos",
+  warehouse: "Armazém / Logística",
+};
+
 function EditUserModal({
   user,
+  isOwner,
+  isSelf,
   onClose,
   onSuccess,
 }: {
   user: TeamUser;
+  isOwner: boolean;
+  isSelf: boolean;
   onClose: () => void;
   onSuccess: (updated: Partial<TeamUser>) => void;
 }) {
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"admin" | "producer" | "warehouse">(user.role);
+  const [role, setRole] = useState<TeamUser["role"]>(user.role);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -653,11 +674,13 @@ function EditUserModal({
       formData.set("name", name);
       formData.set("email", email);
       if (password.trim()) formData.set("password", password.trim());
-      formData.set("role", role);
+      if (isOwner) {
+        formData.set("role", role);
+      }
 
       const res = await updateUserAction(formData);
       if (res.success) {
-        onSuccess((res as any).user || { name, email, role });
+        onSuccess((res as any).user || { name, email, ...(isOwner ? { role } : {}) });
       } else {
         setError(res.error || "Erro ao atualizar utilizador.");
       }
@@ -673,7 +696,9 @@ function EditUserModal({
       <div className="bg-white rounded-[22px] w-full max-w-sm border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-base font-bold text-[#111]">Editar Conta de Equipa</h3>
+            <h3 className="text-base font-bold text-[#111]">
+              {isSelf ? "Editar O Meu Perfil" : "Editar Conta de Membro"}
+            </h3>
           </div>
           <button
             onClick={onClose}
@@ -739,17 +764,25 @@ function EditUserModal({
           </div>
 
           <div>
-            <label className="block font-bold text-[#3a3a3c] mb-1">Nível de Acesso *</label>
-            <select
-              name="role"
-              value={role}
-              onChange={(e) => setRole(e.target.value as "admin" | "producer" | "warehouse")}
-              className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px] text-xs"
-            >
-              <option value="admin">Administrador (Total)</option>
-              <option value="producer">Gestor / Produtor de Eventos</option>
-              <option value="warehouse">Armazém / Logística</option>
-            </select>
+            <label className="block font-bold text-[#3a3a3c] mb-1">Nível de Acesso</label>
+            {isOwner ? (
+              <select
+                name="role"
+                value={role}
+                onChange={(e) => setRole(e.target.value as TeamUser["role"])}
+                className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px] text-xs font-medium"
+              >
+                <option value="owner">Proprietário (Acesso Total & Gestão de Utilizadores)</option>
+                <option value="admin">Administrador (Negócio, Eventos & Inventário)</option>
+                <option value="producer">Gestor / Produtor de Eventos</option>
+                <option value="warehouse">Armazém / Logística</option>
+              </select>
+            ) : (
+              <div className="w-full px-3 py-2 bg-[#f2f2f7] text-[#636366] border border-[#ececf0] rounded-[10px] text-xs flex items-center justify-between">
+                <span className="font-semibold">{roleDescriptions[user.role] || user.role}</span>
+                <span className="text-[10px] text-[#8e8e93] italic">Apenas o Proprietário pode alterar</span>
+              </div>
+            )}
           </div>
 
           <div className="pt-3 border-t border-[#ececf0] flex items-center justify-end gap-2">

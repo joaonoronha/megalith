@@ -219,6 +219,21 @@ export async function ensureDbMigrated(): Promise<void> {
     } catch (e) {
       // Ignore if columns missing or already migrated
     }
+
+    // 10. Ensure at least one Owner exists (promote the first admin if no owner exists yet)
+    try {
+      const ownerCheck = await client.execute("SELECT id FROM users WHERE role = 'owner' LIMIT 1");
+      if (!ownerCheck.rows || ownerCheck.rows.length === 0) {
+        await client.execute(`
+          UPDATE users
+          SET role = 'owner'
+          WHERE id = (SELECT id FROM users WHERE role = 'admin' ORDER BY created_at ASC LIMIT 1)
+        `);
+      }
+    } catch {
+      // Best effort
+    }
+
     isMigrated = true;
   })();
 

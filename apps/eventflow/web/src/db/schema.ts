@@ -6,7 +6,7 @@ export const users = sqliteTable("users", {
   name: text("name").notNull(),
   email: text("email").unique().notNull(),
   passwordHash: text("password_hash").notNull(),
-  role: text("role", { enum: ["admin", "producer", "warehouse"] }).default("admin").notNull(),
+  role: text("role", { enum: ["owner", "admin", "producer", "warehouse"] }).default("admin").notNull(),
   avatarUrl: text("avatar_url"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
 });
