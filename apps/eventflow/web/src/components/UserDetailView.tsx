@@ -213,12 +213,19 @@ export default function UserDetailView({
   const completedTasks = assignedTasks.filter((t) => t.completed).length;
   const pendingTasks = assignedTasks.length - completedTasks;
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString("pt-PT", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+  const formatDate = (date: Date | string | number | null | undefined) => {
+    if (!date) return "—";
+    try {
+      const d = date instanceof Date ? date : new Date(date);
+      if (isNaN(d.getTime())) return "—";
+      return d.toLocaleDateString("pt-PT", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return "—";
+    }
   };
 
   return (

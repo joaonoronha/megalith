@@ -14,12 +14,13 @@ export default function TopProgressBar() {
   useEffect(() => {
     if (currentPathRef.current !== pathname) {
       currentPathRef.current = pathname;
+      if (timerRef.current) clearInterval(timerRef.current);
       // Finish progress bar
       setProgress(100);
       const hideTimeout = setTimeout(() => {
         setVisible(false);
         setProgress(0);
-      }, 250);
+      }, 200);
       return () => clearTimeout(hideTimeout);
     }
   }, [pathname]);
@@ -41,6 +42,13 @@ export default function TopProgressBar() {
           return Math.min(90, prev + increment);
         });
       }, 100);
+
+      // Failsafe auto-reset: never stay stuck if route transition is fast, aborted or cached
+      setTimeout(() => {
+        if (timerRef.current) clearInterval(timerRef.current);
+        setVisible(false);
+        setProgress(0);
+      }, 3500);
     };
 
     const handleAnchorClick = (e: MouseEvent) => {

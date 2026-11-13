@@ -73,7 +73,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@cfmeventos.pt"
+              placeholder="exemplo@email.com"
               className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#ececf0] rounded-[14px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
             />
           </div>
@@ -89,7 +89,7 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••••"
+              placeholder="Introduza a sua palavra-passe"
               className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#ececf0] rounded-[14px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
             />
           </div>
