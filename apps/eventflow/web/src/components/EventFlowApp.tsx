@@ -2568,19 +2568,20 @@ export default function EventFlowApp({
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+              <div className="flex items-center gap-1.5 sm:gap-2 self-start sm:self-auto flex-wrap">
                 <button
                   type="button"
                   onClick={() => {
                     setLocationsModalInitialMode("list");
                     setShowLocationsModal(true);
                   }}
-                  className="px-3.5 py-2.5 rounded-[12px] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[#111] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
-                  title="Gerir locais de armazenamento e responsáveis de armazém"
+                  className="p-2.5 sm:px-3.5 sm:py-2.5 rounded-[12px] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[#111] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  title={`Locais & Gestores (${locationsList.length})`}
+                  aria-label="Locais & Gestores"
                 >
-                  <Building className="w-3.5 h-3.5 text-[#636366]" />
-                  <span>Locais & Gestores</span>
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-[#f2f2f5] text-[#3a3a3c] font-bold border border-[#ececf0]">
+                  <Building className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#636366]" />
+                  <span className="hidden sm:inline">Locais & Gestores</span>
+                  <span className="hidden sm:inline px-1.5 py-0.2 rounded-full text-[10px] bg-[#f2f2f5] text-[#3a3a3c] font-bold border border-[#ececf0]">
                     {locationsList.length}
                   </span>
                 </button>
@@ -2588,20 +2589,23 @@ export default function EventFlowApp({
                 <button
                   type="button"
                   onClick={() => setShowReceiptScanner(true)}
-                  className="px-3.5 py-2.5 rounded-[12px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-sm shadow-blue-500/20"
+                  className="p-2.5 sm:px-3.5 sm:py-2.5 rounded-[12px] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-sm shadow-blue-500/20"
                   title="Digitalizar fatura/recibo com Gemini AI para adicionar stock ou novos artigos"
+                  aria-label="Digitalizar Fatura"
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Digitalizar Fatura</span>
+                  <FileText className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                  <span className="hidden sm:inline">Digitalizar Fatura</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setShowItemWizard(true)}
-                  className="px-4 py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  className="p-2.5 sm:px-4 sm:py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  title="Novo Artigo"
+                  aria-label="Novo Artigo"
                 >
-                  <span>＋</span>
-                  <span>Novo Artigo</span>
+                  <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                  <span className="hidden sm:inline">Novo Artigo</span>
                 </button>
               </div>
             </div>
