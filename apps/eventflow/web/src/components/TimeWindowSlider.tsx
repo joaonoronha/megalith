@@ -72,9 +72,10 @@ export default function TimeWindowSlider({
   const eEndMin = timeToMinutes(eventEnd || "20:00");
   const tEndMin = timeToMinutes(teardownEnd || "23:00");
 
-  // Limiar responsivo de 1 hora antes da montagem e 1 hora após a desmontagem
-  const derivedWindowStart = Math.max(0, pStartMin - 60);
-  const derivedWindowEnd = Math.min(1440, tEndMin + 60);
+  // Limiar responsivo com espaçamento: pelo menos 1 hora antes e depois, arredondado para a hora inteira
+  // para evitar sobreposições e garantir margem confortável de visualização
+  const derivedWindowStart = Math.max(0, Math.floor((pStartMin - 60) / 60) * 60);
+  const derivedWindowEnd = Math.min(1440, Math.ceil((tEndMin + 60) / 60) * 60);
 
   // Estado de arrasto
   // Manipulador 1 = Início da Montagem
@@ -230,8 +231,14 @@ export default function TimeWindowSlider({
       }
 
       // Expande dinamicamente os limites caso o arrasto ultrapasse o limiar inicial
-      const curStart = Math.min(initialWindowStart, Math.max(0, nextPStart - 60));
-      const curEnd = Math.max(initialWindowEnd, Math.min(1440, nextTEnd + 60));
+      const curStart = Math.min(
+        initialWindowStart,
+        Math.max(0, Math.floor((nextPStart - 60) / 60) * 60)
+      );
+      const curEnd = Math.max(
+        initialWindowEnd,
+        Math.min(1440, Math.ceil((nextTEnd + 60) / 60) * 60)
+      );
       setDragBounds({ start: curStart, end: curEnd });
 
       onChange({
@@ -272,47 +279,36 @@ export default function TimeWindowSlider({
   const p3Left = toPercent(eEndMin);
   const p3Width = Math.max(0, toPercent(tEndMin) - p3Left);
 
-  // Geração de marcadores de hora responsivos com passo inteligente
+  // Geração de marcadores de hora responsivos com passo inteligente e espaçamento uniforme
   const hourTicks = useMemo(() => {
     const ticks: { min: number; label: string }[] = [];
     const durHours = windowDuration / 60;
-    const step = durHours > 16 ? 3 : durHours > 8 ? 2 : 1;
+    const step = durHours > 18 ? 3 : durHours > 8 ? 2 : 1;
 
-    // Marcador inicial da janela
-    const startM = windowStart;
-    const startH = Math.floor(startM / 60);
-    const startRem = startM % 60;
-    ticks.push({
-      min: startM,
-      label: startRem === 0 ? `${String(startH).padStart(2, "0")}h` : minutesToTime(startM),
-    });
-
-    // Marcadores de horas inteiras no interior
-    const firstFullH = Math.ceil(startM / 60);
-    const lastFullH = Math.floor(windowEnd / 60);
-
-    for (let h = firstFullH; h <= lastFullH; h++) {
+    for (let h = Math.floor(windowStart / 60); h <= Math.ceil(windowEnd / 60); h++) {
       const m = h * 60;
-      // Garante distância mínima de 30m para evitar sobreposição nos limites
-      if (m - startM >= 30 && windowEnd - m >= 30) {
-        if (h % step === 0) {
-          ticks.push({
-            min: m,
-            label: `${String(h).padStart(2, "0")}h`,
-          });
-        }
+      if (m < windowStart || m > windowEnd) continue;
+
+      if (h % step === 0) {
+        ticks.push({
+          min: m,
+          label: `${String(h).padStart(2, "0")}h`,
+        });
       }
     }
 
-    // Marcador final da janela
-    const endM = windowEnd;
-    const endH = Math.floor(endM / 60);
-    const endRem = endM % 60;
-    if (endM - startM >= 30) {
+    // Se por algum motivo o passo não gerou marcadores, garante os limites arredondados
+    if (ticks.length === 0) {
       ticks.push({
-        min: endM,
-        label: endRem === 0 ? `${String(endH).padStart(2, "0")}h` : minutesToTime(endM),
+        min: windowStart,
+        label: `${String(Math.floor(windowStart / 60)).padStart(2, "0")}h`,
       });
+      if (windowEnd - windowStart >= 60) {
+        ticks.push({
+          min: windowEnd,
+          label: `${String(Math.floor(windowEnd / 60)).padStart(2, "0")}h`,
+        });
+      }
     }
 
     return ticks;
@@ -592,7 +588,7 @@ export default function TimeWindowSlider({
 
         {/* Linha cronológica de horas por baixo da pista */}
         <div className="relative h-4 px-1 text-[10px] font-semibold text-[#8e8e93]">
-          {hourTicks.map((tick, idx) => {
+          {hourTicks.map((tick) => {
             const leftPct = toPercent(tick.min);
             return (
               <span
@@ -600,9 +596,9 @@ export default function TimeWindowSlider({
                 style={{
                   left: `${leftPct}%`,
                   transform:
-                    idx === 0
+                    leftPct <= 2
                       ? "none"
-                      : idx === hourTicks.length - 1
+                      : leftPct >= 98
                       ? "translateX(-100%)"
                       : "translateX(-50%)",
                 }}
