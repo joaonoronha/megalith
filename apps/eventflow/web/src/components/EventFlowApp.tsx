@@ -471,11 +471,11 @@ export default function EventFlowApp({
   const [calendarFilter, setCalendarFilter] = useState<"all" | "meetings" | "events">("all");
 
   const calendlyMeetingsCount = useMemo(() => {
-    return meetingsList.length;
+    return meetingsList.filter((m) => !isCancelledEvent(m)).length;
   }, [meetingsList]);
 
   const productionEventsCount = useMemo(() => {
-    return eventsList.length;
+    return eventsList.filter((e) => !isCancelledEvent(e)).length;
   }, [eventsList]);
 
   const handleSyncCalendly = async (token?: string) => {
@@ -769,16 +769,28 @@ export default function EventFlowApp({
     });
   }, [itemsList, locationsList, inventorySearch, inventoryCategoryFilter, inventoryLocationFilter, inventoryAlertFilter]);
 
-  // Financial aggregates (Realized Cash Flow - only bought items are in movementsList)
-  const totalEntradas = movementsList
+  // Set of cancelled / ineligible event IDs
+  const cancelledEventIds = useMemo(() => {
+    return new Set(
+      eventsList.filter((e) => isCancelledEvent(e) || !countsForFinance(e)).map((e) => e.id)
+    );
+  }, [eventsList]);
+
+  // Movements strictly excluding any movement associated with a cancelled event
+  const activeMovements = useMemo(() => {
+    return movementsList.filter((m) => !m.eventId || !cancelledEventIds.has(m.eventId));
+  }, [movementsList, cancelledEventIds]);
+
+  // Financial aggregates (Realized Cash Flow - strictly ignores cancelled events)
+  const totalEntradas = activeMovements
     .filter((m) => m.type === "entrada")
     .reduce((sum, m) => sum + m.amount, 0);
 
-  const totalSaidas = movementsList
+  const totalSaidas = activeMovements
     .filter((m) => m.type === "saida")
     .reduce((sum, m) => sum + m.amount, 0);
 
-  const totalInvestido = movementsList
+  const totalInvestido = activeMovements
     .filter((m) => m.type === "investimento")
     .reduce((sum, m) => sum + m.amount, 0);
 
@@ -849,7 +861,9 @@ export default function EventFlowApp({
 
   const totalFaturado = projectedMetrics.faturacao > 0
     ? projectedMetrics.faturacao
-    : quotesList.reduce((sum, q) => sum + (q.total || 0), 0);
+    : quotesList
+        .filter((q) => !q.eventId || !cancelledEventIds.has(q.eventId))
+        .reduce((sum, q) => sum + (q.total || 0), 0);
 
   const totalAReceber = projectedMetrics.aReceber;
 
@@ -944,23 +958,27 @@ export default function EventFlowApp({
     });
   };
 
-  // Unified Calendar Items: merges production events and meetings
+  // Unified Calendar Items: merges production events and meetings (excluding cancelled)
   const allCalendarItems = useMemo(() => {
-    const eventItems = eventsList.map((e) => ({
-      ...e,
-      isMeeting: false,
-      detailUrl: `/eventos/${e.id}`,
-      displayTitle: e.name,
-    }));
-    const meetingItems = meetingsList.map((m) => ({
-      ...m,
-      name: m.title || m.name || "Reunião",
-      isMeeting: true,
-      detailUrl: `/reunioes/${m.id}`,
-      displayTitle: m.title || m.name || "Reunião",
-      category: "Reunião Calendly",
-      venue: m.location || m.venue || "Google Meet",
-    }));
+    const eventItems = eventsList
+      .filter((e) => !isCancelledEvent(e))
+      .map((e) => ({
+        ...e,
+        isMeeting: false,
+        detailUrl: `/eventos/${e.id}`,
+        displayTitle: e.name,
+      }));
+    const meetingItems = meetingsList
+      .filter((m) => !isCancelledEvent(m))
+      .map((m) => ({
+        ...m,
+        name: m.title || m.name || "Reunião",
+        isMeeting: true,
+        detailUrl: `/reunioes/${m.id}`,
+        displayTitle: m.title || m.name || "Reunião",
+        category: "Reunião Calendly",
+        venue: m.location || m.venue || "Google Meet",
+      }));
     return [...eventItems, ...meetingItems];
   }, [eventsList, meetingsList]);
 
@@ -3142,10 +3160,10 @@ export default function EventFlowApp({
           <FinanceView
             events={eventsList}
             items={itemsList}
-            movements={movementsList}
+            movements={activeMovements}
             allocations={allocationsList}
             clients={clientsList}
-            quotes={quotesList}
+            quotes={quotesList.filter((q) => !q.eventId || !cancelledEventIds.has(q.eventId))}
             onAddMovement={async (formData) => {
               const res = await createMovementAction(formData);
               if (res && res.success && res.movement) {

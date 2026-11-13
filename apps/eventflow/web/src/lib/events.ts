@@ -47,7 +47,12 @@ export function canEventReceiveQuote(evt: EventLike | null | undefined): boolean
 export function isCancelledEvent(evt: EventLike | null | undefined): boolean {
   if (!evt) return false;
   const status = String(evt.status || "").toLowerCase().trim();
-  return status === "cancelado" || status === "cancelada";
+  return (
+    status === "cancelado" ||
+    status === "cancelada" ||
+    status === "cancelled" ||
+    status === "canceled"
+  );
 }
 
 /**

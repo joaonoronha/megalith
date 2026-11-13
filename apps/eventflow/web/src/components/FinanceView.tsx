@@ -128,6 +128,18 @@ export default function FinanceView({
     return `${monthNames[monthIndex] || m} ${y}`;
   };
 
+  // Set of cancelled / ineligible event IDs
+  const cancelledEventIds = useMemo(() => {
+    return new Set(
+      events.filter((e) => isCancelledEvent(e) || !countsForFinance(e)).map((e) => e.id)
+    );
+  }, [events]);
+
+  // Movements strictly excluding any movement associated with cancelled events
+  const activeMovements = useMemo(() => {
+    return movements.filter((m) => !m.eventId || !cancelledEventIds.has(m.eventId));
+  }, [movements, cancelledEventIds]);
+
   // 1. Group movements and events by month (both Realized Cash Flow and Projected Pipeline)
   const monthlyData = useMemo(() => {
     const monthsMap: Record<
@@ -154,8 +166,8 @@ export default function FinanceView({
       }
     > = {};
 
-    // Collect all unique months from movements
-    movements.forEach((m) => {
+    // Collect all unique months from active movements (ignoring cancelled events)
+    activeMovements.forEach((m) => {
       const key = getMonthKey(m.date);
       if (!key) return;
       if (!monthsMap[key]) {
@@ -293,13 +305,13 @@ export default function FinanceView({
   // Overall totals / Active filtered data (Realized Cash + Projected Pipeline)
   const activeMetrics = useMemo(() => {
     if (selectedMonth === "all") {
-      const totalEntradas = movements
+      const totalEntradas = activeMovements
         .filter((m) => m.type === "entrada")
         .reduce((sum, m) => sum + m.amount, 0);
-      const totalSaidas = movements
+      const totalSaidas = activeMovements
         .filter((m) => m.type === "saida")
         .reduce((sum, m) => sum + m.amount, 0);
-      const totalInvestimentos = movements
+      const totalInvestimentos = activeMovements
         .filter((m) => m.type === "investimento")
         .reduce((sum, m) => sum + m.amount, 0);
       const totalGastos = totalSaidas + totalInvestimentos;
@@ -395,7 +407,7 @@ export default function FinanceView({
         latestMonthLabel: match.label,
       };
     }
-  }, [selectedMonth, monthlyData, movements, events, pendingStockPurchases, pendingStockCount]);
+  }, [selectedMonth, monthlyData, activeMovements, events, pendingStockPurchases, pendingStockCount]);
 
   // 2. Event-by-Event Profitability & Projections (excluding cancelled events)
   const eventProfitabilityList = useMemo(() => {
@@ -403,7 +415,7 @@ export default function FinanceView({
       .filter((ev) => countsForFinance(ev))
       .map((ev) => {
       const client = clients.find((c) => c.id === ev.clientId);
-      const evMovements = movements.filter((m) => m.eventId === ev.id);
+      const evMovements = activeMovements.filter((m) => m.eventId === ev.id);
 
       const entradasReais = evMovements
         .filter((m) => m.type === "entrada")
@@ -530,10 +542,6 @@ export default function FinanceView({
       }
     > = {};
 
-    const cancelledEventIds = new Set(
-      events.filter((e) => !countsForFinance(e)).map((e) => e.id)
-    );
-
     // Group all allocations by item (ignoring allocations for cancelled events)
     allocations.forEach((alc) => {
       if (alc.eventId && cancelledEventIds.has(alc.eventId)) {
@@ -579,17 +587,17 @@ export default function FinanceView({
 
     list.sort((a, b) => b.totalAllocatedQty - a.totalAllocatedQty);
     return list;
-  }, [allocations, items]);
+  }, [allocations, items, cancelledEventIds]);
 
-  // Filtered expenses list for "Despesas Mensais"
+  // Filtered expenses list for "Despesas Mensais" (strictly excluding cancelled events)
   const filteredExpenses = useMemo(() => {
-    return movements.filter((m) => {
+    return activeMovements.filter((m) => {
       // Must be an outflow or investment (expense)
       if (m.type !== "saida" && m.type !== "investimento") return false;
       if (selectedMonth === "all") return true;
       return getMonthKey(m.date) === selectedMonth;
     });
-  }, [movements, selectedMonth]);
+  }, [activeMovements, selectedMonth]);
 
   // Spending by category breakdown
   const categorySpending = useMemo(() => {

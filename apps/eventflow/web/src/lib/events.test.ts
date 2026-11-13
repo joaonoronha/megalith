@@ -181,6 +181,27 @@ describe("CFM Events: Meeting and Quota Business Rules", () => {
     assert.equal(totalFaturacaoProjetada, 14700);
     assert.equal(totalCustosProjetados, 7300);
     assert.equal(totalLucroProjetado, 7400);
+
+    // 4. Calendar exclusion: cancelled events must NOT appear in the calendar
+    const calendarEvents = allEvents.filter((e) => !isCancelledEvent(e));
+    assert.equal(calendarEvents.length, 3, "Cancelled events must be excluded from calendar items");
+    assert.equal(calendarEvents.some((e) => e.id === "evt-003"), false, "evt-003 cancelled must not be in calendar");
+    assert.equal(calendarEvents.some((e) => e.id === "evt-004"), false, "evt-004 cancelled must not be in calendar");
+
+    // 5. Movements & Quotes tied to cancelled events must be completely ignored by finances
+    const cancelledEventIds = new Set(allEvents.filter((e) => isCancelledEvent(e) || !countsForFinance(e)).map((e) => e.id));
+    const testMovements = [
+      { id: "mov-1", amount: 5000, type: "entrada", eventId: "evt-001" }, // active
+      { id: "mov-2", amount: 2000, type: "saida", eventId: "evt-001" },   // active
+      { id: "mov-3", amount: 4500, type: "entrada", eventId: "evt-003" }, // cancelled event movement!
+      { id: "mov-4", amount: 1500, type: "saida", eventId: "evt-003" },   // cancelled event movement!
+    ];
+    const activeMovements = testMovements.filter((m) => !m.eventId || !cancelledEventIds.has(m.eventId));
+    assert.equal(activeMovements.length, 2, "Movements tied to cancelled events must be filtered out");
+    const activeEntradas = activeMovements.filter((m) => m.type === "entrada").reduce((s, m) => s + m.amount, 0);
+    const activeSaidas = activeMovements.filter((m) => m.type === "saida").reduce((s, m) => s + m.amount, 0);
+    assert.equal(activeEntradas, 5000, "Cancelled event income of 4500 must not be included");
+    assert.equal(activeSaidas, 2000, "Cancelled event expense of 1500 must not be included");
   });
 });
 
