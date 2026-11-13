@@ -246,20 +246,20 @@ export default function UserDetailView({
             {currentUserState && (
               <div
                 className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold shadow-2xs"
-                title={`${currentUserState.name} (${currentUserState.email}) · Acesso ${currentUserState.role}`}
+                title={`${currentUserState.name || "Utilizador"} (${currentUserState.email || ""}) · Acesso ${currentUserState.role || ""}`}
               >
                 <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold overflow-hidden flex-shrink-0">
                   {currentUserState.avatarUrl ? (
                     <img
                       src={currentUserState.avatarUrl}
-                      alt={currentUserState.name}
+                      alt={currentUserState.name || "U"}
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    currentUserState.name.charAt(0)
+                    (currentUserState.name || "U").charAt(0)
                   )}
                 </div>
-                <span className="text-[#111] hidden sm:inline">{currentUserState.name.split(" ")[0]}</span>
+                <span className="text-[#111] hidden sm:inline">{(currentUserState.name || "").split(" ")[0]}</span>
               </div>
             )}
 
@@ -302,11 +302,11 @@ export default function UserDetailView({
                   {user.avatarUrl ? (
                     <img
                       src={user.avatarUrl}
-                      alt={user.name}
+                      alt={user.name || "U"}
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    user.name.slice(0, 2).toUpperCase()
+                    (user.name || "U").slice(0, 2).toUpperCase()
                   )}
                   {isUploadingPhoto && (
                     <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
@@ -571,14 +571,20 @@ export default function UserDetailView({
 
                       <div className="flex flex-wrap items-center gap-2 text-xs text-[#8e8e93] mt-1">
                         <span>No evento:</span>
-                        <Link
-                          href={`/eventos/${t.eventId}`}
-                          className="font-semibold text-[#111] hover:text-[#007aff] transition flex items-center gap-1"
-                        >
-                          <span>{t.eventName}</span>
-                          <ExternalLink className="w-3 h-3 opacity-50" />
-                        </Link>
-                        <span className="font-mono text-[10px]">#{t.eventId}</span>
+                        {t.eventId ? (
+                          <>
+                            <Link
+                              href={`/eventos/${t.eventId}`}
+                              className="font-semibold text-[#111] hover:text-[#007aff] transition flex items-center gap-1"
+                            >
+                              <span>{t.eventName || "Evento"}</span>
+                              <ExternalLink className="w-3 h-3 opacity-50" />
+                            </Link>
+                            <span className="font-mono text-[10px]">#{t.eventId}</span>
+                          </>
+                        ) : (
+                          <span className="font-semibold text-[#111]">{t.eventName || "Ação geral"}</span>
+                        )}
                         {t.eventVenue && <span>• {t.eventVenue}</span>}
                       </div>
                     </div>

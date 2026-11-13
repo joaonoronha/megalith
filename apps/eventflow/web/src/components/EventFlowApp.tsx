@@ -1366,9 +1366,10 @@ export default function EventFlowApp({
                             className="flex items-center justify-between gap-2.5 p-2 rounded-[14px] hover:bg-[#f8f8fa] transition"
                           >
                             <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                              <Link
+                              <a
                                 href={`/utilizadores/${u.userId}`}
-                                className="relative flex-shrink-0 group"
+                                onClick={(e) => handleNavigateUser(u.userId, e)}
+                                className="relative flex-shrink-0 group cursor-pointer"
                                 title={`Ver perfil de ${u.userName}`}
                               >
                                 <div className="w-8 h-8 rounded-full bg-[#111] text-white flex items-center justify-center text-xs font-bold overflow-hidden border border-black/5 group-hover:ring-2 group-hover:ring-[#007aff] transition">
@@ -1379,16 +1380,17 @@ export default function EventFlowApp({
                                   )}
                                 </div>
                                 <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
-                              </Link>
+                              </a>
 
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
-                                  <Link
+                                  <a
                                     href={`/utilizadores/${u.userId}`}
-                                    className="text-xs font-bold text-[#111] hover:text-[#007aff] transition truncate"
+                                    onClick={(e) => handleNavigateUser(u.userId, e)}
+                                    className="text-xs font-bold text-[#111] hover:text-[#007aff] transition truncate cursor-pointer"
                                   >
                                     {u.userName}
-                                  </Link>
+                                  </a>
                                   {isSelf && (
                                     <span className="text-[9px] font-extrabold text-[#007aff] bg-blue-50 px-1.5 py-0.2 rounded-full border border-blue-200/60">
                                       Tu
@@ -2827,10 +2829,10 @@ export default function EventFlowApp({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div>
                   <h3 className="font-bold text-sm text-[#111111]">
-                    Equipa CFM & Contas Administrativas
+                    Equipa
                   </h3>
                   <p className="text-xs text-[#8e8e93]">
-                    Gestão de múltiplos utilizadores com privilégios de acesso
+                    Gestão de utilizadores & privilégios de acesso
                   </p>
                 </div>
 
@@ -2849,7 +2851,8 @@ export default function EventFlowApp({
                 {teamUsers.map((u: any) => (
                   <div
                     key={u.id}
-                    className="p-3.5 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                    onClick={(e) => handleNavigateUser(u.id, e)}
+                    className="p-3.5 bg-white hover:bg-[#fafafc] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs cursor-pointer transition group"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-8 h-8 rounded-full bg-[#f2f2f7] text-[#111111] flex items-center justify-center font-bold text-xs overflow-hidden shrink-0">
@@ -2860,18 +2863,19 @@ export default function EventFlowApp({
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          u.name.slice(0, 2).toUpperCase()
+                          (u.name || "U").slice(0, 2).toUpperCase()
                         )}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Link
+                          <a
                             href={`/utilizadores/${u.id}`}
-                            className="font-bold text-sm text-[#111111] hover:text-[#007aff] transition truncate"
+                            onClick={(e) => handleNavigateUser(u.id, e)}
+                            className="font-bold text-sm text-[#111111] group-hover:text-[#007aff] hover:underline transition truncate"
                             title="Ver perfil do utilizador"
                           >
                             {u.name}
-                          </Link>
+                          </a>
                           {user?.id === u.id && (
                             <span className="text-[10px] font-semibold text-[#007aff] bg-[#007aff]/10 px-1.5 py-0.2 rounded shrink-0">
                               Você
@@ -2893,7 +2897,7 @@ export default function EventFlowApp({
                           : "bg-[#fef7e0] text-[#b06000] border-[#feefc3]"
                       }`}>
                         {u.role === "owner"
-                          ? "Proprietário"
+                          ? "Programador"
                           : u.role === "admin"
                           ? "Administrador"
                           : u.role === "producer"
@@ -2904,19 +2908,24 @@ export default function EventFlowApp({
                       </span>
                       {(user?.role === "owner" || user?.id === u.id) && (
                         <button
-                          onClick={() => setEditingTeamUser(u)}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTeamUser(u);
+                          }}
                           className="text-[11px] font-semibold text-[#007aff] hover:underline cursor-pointer"
                         >
                           Editar
                         </button>
                       )}
-                      <Link
+                      <a
                         href={`/utilizadores/${u.id}`}
-                        className="text-[11px] font-semibold text-[#8e8e93] hover:text-[#111] transition"
+                        onClick={(e) => handleNavigateUser(u.id, e)}
+                        className="text-[11px] font-semibold text-[#8e8e93] group-hover:text-[#007aff] hover:underline transition cursor-pointer"
                         title="Ver detalhes da conta"
                       >
                         Ver perfil →
-                      </Link>
+                      </a>
                     </div>
                   </div>
                 ))}
@@ -2928,7 +2937,7 @@ export default function EventFlowApp({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div>
                   <h3 className="font-bold text-sm text-[#111111]">
-                    Clientes CRM
+                    Clientes
                   </h3>
                   <p className="text-xs text-[#8e8e93]">
                     Base de contactos e histórico comercial
@@ -2975,7 +2984,7 @@ export default function EventFlowApp({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div>
                   <h3 className="font-bold text-sm text-[#111111]">
-                    Orçamentos & Links de Proposta
+                    Orçamentos
                   </h3>
                   <p className="text-xs text-[#8e8e93]">
                     Propostas emitidas. Os orçamentos são gerados dentro da configuração de cada evento.
@@ -4805,7 +4814,7 @@ function NewUserModal({
               onChange={(e) => setRole(e.target.value)}
               className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
             >
-              <option value="owner">Proprietário (Acesso Total & Gestão de Utilizadores)</option>
+              <option value="owner">Programador (Acesso Total & Gestão de Utilizadores)</option>
               <option value="admin">Administrador (Negócio, Eventos & Inventário)</option>
               <option value="producer">Gestor / Produtor de Eventos</option>
               <option value="warehouse">Armazém / Logística</option>
@@ -4948,7 +4957,7 @@ function EditUserModal({
                 onChange={(e) => setRole(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
               >
-                <option value="owner">Proprietário (Acesso Total & Gestão de Utilizadores)</option>
+                <option value="owner">Programador (Acesso Total & Gestão de Utilizadores)</option>
                 <option value="admin">Administrador (Negócio, Eventos & Inventário)</option>
                 <option value="producer">Gestor / Produtor de Eventos</option>
                 <option value="warehouse">Armazém / Logística</option>
@@ -4957,7 +4966,7 @@ function EditUserModal({
               <div className="w-full px-3 py-2 bg-[#f2f2f7] text-[#636366] border border-[#ececf0] rounded-[12px] text-xs flex items-center justify-between">
                 <span className="font-semibold capitalize">
                   {user.role === "owner"
-                    ? "Proprietário (Owner)"
+                    ? "Programador (Owner)"
                     : user.role === "admin"
                     ? "Administrador"
                     : user.role === "producer"
@@ -4966,7 +4975,7 @@ function EditUserModal({
                     ? "Armazém"
                     : user.role}
                 </span>
-                <span className="text-[10px] text-[#8e8e93] italic">Apenas o Proprietário pode alterar</span>
+                <span className="text-[10px] text-[#8e8e93] italic">Apenas o Programador pode alterar</span>
               </div>
             )}
           </div>
