@@ -62,6 +62,7 @@ import { useRouter } from "next/navigation";
 import AuditLogModal from "@/components/AuditLogModal";
 import EventQuoteModal from "@/components/EventQuoteModal";
 import TimeWindowSlider from "@/components/TimeWindowSlider";
+import { usePresence } from "@/lib/usePresence";
 import { formatRelativeTime, formatUpcomingTime, formatMeetingRange } from "@/lib/date-format";
 import { isMeetingEvent } from "@/lib/events";
 import {
@@ -1608,6 +1609,17 @@ export default function EventDetailView({
   const [showCreateClientModal, setShowCreateClientModal] = useState(false);
   const [currentUserState, setCurrentUserState] = useState(currentUser);
 
+  // Live Team Presence & Editing Tracker
+  const { activeEditors } = usePresence({
+    currentUser: currentUserState,
+    editing: {
+      type: "event",
+      id: event.id,
+      title: event.name,
+    },
+    pollIntervalMs: 8000,
+  });
+
   useEffect(() => {
     setCurrentUserState(currentUser);
   }, [currentUser]);
@@ -3052,6 +3064,30 @@ export default function EventDetailView({
           </Link>
 
           <div className="flex items-center gap-1.5 sm:gap-3">
+            {/* Active Editors Pulsing Avatar Badge */}
+            {activeEditors.map((editor) => (
+              <div
+                key={editor.userId}
+                className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50/90 border border-blue-200/90 text-[#007aff] text-xs font-semibold animate-pulse shadow-2xs flex-shrink-0"
+                title={`${editor.userName} está a editar este evento agora`}
+              >
+                <div className="relative w-5 h-5 rounded-full overflow-hidden bg-[#007aff] text-white flex items-center justify-center text-[10px] font-bold ring-2 ring-[#007aff] ring-offset-1 flex-shrink-0">
+                  {editor.avatarUrl ? (
+                    <img src={editor.avatarUrl} alt={editor.userName} className="w-full h-full object-cover" />
+                  ) : (
+                    editor.userName.charAt(0)
+                  )}
+                </div>
+                <span className="hidden sm:inline text-[11px] font-bold truncate max-w-[120px]">
+                  {editor.userName.split(" ")[0]} a editar
+                </span>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#007aff] opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#007aff]" />
+                </span>
+              </div>
+            ))}
+
             {/* Auto-save Status Indicator / Button */}
             {saveStatus === "saving" ? (
               <div
@@ -3121,8 +3157,12 @@ export default function EventDetailView({
                 className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold shadow-2xs flex-shrink-0"
                 title={`${currentUserState.name} (${currentUserState.email}) · Acesso ${currentUserState.role}`}
               >
-                <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold">
-                  {currentUserState.name.charAt(0)}
+                <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold overflow-hidden flex-shrink-0">
+                  {currentUserState.avatarUrl ? (
+                    <img src={currentUserState.avatarUrl} alt={currentUserState.name} className="w-full h-full object-cover" />
+                  ) : (
+                    currentUserState.name.charAt(0)
+                  )}
                 </div>
                 <span className="text-[#111] hidden sm:inline">{currentUserState.name.split(" ")[0]}</span>
               </div>

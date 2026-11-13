@@ -34,6 +34,7 @@ import {
 import AuditLogModal from "@/components/AuditLogModal";
 import StorageLocationsModal, { StorageLocation, TeamUser } from "@/components/StorageLocationsModal";
 import { formatRelativeTime } from "@/lib/date-format";
+import { usePresence } from "@/lib/usePresence";
 import {
   updateItemPatchAction,
   updateItemTriageAction,
@@ -83,7 +84,7 @@ interface InventoryDetailViewProps {
   allocations: ItemAllocation[];
   locations?: StorageLocation[];
   users?: TeamUser[];
-  currentUser?: { id: string; name: string; email: string; role: string } | null;
+  currentUser?: { id: string; name: string; email: string; role: string; avatarUrl?: string | null } | null;
 }
 
 const PRESET_CATEGORIES = [
@@ -126,6 +127,17 @@ export default function InventoryDetailView({
 }: InventoryDetailViewProps) {
   const [item, setItem] = useState<InventoryItem>(initialItem);
   const [currentUserState, setCurrentUserState] = useState(currentUser);
+
+  // Live Team Presence & Editing Tracker
+  const { activeEditors } = usePresence({
+    currentUser: currentUserState,
+    editing: {
+      type: "inventory",
+      id: item.id,
+      title: item.name,
+    },
+    pollIntervalMs: 8000,
+  });
   const [locationsList, setLocationsList] = useState<StorageLocation[]>(initialLocations);
 
   useEffect(() => {
@@ -338,8 +350,32 @@ export default function InventoryDetailView({
             <span className="hidden sm:inline">Voltar ao Catálogo</span>
           </Link>
 
-          {/* Right Header: Auto-save status, Last Updated & Audit History */}
+          {/* Right Header: Active editors, Auto-save status, Last Updated & Audit History */}
           <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {/* Active Editors Pulsing Avatar Badge */}
+            {activeEditors.map((editor) => (
+              <div
+                key={editor.userId}
+                className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50/90 border border-blue-200/90 text-[#007aff] text-xs font-semibold animate-pulse shadow-2xs flex-shrink-0"
+                title={`${editor.userName} está a editar este artigo agora`}
+              >
+                <div className="relative w-5 h-5 rounded-full overflow-hidden bg-[#007aff] text-white flex items-center justify-center text-[10px] font-bold ring-2 ring-[#007aff] ring-offset-1 flex-shrink-0">
+                  {editor.avatarUrl ? (
+                    <img src={editor.avatarUrl} alt={editor.userName} className="w-full h-full object-cover" />
+                  ) : (
+                    editor.userName.charAt(0)
+                  )}
+                </div>
+                <span className="hidden sm:inline text-[11px] font-bold truncate max-w-[120px]">
+                  {editor.userName.split(" ")[0]} a editar
+                </span>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#007aff] opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#007aff]" />
+                </span>
+              </div>
+            ))}
+
             {/* Auto-save Status Badge */}
             {saveStatus === "saving" && (
               <div
@@ -400,8 +436,12 @@ export default function InventoryDetailView({
                 className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold shadow-2xs flex-shrink-0"
                 title={`${currentUserState.name} (${currentUserState.email}) · Acesso ${currentUserState.role}`}
               >
-                <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold">
-                  {currentUserState.name.charAt(0)}
+                <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold overflow-hidden flex-shrink-0">
+                  {currentUserState.avatarUrl ? (
+                    <img src={currentUserState.avatarUrl} alt={currentUserState.name} className="w-full h-full object-cover" />
+                  ) : (
+                    currentUserState.name.charAt(0)
+                  )}
                 </div>
                 <span className="text-[#111] hidden sm:inline">{currentUserState.name.split(" ")[0]}</span>
               </div>

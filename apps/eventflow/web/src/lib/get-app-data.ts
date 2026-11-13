@@ -78,6 +78,7 @@ export async function getAppInitialData() {
           name: users.name,
           email: users.email,
           role: users.role,
+          avatarUrl: users.avatarUrl,
           createdAt: users.createdAt,
         })
         .from(users)

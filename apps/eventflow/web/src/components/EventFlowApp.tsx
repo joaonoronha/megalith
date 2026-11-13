@@ -51,6 +51,7 @@ import ReceiptScannerModal from "@/components/ReceiptScannerModal";
 import BarcodeScannerModal from "@/components/BarcodeScannerModal";
 import FinanceView from "@/components/FinanceView";
 import CompletedEventsProfitChart from "@/components/CompletedEventsProfitChart";
+import { usePresence } from "@/lib/usePresence";
 import { formatRelativeTime } from "@/lib/date-format";
 import { isMeetingEvent, canEventReceiveQuote, countsForFinance, isCancelledEvent } from "@/lib/events";
 import { computeCompletedEventsProfit } from "@/lib/profit-trajectory";
@@ -77,7 +78,7 @@ import {
 } from "@/app/actions";
 
 interface Props {
-  currentUser: { id: string; name: string; email: string; role: string } | null;
+  currentUser: { id: string; name: string; email: string; role: string; avatarUrl?: string | null } | null;
   initialUsers: any[];
   initialEvents: any[];
   initialItems: any[];
@@ -214,6 +215,7 @@ export default function EventFlowApp({
 
   // Core App State
   const [user, setUser] = useState(currentUser);
+  const { onlineUsers } = usePresence({ currentUser: user, pollIntervalMs: 10000 });
   const [teamUsers, setTeamUsers] = useState(initialUsers);
   const [eventsList, setEventsList] = useState(initialEvents);
   const [meetingsList, setMeetingsList] = useState(initialMeetings);
@@ -1097,15 +1099,20 @@ export default function EventFlowApp({
 
             {user ? (
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <div
-                  className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold shadow-2xs"
-                  title={`${user.name} (${user.email}) · Acesso ${user.role}`}
+                <Link
+                  href={`/utilizadores/${user.id}`}
+                  className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-xl bg-white hover:bg-[#fafafc] border border-[#ececf0] text-xs font-semibold shadow-2xs transition group"
+                  title={`${user.name} (${user.email}) · Acesso ${user.role} · Ver Perfil`}
                 >
-                  <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold">
-                    {user.name.charAt(0)}
+                  <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold overflow-hidden flex-shrink-0">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                    ) : (
+                      user.name.charAt(0)
+                    )}
                   </div>
-                  <span className="text-[#111] hidden sm:inline">{user.name.split(" ")[0]}</span>
-                </div>
+                  <span className="text-[#111] group-hover:text-[#007aff] transition hidden sm:inline">{user.name.split(" ")[0]}</span>
+                </Link>
 
                 <button
                   type="button"
@@ -1307,8 +1314,104 @@ export default function EventFlowApp({
                 </div>
               </div>
 
-              {/* 1/3 COLUMN: Alertas Importantes */}
-              <div className="lg:col-span-4 bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+              {/* 1/3 COLUMN: Equipa Online Agora & Alertas Importantes */}
+              <div className="lg:col-span-4 space-y-3.5">
+                {/* Equipa Online Agora Card */}
+                <div className="bg-white border border-[#ececf0] rounded-[22px] p-4 sm:p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+                  <div className="flex items-center justify-between mb-3 px-1">
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                      </div>
+                      <h3 className="text-[15px] font-bold tracking-tight text-[#111111]">
+                        Equipa online agora
+                      </h3>
+                    </div>
+
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                      {onlineUsers.length} online
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {onlineUsers.length === 0 ? (
+                      <div className="py-4 text-center text-xs text-[#8e8e93]">
+                        Nenhum membro ativo detectado.
+                      </div>
+                    ) : (
+                      onlineUsers.map((u) => {
+                        const isSelf = user?.id === u.userId;
+                        const isEditing = !!u.editingEntityType && !!u.editingEntityId;
+
+                        return (
+                          <div
+                            key={u.userId}
+                            className="flex items-center justify-between gap-2.5 p-2 rounded-[14px] hover:bg-[#f8f8fa] transition"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <Link
+                                href={`/utilizadores/${u.userId}`}
+                                className="relative flex-shrink-0 group"
+                                title={`Ver perfil de ${u.userName}`}
+                              >
+                                <div className="w-8 h-8 rounded-full bg-[#111] text-white flex items-center justify-center text-xs font-bold overflow-hidden border border-black/5 group-hover:ring-2 group-hover:ring-[#007aff] transition">
+                                  {u.avatarUrl ? (
+                                    <img src={u.avatarUrl} alt={u.userName} className="w-full h-full object-cover" />
+                                  ) : (
+                                    u.userName.slice(0, 2).toUpperCase()
+                                  )}
+                                </div>
+                                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
+                              </Link>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  <Link
+                                    href={`/utilizadores/${u.userId}`}
+                                    className="text-xs font-bold text-[#111] hover:text-[#007aff] transition truncate"
+                                  >
+                                    {u.userName}
+                                  </Link>
+                                  {isSelf && (
+                                    <span className="text-[9px] font-extrabold text-[#007aff] bg-blue-50 px-1.5 py-0.2 rounded-full border border-blue-200/60">
+                                      Tu
+                                    </span>
+                                  )}
+                                </div>
+
+                                {isEditing ? (
+                                  <Link
+                                    href={
+                                      u.editingEntityType === "event"
+                                        ? `/eventos/${u.editingEntityId}`
+                                        : `/inventario/${u.editingEntityId}`
+                                    }
+                                    className="text-[11px] font-semibold text-[#007aff] hover:underline flex items-center gap-1.5 truncate mt-0.5"
+                                    title={u.editingEntityTitle || ""}
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#007aff] animate-ping flex-shrink-0" />
+                                    <span className="truncate">
+                                      A editar {u.editingEntityType === "event" ? "evento" : "artigo"}:{" "}
+                                      <strong>{u.editingEntityTitle || u.editingEntityId}</strong>
+                                    </span>
+                                  </Link>
+                                ) : (
+                                  <div className="text-[11px] text-[#8e8e93] truncate">
+                                    Ativo na aplicação
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Alertas Importantes */}
+                <div className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
                 <div className="flex items-center justify-between mb-2.5 px-1">
                   <div className="flex items-center gap-2.5">
                     <div className="w-[34px] h-[34px] rounded-[11px] bg-white text-[#ff3b30] border border-[#ff3b30]/15 flex items-center justify-center font-bold text-[16px] shadow-xs">
@@ -1553,6 +1656,7 @@ export default function EventFlowApp({
                     });
                   })()}
                 </div>
+              </div>
               </div>
             </div>
           </section>

@@ -50,6 +50,7 @@ export default async function InventoryItemPage({ params }: PageProps) {
         name: users.name,
         email: users.email,
         role: users.role,
+        avatarUrl: users.avatarUrl,
       })
       .from(users),
     getCurrentUser(),
