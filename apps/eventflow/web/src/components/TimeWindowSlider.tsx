@@ -1,17 +1,7 @@
 "use client";
 
-import React, { useRef, useState, useCallback, useEffect } from "react";
-import {
-  Calendar,
-  Wrench,
-  PartyPopper,
-  Truck,
-  Clock,
-  ChevronLeft,
-  ChevronRight,
-  Minus,
-  Plus,
-} from "lucide-react";
+import React, { useRef, useState, useMemo, useEffect } from "react";
+import { Calendar, Wrench, PartyPopper, Truck } from "lucide-react";
 
 export interface TimeWindowSliderProps {
   date: string;
@@ -32,7 +22,7 @@ export interface TimeWindowSliderProps {
   }) => void;
 }
 
-// Convert "HH:mm" to minutes from 00:00 (0..1440)
+// Converte "HH:mm" para minutos desde as 00:00 (0..1440)
 export function timeToMinutes(timeStr: string): number {
   if (!timeStr) return 0;
   const parts = timeStr.split(":");
@@ -41,7 +31,7 @@ export function timeToMinutes(timeStr: string): number {
   return Math.min(1440, Math.max(0, h * 60 + m));
 }
 
-// Convert minutes to "HH:mm" (snapped to 15m)
+// Converte minutos para "HH:mm" com ajuste de 15 minutos
 export function minutesToTime(mins: number): string {
   const clamped = Math.min(1440, Math.max(0, Math.round(mins / 15) * 15));
   if (clamped >= 1440) return "24:00";
@@ -72,11 +62,15 @@ export default function TimeWindowSlider({
 }: TimeWindowSliderProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
 
-  // Minutes from midnight
+  // Minutos desde a meia-noite
   const pStartMin = timeToMinutes(prepStart || "09:00");
   const eStartMin = timeToMinutes(eventStart || "14:00");
   const eEndMin = timeToMinutes(eventEnd || "20:00");
   const tEndMin = timeToMinutes(teardownEnd || "23:00");
+
+  // Limiar responsivo de 1 hora antes da montagem e 1 hora após a desmontagem
+  const derivedWindowStart = Math.max(0, pStartMin - 60);
+  const derivedWindowEnd = Math.min(1440, tEndMin + 60);
 
   // Estado de arrasto
   // Manipulador 1 = Início da Montagem
@@ -87,21 +81,38 @@ export default function TimeWindowSlider({
   const [activeDrag, setActiveDrag] = useState<
     1 | 2 | 3 | 4 | "range1" | "range2" | "range3" | null
   >(null);
-  const [hoveredRange, setHoveredRange] = useState<1 | 2 | 3 | null>(null);
+  const [dragBounds, setDragBounds] = useState<{ start: number; end: number } | null>(null);
 
-  // Drag reference coordinates
+  // Limites da janela ativa
+  const windowStart = dragBounds ? dragBounds.start : derivedWindowStart;
+  const windowEnd = Math.max(windowStart + 60, dragBounds ? dragBounds.end : derivedWindowEnd);
+  const windowDuration = windowEnd - windowStart;
+
+  // Conversão de minutos para percentagem relativa à janela visível
+  const toPercent = (mins: number) => {
+    const clamped = Math.max(windowStart, Math.min(windowEnd, mins));
+    return ((clamped - windowStart) / windowDuration) * 100;
+  };
+
+  // Coordenadas de referência para arrasto
   const dragContextRef = useRef<{
     startX: number;
     initialPStart: number;
     initialEStart: number;
     initialEEnd: number;
     initialTEnd: number;
+    initialWindowStart: number;
+    initialWindowEnd: number;
+    initialWindowDur: number;
   }>({
     startX: 0,
     initialPStart: pStartMin,
     initialEStart: eStartMin,
     initialEEnd: eEndMin,
     initialTEnd: tEndMin,
+    initialWindowStart: derivedWindowStart,
+    initialWindowEnd: derivedWindowEnd,
+    initialWindowDur: Math.max(60, derivedWindowEnd - derivedWindowStart),
   });
 
   const getClientX = (e: MouseEvent | TouchEvent): number => {
@@ -116,12 +127,21 @@ export default function TimeWindowSlider({
     clientX: number
   ) => {
     setActiveDrag(handle);
+    const initStart = derivedWindowStart;
+    const initEnd = derivedWindowEnd;
+    const initDur = Math.max(60, initEnd - initStart);
+
+    setDragBounds({ start: initStart, end: initEnd });
+
     dragContextRef.current = {
       startX: clientX,
       initialPStart: pStartMin,
       initialEStart: eStartMin,
       initialEEnd: eEndMin,
       initialTEnd: tEndMin,
+      initialWindowStart: initStart,
+      initialWindowEnd: initEnd,
+      initialWindowDur: initDur,
     };
   };
 
@@ -134,7 +154,7 @@ export default function TimeWindowSlider({
     startDrag(handle, clientX);
   };
 
-  // Window drag listeners
+  // Listeners de arrasto na janela
   useEffect(() => {
     if (!activeDrag) return;
 
@@ -143,16 +163,19 @@ export default function TimeWindowSlider({
       const rect = trackRef.current.getBoundingClientRect();
       const currentX = getClientX(e);
       const deltaX = currentX - dragContextRef.current.startX;
-      const deltaMinutes = Math.round(((deltaX / rect.width) * 1440) / 15) * 15;
+      const deltaMinutes =
+        Math.round(((deltaX / rect.width) * dragContextRef.current.initialWindowDur) / 15) * 15;
 
       const {
         initialPStart,
         initialEStart,
         initialEEnd,
         initialTEnd,
+        initialWindowStart,
+        initialWindowEnd,
       } = dragContextRef.current;
 
-      const MIN_DURATION = 30; // 30 minutes minimum per phase
+      const MIN_DURATION = 30; // 30 minutos de duração mínima por fase
 
       let nextPStart = pStartMin;
       let nextEStart = eStartMin;
@@ -182,7 +205,6 @@ export default function TimeWindowSlider({
         );
       } else if (activeDrag === "range1") {
         // Deslocar todo o intervalo de Montagem
-        const dur = initialEStart - initialPStart;
         const maxShift = initialEEnd - MIN_DURATION - initialEStart;
         const minShift = -initialPStart;
         const clampedShift = Math.max(minShift, Math.min(maxShift, deltaMinutes));
@@ -190,7 +212,6 @@ export default function TimeWindowSlider({
         nextEStart = initialEStart + clampedShift;
       } else if (activeDrag === "range2") {
         // Deslocar todo o intervalo do Evento
-        const dur = initialEEnd - initialEStart;
         const maxShift = initialTEnd - MIN_DURATION - initialEEnd;
         const minShift = initialPStart + MIN_DURATION - initialEStart;
         const clampedShift = Math.max(minShift, Math.min(maxShift, deltaMinutes));
@@ -198,12 +219,16 @@ export default function TimeWindowSlider({
         nextEEnd = initialEEnd + clampedShift;
       } else if (activeDrag === "range3") {
         // Deslocar todo o intervalo de Desmontagem
-        const dur = initialTEnd - initialEEnd;
         const maxShift = 1440 - initialTEnd;
         const minShift = initialEEnd + MIN_DURATION - initialTEnd;
         const clampedShift = Math.max(minShift, Math.min(maxShift, deltaMinutes));
         nextTEnd = initialTEnd + clampedShift;
       }
+
+      // Expande dinamicamente os limites caso o arrasto ultrapasse o limiar inicial
+      const curStart = Math.min(initialWindowStart, Math.max(0, nextPStart - 60));
+      const curEnd = Math.max(initialWindowEnd, Math.min(1440, nextTEnd + 60));
+      setDragBounds({ start: curStart, end: curEnd });
 
       onChange({
         prepStart: minutesToTime(nextPStart),
@@ -217,6 +242,7 @@ export default function TimeWindowSlider({
 
     const onUp = () => {
       setActiveDrag(null);
+      setDragBounds(null);
     };
 
     window.addEventListener("mousemove", onMove);
@@ -232,61 +258,67 @@ export default function TimeWindowSlider({
     };
   }, [activeDrag, onChange, pStartMin, eStartMin, eEndMin, tEndMin]);
 
-  // Nudge helpers
-  const nudge = (field: "pStart" | "eStart" | "eEnd" | "tEnd", delta: number) => {
-    let nextP = pStartMin;
-    let nextES = eStartMin;
-    let nextEE = eEndMin;
-    let nextTE = tEndMin;
+  // Posições percentuais dos 3 blocos
+  const p1Left = toPercent(pStartMin);
+  const p1Width = Math.max(0, toPercent(eStartMin) - p1Left);
 
-    const MIN_DURATION = 30;
+  const p2Left = toPercent(eStartMin);
+  const p2Width = Math.max(0, toPercent(eEndMin) - p2Left);
 
-    if (field === "pStart") {
-      nextP = Math.max(0, Math.min(eStartMin - MIN_DURATION, pStartMin + delta));
-    } else if (field === "eStart") {
-      nextES = Math.max(pStartMin + MIN_DURATION, Math.min(eEndMin - MIN_DURATION, eStartMin + delta));
-    } else if (field === "eEnd") {
-      nextEE = Math.max(eStartMin + MIN_DURATION, Math.min(tEndMin - MIN_DURATION, eEndMin + delta));
-    } else if (field === "tEnd") {
-      nextTE = Math.max(eEndMin + MIN_DURATION, Math.min(1440, tEndMin + delta));
+  const p3Left = toPercent(eEndMin);
+  const p3Width = Math.max(0, toPercent(tEndMin) - p3Left);
+
+  // Geração de marcadores de hora responsivos com passo inteligente
+  const hourTicks = useMemo(() => {
+    const ticks: { min: number; label: string }[] = [];
+    const durHours = windowDuration / 60;
+    const step = durHours > 16 ? 3 : durHours > 8 ? 2 : 1;
+
+    // Marcador inicial da janela
+    const startM = windowStart;
+    const startH = Math.floor(startM / 60);
+    const startRem = startM % 60;
+    ticks.push({
+      min: startM,
+      label: startRem === 0 ? `${String(startH).padStart(2, "0")}h` : minutesToTime(startM),
+    });
+
+    // Marcadores de horas inteiras no interior
+    const firstFullH = Math.ceil(startM / 60);
+    const lastFullH = Math.floor(windowEnd / 60);
+
+    for (let h = firstFullH; h <= lastFullH; h++) {
+      const m = h * 60;
+      // Garante distância mínima de 30m para evitar sobreposição nos limites
+      if (m - startM >= 30 && windowEnd - m >= 30) {
+        if (h % step === 0) {
+          ticks.push({
+            min: m,
+            label: `${String(h).padStart(2, "0")}h`,
+          });
+        }
+      }
     }
 
-    onChange({
-      prepStart: minutesToTime(nextP),
-      prepEnd: minutesToTime(nextES),
-      eventStart: minutesToTime(nextES),
-      eventEnd: minutesToTime(nextEE),
-      teardownStart: minutesToTime(nextEE),
-      teardownEnd: minutesToTime(nextTE),
-    });
-  };
+    // Marcador final da janela
+    const endM = windowEnd;
+    const endH = Math.floor(endM / 60);
+    const endRem = endM % 60;
+    if (endM - startM >= 30) {
+      ticks.push({
+        min: endM,
+        label: endRem === 0 ? `${String(endH).padStart(2, "0")}h` : minutesToTime(endM),
+      });
+    }
 
-  // Convert to percent of 1440
-  const p1Left = (pStartMin / 1440) * 100;
-  const p1Width = ((eStartMin - pStartMin) / 1440) * 100;
-
-  const p2Left = (eStartMin / 1440) * 100;
-  const p2Width = ((eEndMin - eStartMin) / 1440) * 100;
-
-  const p3Left = (eEndMin / 1440) * 100;
-  const p3Width = ((tEndMin - eEndMin) / 1440) * 100;
-
-  // Major Hour Tick marks (00, 04, 08, 12, 16, 20, 24)
-  const hourTicks = [
-    { hour: 0, label: "00h" },
-    { hour: 4, label: "04h" },
-    { hour: 8, label: "08h" },
-    { hour: 12, label: "12h" },
-    { hour: 16, label: "16h" },
-    { hour: 20, label: "20h" },
-    { hour: 24, label: "24h" },
-  ];
+    return ticks;
+  }, [windowStart, windowEnd, windowDuration]);
 
   return (
     <section className="bg-white border border-[#ececf0] rounded-[24px] p-5 sm:p-6 shadow-xs space-y-5">
-      {/* Top Header: Date Picker & Visual Range Legend */}
+      {/* Cabeçalho: Seletor de Data & Badges dos 3 Intervalos Operacionais */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#ececf0]">
-        {/* Date Selector */}
+        {/* Seletor de Data */}
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-[#f2f2f5] flex items-center justify-center text-[#111] shrink-0">
             <Calendar className="w-5 h-5 text-[#007aff]" />
@@ -310,7 +342,9 @@ export default function TimeWindowSlider({
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-900 font-semibold shadow-2xs">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
             <span className="font-bold">Montagem:</span>
-            <span>{minutesToTime(pStartMin)} - {minutesToTime(eStartMin)}</span>
+            <span>
+              {minutesToTime(pStartMin)} - {minutesToTime(eStartMin)}
+            </span>
             <span className="text-[10px] text-amber-700 bg-amber-100/70 px-1.5 py-0.2 rounded-md font-bold">
               {formatDuration(pStartMin, eStartMin)}
             </span>
@@ -320,7 +354,9 @@ export default function TimeWindowSlider({
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-950 font-semibold shadow-2xs">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
             <span className="font-bold">Evento:</span>
-            <span>{minutesToTime(eStartMin)} - {minutesToTime(eEndMin)}</span>
+            <span>
+              {minutesToTime(eStartMin)} - {minutesToTime(eEndMin)}
+            </span>
             <span className="text-[10px] text-emerald-800 bg-emerald-100/80 px-1.5 py-0.2 rounded-md font-bold">
               {formatDuration(eStartMin, eEndMin)}
             </span>
@@ -330,7 +366,9 @@ export default function TimeWindowSlider({
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-950 font-semibold shadow-2xs">
             <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 shrink-0" />
             <span className="font-bold">Desmontagem:</span>
-            <span>{minutesToTime(eEndMin)} - {minutesToTime(tEndMin)}</span>
+            <span>
+              {minutesToTime(eEndMin)} - {minutesToTime(tEndMin)}
+            </span>
             <span className="text-[10px] text-indigo-800 bg-indigo-100/70 px-1.5 py-0.2 rounded-md font-bold">
               {formatDuration(eEndMin, tEndMin)}
             </span>
@@ -339,20 +377,20 @@ export default function TimeWindowSlider({
       </div>
 
       {/* =================================================================== */}
-      {/* THE 3-RANGE COLORED TIME WINDOW SLIDER TRACK                         */}
+      {/* PISTA DO SLIDER DE INTERVALO DE TEMPO RESPONSIVO (3 CORES)          */}
       {/* =================================================================== */}
       <div className="space-y-2 select-none">
-        {/* Track */}
+        {/* Pista do Slider */}
         <div
           ref={trackRef}
           className="relative h-14 sm:h-16 bg-[#f4f4f7] rounded-2xl border border-[#e5e5ea] overflow-hidden shadow-inner cursor-pointer"
         >
-          {/* Subtle vertical hour guide lines across the background */}
+          {/* Linhas verticais de orientação alinhadas com as horas */}
           {hourTicks.map((tick) => {
-            const leftPct = (tick.hour / 24) * 100;
+            const leftPct = toPercent(tick.min);
             return (
               <div
-                key={tick.hour}
+                key={tick.min}
                 style={{ left: `${leftPct}%` }}
                 className="absolute top-0 bottom-0 w-px bg-[#e5e5ea] pointer-events-none"
               />
@@ -367,8 +405,6 @@ export default function TimeWindowSlider({
               left: `${p1Left}%`,
               width: `${p1Width}%`,
             }}
-            onMouseEnter={() => setHoveredRange(1)}
-            onMouseLeave={() => setHoveredRange(null)}
             onMouseDown={(e) => handlePointerDown("range1", e)}
             onTouchStart={(e) => handlePointerDown("range1", e)}
             className={`absolute top-1 bottom-1 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-white shadow-md flex items-center justify-between px-2 overflow-hidden cursor-grab active:cursor-grabbing border border-amber-300 transition-opacity ${
@@ -400,8 +436,6 @@ export default function TimeWindowSlider({
               left: `${p2Left}%`,
               width: `${p2Width}%`,
             }}
-            onMouseEnter={() => setHoveredRange(2)}
-            onMouseLeave={() => setHoveredRange(null)}
             onMouseDown={(e) => handlePointerDown("range2", e)}
             onTouchStart={(e) => handlePointerDown("range2", e)}
             className={`absolute top-1 bottom-1 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md flex items-center justify-between px-2 overflow-hidden cursor-grab active:cursor-grabbing border border-emerald-400 transition-opacity ${
@@ -433,8 +467,6 @@ export default function TimeWindowSlider({
               left: `${p3Left}%`,
               width: `${p3Width}%`,
             }}
-            onMouseEnter={() => setHoveredRange(3)}
-            onMouseLeave={() => setHoveredRange(null)}
             onMouseDown={(e) => handlePointerDown("range3", e)}
             onTouchStart={(e) => handlePointerDown("range3", e)}
             className={`absolute top-1 bottom-1 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-md flex items-center justify-between px-2 overflow-hidden cursor-grab active:cursor-grabbing border border-indigo-400 transition-opacity ${
@@ -529,7 +561,7 @@ export default function TimeWindowSlider({
 
           {/* Manipulador 4: Fim da Desmontagem */}
           <div
-            style={{ left: `${(tEndMin / 1440) * 100}%` }}
+            style={{ left: `${toPercent(tEndMin)}%` }}
             onMouseDown={(e) => handlePointerDown(4, e)}
             onTouchStart={(e) => handlePointerDown(4, e)}
             className="absolute top-0 bottom-0 -ml-2.5 w-5 flex items-center justify-center cursor-ew-resize z-20 group"
@@ -550,214 +582,28 @@ export default function TimeWindowSlider({
           </div>
         </div>
 
-        {/* Hour markers timeline scale below track */}
+        {/* Linha cronológica de horas por baixo da pista */}
         <div className="relative h-4 px-1 text-[10px] font-semibold text-[#8e8e93]">
-          {hourTicks.map((tick) => {
-            const leftPct = (tick.hour / 24) * 100;
+          {hourTicks.map((tick, idx) => {
+            const leftPct = toPercent(tick.min);
             return (
               <span
-                key={tick.hour}
+                key={tick.min}
                 style={{
                   left: `${leftPct}%`,
-                  transform: tick.hour === 0 ? "none" : tick.hour === 24 ? "translateX(-100%)" : "translateX(-50%)",
+                  transform:
+                    idx === 0
+                      ? "none"
+                      : idx === hourTicks.length - 1
+                      ? "translateX(-100%)"
+                      : "translateX(-50%)",
                 }}
-                className="absolute top-0"
+                className="absolute top-0 whitespace-nowrap"
               >
                 {tick.label}
               </span>
             );
           })}
-        </div>
-      </div>
-
-      {/* =================================================================== */}
-      {/* 3 CARTÕES DE INTERVALOS COM AJUSTES RÁPIDOS (+/- 15 min)           */}
-      {/* =================================================================== */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-        {/* Cartão 1: Montagem */}
-        <div className="p-3.5 rounded-2xl bg-amber-50/60 border border-amber-200/80 flex flex-col justify-between gap-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-              <span>Montagem</span>
-              <span className="text-[10px] font-medium text-amber-700">(Preparação)</span>
-            </div>
-            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-200/80 text-amber-900">
-              {formatDuration(pStartMin, eStartMin)}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between gap-1 text-xs">
-            <div className="flex items-center gap-1 bg-white border border-amber-200 rounded-xl px-2 py-1 shadow-2xs">
-              <button
-                type="button"
-                onClick={() => nudge("pStart", -15)}
-                className="p-0.5 text-amber-800 hover:text-amber-950 cursor-pointer"
-                title="Antecipar 15 min"
-              >
-                <Minus className="w-3 h-3" />
-              </button>
-              <span className="font-bold text-[#111] min-w-[38px] text-center">
-                {minutesToTime(pStartMin)}
-              </span>
-              <button
-                type="button"
-                onClick={() => nudge("pStart", 15)}
-                className="p-0.5 text-amber-800 hover:text-amber-950 cursor-pointer"
-                title="Adiar 15 min"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-            </div>
-
-            <span className="text-amber-700 text-xs font-medium">às</span>
-
-            <div className="flex items-center gap-1 bg-white border border-amber-200 rounded-xl px-2 py-1 shadow-2xs">
-              <button
-                type="button"
-                onClick={() => nudge("eStart", -15)}
-                className="p-0.5 text-amber-800 hover:text-amber-950 cursor-pointer"
-                title="Antecipar 15 min"
-              >
-                <Minus className="w-3 h-3" />
-              </button>
-              <span className="font-bold text-[#111] min-w-[38px] text-center">
-                {minutesToTime(eStartMin)}
-              </span>
-              <button
-                type="button"
-                onClick={() => nudge("eStart", 15)}
-                className="p-0.5 text-amber-800 hover:text-amber-950 cursor-pointer"
-                title="Adiar 15 min"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Cartão 2: Horário do Evento */}
-        <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/90 flex flex-col justify-between gap-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-950">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-              <span>Horário do Evento</span>
-              <span className="text-[10px] font-medium text-emerald-700">(Festa)</span>
-            </div>
-            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-200/80 text-emerald-950">
-              {formatDuration(eStartMin, eEndMin)}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between gap-1 text-xs">
-            <div className="flex items-center gap-1 bg-white border border-emerald-200 rounded-xl px-2 py-1 shadow-2xs">
-              <button
-                type="button"
-                onClick={() => nudge("eStart", -15)}
-                className="p-0.5 text-emerald-800 hover:text-emerald-950 cursor-pointer"
-                title="Antecipar início do evento 15 min"
-              >
-                <Minus className="w-3 h-3" />
-              </button>
-              <span className="font-bold text-emerald-950 min-w-[38px] text-center">
-                {minutesToTime(eStartMin)}
-              </span>
-              <button
-                type="button"
-                onClick={() => nudge("eStart", 15)}
-                className="p-0.5 text-emerald-800 hover:text-emerald-950 cursor-pointer"
-                title="Adiar início do evento 15 min"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-            </div>
-
-            <span className="text-emerald-800 text-xs font-medium">às</span>
-
-            <div className="flex items-center gap-1 bg-white border border-emerald-200 rounded-xl px-2 py-1 shadow-2xs">
-              <button
-                type="button"
-                onClick={() => nudge("eEnd", -15)}
-                className="p-0.5 text-emerald-800 hover:text-emerald-950 cursor-pointer"
-                title="Antecipar fim do evento 15 min"
-              >
-                <Minus className="w-3 h-3" />
-              </button>
-              <span className="font-bold text-emerald-950 min-w-[38px] text-center">
-                {minutesToTime(eEndMin)}
-              </span>
-              <button
-                type="button"
-                onClick={() => nudge("eEnd", 15)}
-                className="p-0.5 text-emerald-800 hover:text-emerald-950 cursor-pointer"
-                title="Adiar fim do evento 15 min"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Cartão 3: Desmontagem */}
-        <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-200/80 flex flex-col justify-between gap-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950">
-              <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 shrink-0" />
-              <span>Desmontagem</span>
-              <span className="text-[10px] font-medium text-indigo-700">(Recolha)</span>
-            </div>
-            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-200/80 text-indigo-950">
-              {formatDuration(eEndMin, tEndMin)}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between gap-1 text-xs">
-            <div className="flex items-center gap-1 bg-white border border-indigo-200 rounded-xl px-2 py-1 shadow-2xs">
-              <button
-                type="button"
-                onClick={() => nudge("eEnd", -15)}
-                className="p-0.5 text-indigo-800 hover:text-indigo-950 cursor-pointer"
-                title="Antecipar início da desmontagem 15 min"
-              >
-                <Minus className="w-3 h-3" />
-              </button>
-              <span className="font-bold text-[#111] min-w-[38px] text-center">
-                {minutesToTime(eEndMin)}
-              </span>
-              <button
-                type="button"
-                onClick={() => nudge("eEnd", 15)}
-                className="p-0.5 text-indigo-800 hover:text-indigo-950 cursor-pointer"
-                title="Adiar início da desmontagem 15 min"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-            </div>
-
-            <span className="text-indigo-700 text-xs font-medium">às</span>
-
-            <div className="flex items-center gap-1 bg-white border border-indigo-200 rounded-xl px-2 py-1 shadow-2xs">
-              <button
-                type="button"
-                onClick={() => nudge("tEnd", -15)}
-                className="p-0.5 text-indigo-800 hover:text-indigo-950 cursor-pointer"
-                title="Antecipar fim da desmontagem 15 min"
-              >
-                <Minus className="w-3 h-3" />
-              </button>
-              <span className="font-bold text-[#111] min-w-[38px] text-center">
-                {minutesToTime(tEndMin)}
-              </span>
-              <button
-                type="button"
-                onClick={() => nudge("tEnd", 15)}
-                className="p-0.5 text-indigo-800 hover:text-indigo-950 cursor-pointer"
-                title="Adiar fim da desmontagem 15 min"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </section>
