@@ -77,6 +77,7 @@ export default async function EventPage({ params }: PageProps) {
         name: users.name,
         email: users.email,
         role: users.role,
+        avatarUrl: users.avatarUrl,
       })
       .from(users)
       .catch(() => []),
