@@ -53,6 +53,8 @@ export const inventoryItems = sqliteTable("inventory_items", {
   replacementCost: real("replacement_cost").default(0),
   purchaseStatus: text("purchase_status", { enum: ["bought", "not_bought"] }).default("bought").notNull(), // "bought" (contabilizado em finanças) | "not_bought" (deduzido no lucro projetado)
   purchaseCost: real("purchase_cost").default(0), // total acquisition / purchase cost
+  isConsumable: integer("is_consumable", { mode: "boolean" }).default(false).notNull(), // true = consumível (velas, guardanapos, fitas, flores), false = equipamento reutilizável
+  packageUnits: integer("package_units").default(1), // unidades por embalagem / pack
   imageUrl: text("image_url"),
   damagedQuantity: integer("damaged_quantity").default(0),
   inMaintenanceQuantity: integer("in_maintenance_quantity").default(0),
@@ -162,6 +164,9 @@ export const eventCustomItems = sqliteTable("event_custom_items", {
   unitPrice: real("unit_price").default(0).notNull(), // Price charged to customer in quota
   supplier: text("supplier"), // Supplier / manufacturer
   notes: text("notes"), // Dimensions, specifications, colors
+  isConsumable: integer("is_consumable", { mode: "boolean" }).default(false).notNull(),
+  boughtStatus: text("bought_status", { enum: ["pending", "bought"] }).default("pending").notNull(), // "pending" = por comprar, "bought" = adquirido & adicionado ao inventário
+  convertedItemId: text("converted_item_id"), // ID of item created in inventory
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });

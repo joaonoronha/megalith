@@ -46,6 +46,8 @@ interface InventoryItem {
   replacementCost: number | null;
   purchaseStatus?: "bought" | "not_bought";
   purchaseCost?: number | null;
+  isConsumable?: boolean;
+  packageUnits?: number | null;
   imageUrl: string | null;
   damagedQuantity: number | null;
   inMaintenanceQuantity: number | null;
@@ -516,6 +518,43 @@ export default function InventoryDetailView({
                       title="Edite as dimensões do artigo"
                     />
                   </div>
+
+                  {/* Consumable vs Reusable Badge with Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextVal = !item.isConsumable;
+                      setItem((prev) => ({ ...prev, isConsumable: nextVal }));
+                      savePatch({ isConsumable: nextVal });
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[10px] text-xs font-bold transition cursor-pointer border ${
+                      item.isConsumable
+                        ? "bg-orange-50 border-orange-200 text-orange-800 hover:bg-orange-100"
+                        : "bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100"
+                    }`}
+                    title="Clique para alternar entre Consumível e Reutilizável"
+                  >
+                    <span>{item.isConsumable ? "🔥 Consumível" : "📦 Reutilizável"}</span>
+                  </button>
+
+                  {item.isConsumable && (
+                    <div className="inline-flex items-center gap-1 bg-[#fafafc] border border-[#ececf0] px-2.5 py-1 rounded-[10px] text-xs">
+                      <span className="text-[10px] text-[#8e8e93]">Embalagem:</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.packageUnits || 1}
+                        onChange={(e) => {
+                          const val = Math.max(1, parseInt(e.target.value || "1", 10));
+                          setItem((prev) => ({ ...prev, packageUnits: val }));
+                          savePatch({ packageUnits: val });
+                        }}
+                        className="w-12 text-center font-bold bg-transparent focus:outline-none"
+                        title="Unidades por embalagem / pack"
+                      />
+                      <span className="text-[10px] text-[#8e8e93]">un/pack</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -49,6 +49,9 @@ import {
   Paperclip,
   Tag,
   Pencil,
+  ShoppingCart,
+  AlertTriangle,
+  CheckCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AuditLogModal from "@/components/AuditLogModal";
@@ -65,6 +68,7 @@ import {
   addEventCustomItemAction,
   updateEventCustomItemAction,
   deleteEventCustomItemAction,
+  convertEventCustomItemToInventoryAction,
   addEventTaskAction,
   toggleEventTaskAction,
   deleteEventTaskAction,
@@ -147,6 +151,8 @@ interface InventoryItem {
   imageUrl: string | null;
   damagedQuantity: number | null;
   inMaintenanceQuantity: number | null;
+  isConsumable?: boolean;
+  packageUnits?: number | null;
 }
 
 interface Allocation {
@@ -164,6 +170,8 @@ interface Allocation {
   itemWarehouseLocation: string | null;
   itemImageUrl: string | null;
   itemTotalQuantity: number;
+  itemIsConsumable?: boolean;
+  itemPackageUnits?: number | null;
 }
 
 interface Task {
@@ -1432,6 +1440,9 @@ export interface EventCustomItem {
   unitPrice: number;
   supplier?: string | null;
   notes?: string | null;
+  isConsumable?: boolean;
+  boughtStatus?: "pending" | "bought";
+  convertedItemId?: string | null;
   createdAt?: Date | string | null;
   updatedAt?: Date | string | null;
 }
@@ -1442,6 +1453,15 @@ interface Props {
   allClients: Client[];
   allItems: InventoryItem[];
   initialAllocations: Allocation[];
+  otherEventAllocations?: Array<{
+    id: string;
+    eventId: string;
+    eventName: string;
+    eventStartDate: Date | string | null;
+    eventStatus: string;
+    itemId: string;
+    quantity: number;
+  }>;
   initialCustomItems?: EventCustomItem[];
   initialTasks: Task[];
   initialMedia?: EventMediaItem[];
@@ -1557,6 +1577,7 @@ export default function EventDetailView({
   allClients,
   allItems,
   initialAllocations,
+  otherEventAllocations = [],
   initialCustomItems = [],
   initialTasks,
   initialMedia = [],
@@ -1897,8 +1918,10 @@ export default function EventDetailView({
   const [customItemUnitPrice, setCustomItemUnitPrice] = useState(0);
   const [customItemSupplier, setCustomItemSupplier] = useState("");
   const [customItemNotes, setCustomItemNotes] = useState("");
+  const [customItemIsConsumable, setCustomItemIsConsumable] = useState(false);
   const [customItemAddToQuota, setCustomItemAddToQuota] = useState(true);
   const [isSubmittingCustomItem, setIsSubmittingCustomItem] = useState(false);
+  const [convertingCustomItemId, setConvertingCustomItemId] = useState<string | null>(null);
 
   // New task inline state
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -2188,6 +2211,7 @@ export default function EventDetailView({
     setCustomItemUnitPrice(0);
     setCustomItemSupplier("");
     setCustomItemNotes("");
+    setCustomItemIsConsumable(false);
     setCustomItemAddToQuota(true);
     setShowAddCustomItemModal(true);
   };
@@ -2201,6 +2225,7 @@ export default function EventDetailView({
     setCustomItemUnitPrice(item.unitPrice);
     setCustomItemSupplier(item.supplier || "");
     setCustomItemNotes(item.notes || "");
+    setCustomItemIsConsumable(Boolean(item.isConsumable));
     setCustomItemAddToQuota(true);
     setShowAddCustomItemModal(true);
   };
@@ -2227,6 +2252,7 @@ export default function EventDetailView({
           unitPrice: customItemUnitPrice,
           supplier: customItemSupplier.trim() || undefined,
           notes: customItemNotes.trim() || undefined,
+          isConsumable: customItemIsConsumable,
           syncQuotaDifference: customItemAddToQuota,
         });
 
@@ -2250,6 +2276,7 @@ export default function EventDetailView({
                   unitPrice: customItemUnitPrice,
                   supplier: customItemSupplier.trim() || null,
                   notes: customItemNotes.trim() || null,
+                  isConsumable: customItemIsConsumable,
                   updatedAt: new Date(),
                 }
               : c
@@ -2268,6 +2295,7 @@ export default function EventDetailView({
           unitPrice: customItemUnitPrice,
           supplier: customItemSupplier.trim() || undefined,
           notes: customItemNotes.trim() || undefined,
+          isConsumable: customItemIsConsumable,
           addToQuota: customItemAddToQuota,
         });
 
@@ -2287,6 +2315,63 @@ export default function EventDetailView({
       console.error("Erro ao guardar artigo personalizado:", err);
     } finally {
       setIsSubmittingCustomItem(false);
+    }
+  };
+
+  const handleConvertCustomItemToInventory = async (item: EventCustomItem) => {
+    if (item.boughtStatus === "bought") return;
+    const confirmBuy = window.confirm(
+      `Confirmar a aquisição do artigo "${item.name}"?\n\n• Será registado no inventário permanente da CFM Events.\n• Será registada despesa financeira automática no valor de €${((item.quantity || 1) * (item.unitCost || 0)).toFixed(2)}.\n• Ficará alocado como material deste evento.`
+    );
+    if (!confirmBuy) return;
+
+    setConvertingCustomItemId(item.id);
+    try {
+      const res = await convertEventCustomItemToInventoryAction({
+        customItemId: item.id,
+        eventId: event.id,
+      });
+
+      if (res.success && res.itemId) {
+        // Update local custom items state
+        setCustomItems((prev) =>
+          prev.map((c) =>
+            c.id === item.id
+              ? { ...c, boughtStatus: "bought", convertedItemId: res.itemId }
+              : c
+          )
+        );
+
+        // Add newly created item to allocations so it's immediately visible in Stock
+        const newlyCreatedAllocation: Allocation = {
+          id: res.allocationId || `alc-${Date.now()}`,
+          eventId: event.id,
+          itemId: res.itemId,
+          quantity: item.quantity || 1,
+          status: "reservado",
+          notes: `Item adquirido para o evento (anteriormente exclusivo). Fornecedor: ${item.supplier || "N/A"}`,
+          itemName: item.name,
+          itemSku: res.sku || "ITM-NOVO",
+          itemCategory: item.category || "Personalizado",
+          itemUnitPrice: item.unitPrice,
+          itemReplacementCost: item.unitCost,
+          itemWarehouseLocation: "Armazém Principal",
+          itemImageUrl: "https://images.unsplash.com/photo-1549497538-303791108f95?auto=format&fit=crop&w=400&q=80",
+          itemTotalQuantity: item.quantity || 1,
+          itemIsConsumable: item.isConsumable,
+          itemPackageUnits: 1,
+        };
+        setAllocations((prev) => [...prev, newlyCreatedAllocation]);
+
+        alert(`Artigo "${item.name}" adicionado com sucesso ao inventário (SKU: ${res.sku}) e despesa de €${((item.quantity || 1) * (item.unitCost || 0)).toFixed(2)} registada em Finanças!`);
+      } else {
+        alert(res.error || "Não foi possível converter o artigo para o inventário.");
+      }
+    } catch (err: any) {
+      console.error("Erro ao converter artigo:", err);
+      alert("Erro ao registar compra do artigo.");
+    } finally {
+      setConvertingCustomItemId(null);
     }
   };
 
@@ -3672,9 +3757,30 @@ export default function EventDetailView({
                                   <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#e5e5ea] text-[#1c1c1e]">
                                     {item.category || "Personalizado"}
                                   </span>
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                                    Exclusivo deste evento
-                                  </span>
+                                  {item.isConsumable ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800">
+                                      🔥 Consumível
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                                      📦 Reutilizável
+                                    </span>
+                                  )}
+                                  {item.boughtStatus === "bought" ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 inline-flex items-center gap-1">
+                                      <CheckCircle className="w-3 h-3 text-emerald-600" />
+                                      <span>Adquirido & no Inventário</span>
+                                      {item.convertedItemId && (
+                                        <Link href={`/inventario/${item.convertedItemId}`} prefetch={false} className="underline hover:text-emerald-950 font-mono text-[9px]">
+                                          #{item.convertedItemId}
+                                        </Link>
+                                      )}
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                                      Exclusivo deste evento
+                                    </span>
+                                  )}
                                 </div>
 
                                 <div className="text-xs text-[#8e8e93] flex flex-wrap items-center gap-2 mt-1">
@@ -3702,7 +3808,7 @@ export default function EventDetailView({
                             </div>
 
                             {/* Right side values & actions */}
-                            <div className="flex items-center justify-between md:justify-end gap-4 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-[#ececf0]">
+                            <div className="flex items-center justify-between md:justify-end gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-[#ececf0]">
                               {/* Price breakdown */}
                               <div className="text-right">
                                 <div className="text-xs font-bold text-[#007aff] flex items-center justify-end gap-1">
@@ -3716,6 +3822,24 @@ export default function EventDetailView({
                                   </span>
                                 </div>
                               </div>
+
+                              {/* Button: Comprado — Adicionar ao Inventário & Despesa */}
+                              {item.boughtStatus !== "bought" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleConvertCustomItemToInventory(item)}
+                                  disabled={convertingCustomItemId === item.id}
+                                  className="px-3 py-1.5 rounded-[10px] bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50"
+                                  title="Marcar como comprado, registar despesa de saída e adicionar ao inventário permanente"
+                                >
+                                  {convertingCustomItemId === item.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <ShoppingCart className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>Comprado (Lançar no Inventário & Despesa)</span>
+                                </button>
+                              )}
 
                               {/* Edit & Delete */}
                               <div className="flex items-center gap-1">
@@ -4749,7 +4873,7 @@ export default function EventDetailView({
                 />
 
                 <select
-                  value={selectedItemId}
+                  value={selectedItemId || allItems[0]?.id || ""}
                   onChange={(e) => setSelectedItemId(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-white border border-[#ececf0] rounded-[12px] text-xs font-semibold"
                 >
@@ -4761,11 +4885,116 @@ export default function EventDetailView({
                     )
                     .map((item) => (
                       <option key={item.id} value={item.id}>
-                        {item.name} ({item.sku}) — Stock total: {item.totalQuantity} | €{item.unitPrice.toFixed(2)}
+                        {item.name} ({item.sku}) {item.isConsumable ? "🔥 Consumível" : "📦 Reutilizável"} — Stock: {item.totalQuantity} | €{item.unitPrice.toFixed(2)}
                       </option>
                     ))}
                 </select>
               </div>
+
+              {/* Consumable Caution Banner & Cross-Event Stock Breakdown */}
+              {(() => {
+                const targetId = selectedItemId || allItems[0]?.id;
+                const curItem = allItems.find((i) => i.id === targetId);
+                if (!curItem || !curItem.isConsumable) return null;
+
+                const packageUnits = curItem.packageUnits && curItem.packageUnits > 0 ? curItem.packageUnits : 1;
+                const totalStock = curItem.totalQuantity || 0;
+
+                // Other events using this consumable
+                const otherAllocationsForThisItem = otherEventAllocations.filter(
+                  (a) => a.itemId === curItem.id && a.eventStatus !== "cancelado"
+                );
+                const otherAllocatedTotal = otherAllocationsForThisItem.reduce((sum, a) => sum + a.quantity, 0);
+
+                const remainingAvailable = totalStock - otherAllocatedTotal;
+                const remainingPacks = Math.floor(Math.max(0, remainingAvailable) / packageUnits);
+                const requestedPacks = Math.ceil(allocationQty / packageUnits);
+                const hasStockDeficit = allocationQty > remainingAvailable;
+
+                return (
+                  <div
+                    className={`p-3.5 rounded-[16px] border ${
+                      hasStockDeficit
+                        ? "bg-rose-50/90 border-rose-300 text-rose-950"
+                        : otherAllocationsForThisItem.length > 0
+                        ? "bg-amber-50/90 border-amber-300 text-amber-950"
+                        : "bg-orange-50/80 border-orange-200 text-orange-950"
+                    } space-y-2.5`}
+                  >
+                    <div className="flex items-center justify-between font-bold text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-orange-200 text-orange-900">
+                          🔥 Artigo Consumível
+                        </span>
+                        <span className="text-[11px] font-semibold text-[#48484a]">
+                          {packageUnits > 1 ? `Embalagem: ${packageUnits} un/pack` : "Gasto por evento"}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold text-[#8e8e93]">
+                        {requestedPacks} pack(s) pedido(s)
+                      </span>
+                    </div>
+
+                    {/* Stock overview */}
+                    <div className="grid grid-cols-3 gap-2 text-center text-[11px] bg-white/90 rounded-[12px] p-2 border border-black/5">
+                      <div>
+                        <div className="text-[10px] text-[#8e8e93]">Stock Total</div>
+                        <div className="font-bold text-[#111]">{totalStock} un ({Math.ceil(totalStock / packageUnits)} pks)</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-[#8e8e93]">Noutros Eventos</div>
+                        <div className="font-bold text-amber-700">{otherAllocatedTotal} un</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-[#8e8e93]">Livre Restante</div>
+                        <div className={`font-bold ${hasStockDeficit ? "text-rose-600" : "text-emerald-700"}`}>
+                          {Math.max(0, remainingAvailable)} un ({remainingPacks} pks)
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Other events list */}
+                    {otherAllocationsForThisItem.length > 0 && (
+                      <div className="pt-2 border-t border-black/10 text-[11px]">
+                        <div className="font-bold mb-1.5 flex items-center justify-between text-amber-900">
+                          <span>Atenção: Este consumível está atribuído a outro(s) evento(s):</span>
+                          <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded font-bold">
+                            {otherAllocationsForThisItem.length} evento(s)
+                          </span>
+                        </div>
+                        <div className="max-h-24 overflow-y-auto space-y-1 pr-0.5">
+                          {otherAllocationsForThisItem.map((oa) => (
+                            <div
+                              key={oa.id}
+                              className="flex items-center justify-between bg-white px-2 py-1 rounded-[8px] text-[10px] border border-amber-200"
+                            >
+                              <span className="font-semibold text-[#111] truncate max-w-[190px]">
+                                {oa.eventName}
+                              </span>
+                              <span className="text-amber-800 shrink-0 font-mono font-bold">
+                                {oa.quantity} un ({Math.ceil(oa.quantity / packageUnits)} pks)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Caution Deficit Alert */}
+                    {hasStockDeficit && (
+                      <div className="p-2.5 rounded-[12px] bg-rose-100 border border-rose-300 text-rose-950 text-[11px] font-semibold flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="block text-rose-900">Cuidado: Não há embalagens suficientes!</strong>
+                          <p className="text-[10px] text-rose-800 mt-0.5 font-normal leading-tight">
+                            A quantidade pretendida ({allocationQty} un / {requestedPacks} pks) excede o stock livre restante ({Math.max(0, remainingAvailable)} un / {remainingPacks} pks). O mesmo consumível está a ser usado em múltiplos eventos. É necessário adquirir mais embalagens.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Quantity */}
               <div>
@@ -4971,6 +5200,21 @@ export default function EventDetailView({
                   onChange={(e) => setCustomItemNotes(e.target.value)}
                   className="w-full px-3.5 py-2 bg-white border border-[#ececf0] focus:border-[#007aff] rounded-[10px] text-xs outline-none resize-none"
                 />
+              </div>
+
+              {/* Consumable toggle */}
+              <div className="p-3 rounded-[12px] bg-orange-50/70 border border-orange-200/80 flex items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  id="customItemIsConsumable"
+                  checked={customItemIsConsumable}
+                  onChange={(e) => setCustomItemIsConsumable(e.target.checked)}
+                  className="mt-0.5 rounded border-orange-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                />
+                <label htmlFor="customItemIsConsumable" className="text-[11px] text-[#1c1c1e] cursor-pointer select-none">
+                  <strong className="text-orange-900 block font-bold">Artigo Consumível / Uso Único</strong>
+                  Marque se for um artigo que se consome ou gasta no evento (ex: flores frescas, velas, fitas decorativas, descartáveis, produtos perecíveis) em vez de equipamento permanente.
+                </label>
               </div>
 
               {/* Quota addition toggle */}

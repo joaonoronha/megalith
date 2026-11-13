@@ -461,6 +461,9 @@ export async function createItemAction(formData: FormData) {
   const purchaseStatus: "bought" | "not_bought" =
     rawPurchaseStatus === "not_bought" ? "not_bought" : "bought";
 
+  const isConsumable = formData.get("isConsumable") === "true" || formData.get("isConsumable") === "1" || formData.get("isConsumable") === "on";
+  const packageUnits = parseInt((formData.get("packageUnits") as string) || "1", 10) || 1;
+
   const rawPurchasePrice = formData.get("purchasePrice") as string;
   const rawTotalPurchasePrice = formData.get("totalPurchasePrice") as string;
   let totalCost = 0;
@@ -488,6 +491,8 @@ export async function createItemAction(formData: FormData) {
     replacementCost,
     purchaseStatus,
     purchaseCost: totalCost,
+    isConsumable,
+    packageUnits,
     imageUrl: imageUrl || "https://images.unsplash.com/photo-1549497538-303791108f95?auto=format&fit=crop&w=400&q=80",
     damagedQuantity: 0,
     inMaintenanceQuantity: 0,
@@ -631,6 +636,8 @@ export async function updateItemPatchAction(
     replacementCost?: number | null;
     purchaseStatus?: "bought" | "not_bought" | null;
     purchaseCost?: number | null;
+    isConsumable?: boolean | null;
+    packageUnits?: number | null;
     imageUrl?: string | null;
     damagedQuantity?: number | null;
     inMaintenanceQuantity?: number | null;
@@ -654,6 +661,8 @@ export async function updateItemPatchAction(
   if (patch.replacementCost !== undefined) updateData.replacementCost = patch.replacementCost === null ? null : Math.max(0, patch.replacementCost);
   if (patch.purchaseStatus !== undefined) updateData.purchaseStatus = patch.purchaseStatus;
   if (patch.purchaseCost !== undefined) updateData.purchaseCost = patch.purchaseCost === null ? 0 : Math.max(0, patch.purchaseCost);
+  if (patch.isConsumable !== undefined) updateData.isConsumable = Boolean(patch.isConsumable);
+  if (patch.packageUnits !== undefined) updateData.packageUnits = patch.packageUnits === null ? 1 : Math.max(1, patch.packageUnits);
   if (patch.imageUrl !== undefined) updateData.imageUrl = patch.imageUrl || null;
   if (patch.damagedQuantity !== undefined) updateData.damagedQuantity = patch.damagedQuantity === null ? 0 : Math.max(0, patch.damagedQuantity);
   if (patch.inMaintenanceQuantity !== undefined) updateData.inMaintenanceQuantity = patch.inMaintenanceQuantity === null ? 0 : Math.max(0, patch.inMaintenanceQuantity);
@@ -1266,6 +1275,7 @@ export async function addEventCustomItemAction(params: {
   unitPrice: number;
   supplier?: string;
   notes?: string;
+  isConsumable?: boolean;
   addToQuota?: boolean;
 }) {
   await ensureDbMigrated().catch(() => {});
@@ -1278,6 +1288,7 @@ export async function addEventCustomItemAction(params: {
     unitPrice = 0,
     supplier,
     notes,
+    isConsumable = false,
     addToQuota = true,
   } = params;
 
@@ -1304,6 +1315,8 @@ export async function addEventCustomItemAction(params: {
     unitPrice: cleanUnitPrice,
     supplier: supplier?.trim() || null,
     notes: notes?.trim() || null,
+    isConsumable: Boolean(isConsumable),
+    boughtStatus: "pending",
     createdAt: now,
     updatedAt: now,
   });
@@ -1334,7 +1347,7 @@ export async function addEventCustomItemAction(params: {
     title: "Artigo personalizado adicionado",
     details: `Adicionado artigo exclusivo "${name.trim()}" (Qtd: ${cleanQty}, Custo: €${cleanUnitCost.toFixed(2)}, Quota: €${cleanUnitPrice.toFixed(2)}${
       addToQuota ? ` · +€${totalPrice.toFixed(2)} adicionado à quota` : ""
-    })`,
+    }${isConsumable ? " · Classificado como consumível" : ""})`,
   });
 
   invalidateAllCaches();
@@ -1351,6 +1364,8 @@ export async function addEventCustomItemAction(params: {
       unitPrice: cleanUnitPrice,
       supplier: supplier?.trim() || null,
       notes: notes?.trim() || null,
+      isConsumable: Boolean(isConsumable),
+      boughtStatus: "pending" as const,
       createdAt: now,
       updatedAt: now,
     },
@@ -1368,6 +1383,7 @@ export async function updateEventCustomItemAction(params: {
   unitPrice: number;
   supplier?: string;
   notes?: string;
+  isConsumable?: boolean;
   syncQuotaDifference?: boolean;
 }) {
   await ensureDbMigrated().catch(() => {});
@@ -1381,6 +1397,7 @@ export async function updateEventCustomItemAction(params: {
     unitPrice = 0,
     supplier,
     notes,
+    isConsumable,
     syncQuotaDifference = true,
   } = params;
 
@@ -1411,18 +1428,24 @@ export async function updateEventCustomItemAction(params: {
 
   const now = new Date();
 
+  const updateFields: Record<string, any> = {
+    name: name.trim(),
+    category: category.trim() || "Personalizado",
+    quantity: cleanQty,
+    unitCost: cleanUnitCost,
+    unitPrice: cleanUnitPrice,
+    supplier: supplier?.trim() || null,
+    notes: notes?.trim() || null,
+    updatedAt: now,
+  };
+
+  if (isConsumable !== undefined) {
+    updateFields.isConsumable = Boolean(isConsumable);
+  }
+
   await db
     .update(eventCustomItems)
-    .set({
-      name: name.trim(),
-      category: category.trim() || "Personalizado",
-      quantity: cleanQty,
-      unitCost: cleanUnitCost,
-      unitPrice: cleanUnitPrice,
-      supplier: supplier?.trim() || null,
-      notes: notes?.trim() || null,
-      updatedAt: now,
-    })
+    .set(updateFields)
     .where(eq(eventCustomItems.id, id));
 
   if (syncQuotaDifference && (diffPrice !== 0 || diffCost !== 0)) {
@@ -1454,6 +1477,136 @@ export async function updateEventCustomItemAction(params: {
   invalidateAllCaches();
   revalidatePath(`/eventos/${eventId}`);
   return { success: true };
+}
+
+// 14.25 Convert Event Custom Item to Inventory Item & Expense It Straight Away
+export async function convertEventCustomItemToInventoryAction(params: {
+  customItemId: string;
+  eventId: string;
+  warehouseLocation?: string;
+  customSku?: string;
+}) {
+  await ensureDbMigrated().catch(() => {});
+  const { customItemId, eventId, warehouseLocation = "Armazém Principal", customSku } = params;
+
+  if (!customItemId || !eventId) {
+    return { success: false, error: "ID do artigo e ID do evento são obrigatórios." };
+  }
+
+  const customItem = await db.query.eventCustomItems.findFirst({
+    where: eq(eventCustomItems.id, customItemId),
+  });
+
+  if (!customItem) {
+    return { success: false, error: "Artigo exclusivo não encontrado." };
+  }
+
+  if (customItem.boughtStatus === "bought" && customItem.convertedItemId) {
+    return { success: false, error: "Este artigo já foi adquirido e convertido para o inventário." };
+  }
+
+  const targetEvent = await db.query.events.findFirst({
+    where: eq(events.id, eventId),
+  });
+
+  const now = new Date();
+  const newItemId = generateId("itm");
+  const skuPrefix = customItem.isConsumable ? "CSM" : "EQP";
+  const sku = customSku?.trim() || `${skuPrefix}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  const totalCost = (customItem.quantity || 1) * (customItem.unitCost || 0);
+
+  // 1. Create item in inventory (marked as bought)
+  await db.insert(inventoryItems).values({
+    id: newItemId,
+    sku: sku.toUpperCase(),
+    name: customItem.name,
+    category: customItem.category || "Personalizado",
+    totalQuantity: customItem.quantity || 1,
+    minStock: 0,
+    warehouseLocation: warehouseLocation || "Armazém Principal",
+    dimensions: customItem.notes || null,
+    unitPrice: customItem.unitPrice || 0,
+    replacementCost: customItem.unitCost || 0,
+    purchaseStatus: "bought",
+    purchaseCost: totalCost,
+    isConsumable: Boolean(customItem.isConsumable),
+    packageUnits: 1,
+    imageUrl: "https://images.unsplash.com/photo-1549497538-303791108f95?auto=format&fit=crop&w=400&q=80",
+    damagedQuantity: 0,
+    inMaintenanceQuantity: 0,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  // 2. Automatically expense in finance (saída)
+  let createdMovement: any = null;
+  if (totalCost > 0) {
+    const movId = generateId("mov");
+    createdMovement = {
+      id: movId,
+      type: "saida" as const,
+      category: "Material / Stock",
+      description: `Aquisição de Material do Evento: ${customItem.name} (${customItem.quantity} un.)`,
+      amount: totalCost,
+      date: now,
+      eventId: eventId,
+      clientId: targetEvent?.clientId || null,
+      notes: `Despesa automática gerada ao comprar artigo exclusivo "${customItem.name}" para o evento "${targetEvent?.name || eventId}" e integrá-lo no inventário (${sku}).`,
+      createdAt: now,
+    };
+    await db.insert(financialMovements).values(createdMovement);
+  }
+
+  // 3. Create allocation linking the new inventory item to the event
+  const allocId = generateId("alc");
+  await db.insert(eventAllocations).values({
+    id: allocId,
+    eventId: eventId,
+    itemId: newItemId,
+    quantity: customItem.quantity || 1,
+    status: "reservado",
+    notes: `Item adquirido para o evento (anteriormente exclusivo). Fornecedor: ${customItem.supplier || "N/A"}`,
+  });
+
+  // 4. Mark custom item as bought and link to converted item
+  await db
+    .update(eventCustomItems)
+    .set({
+      boughtStatus: "bought",
+      convertedItemId: newItemId,
+      updatedAt: now,
+    })
+    .where(eq(eventCustomItems.id, customItemId));
+
+  // 5. Audit logs
+  await recordAuditLog({
+    entityType: "event",
+    entityId: eventId,
+    action: "material_comprado",
+    title: "Material comprado e adicionado ao inventário",
+    details: `Artigo "${customItem.name}" (${customItem.quantity} un.) marcado como comprado. Adicionado ao inventário com SKU ${sku} e registada despesa de €${totalCost.toFixed(2)}.`,
+  });
+
+  await recordAuditLog({
+    entityType: "inventory",
+    entityId: newItemId,
+    action: "criado_de_evento",
+    title: "Artigo criado a partir de evento",
+    details: `Artigo "${customItem.name}" comprado especificamente para o evento "${targetEvent?.name || eventId}" e integrado no stock permanente.`,
+  });
+
+  invalidateAllCaches();
+  safeRevalidate(`/eventos/${eventId}`);
+  safeRevalidate(`/inventario/${newItemId}`);
+
+  return {
+    success: true,
+    itemId: newItemId,
+    sku,
+    allocationId: allocId,
+    movementId: createdMovement?.id || null,
+  };
 }
 
 // 14.3 Delete Custom Item Specific to Event (deduct from quota)

@@ -110,9 +110,19 @@ export async function ensureDbMigrated(): Promise<void> {
         unit_price REAL NOT NULL DEFAULT 0,
         supplier TEXT,
         notes TEXT,
+        is_consumable INTEGER DEFAULT 0,
+        bought_status TEXT DEFAULT 'pending',
+        converted_item_id TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER
       )`,
+
+      // 8. Consumables & Custom Items conversion columns
+      "ALTER TABLE inventory_items ADD COLUMN is_consumable INTEGER DEFAULT 0",
+      "ALTER TABLE inventory_items ADD COLUMN package_units INTEGER DEFAULT 1",
+      "ALTER TABLE event_custom_items ADD COLUMN is_consumable INTEGER DEFAULT 0",
+      "ALTER TABLE event_custom_items ADD COLUMN bought_status TEXT DEFAULT 'pending'",
+      "ALTER TABLE event_custom_items ADD COLUMN converted_item_id TEXT",
     ];
 
     for (const sql of migrationStatements) {

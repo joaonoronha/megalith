@@ -13,7 +13,7 @@ import {
   quotes,
   users,
 } from "@/db/schema";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, ne, desc, asc } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import EventDetailView from "@/components/EventDetailView";
 import { isMeetingEvent } from "@/lib/events";
@@ -58,6 +58,7 @@ export default async function EventPage({ params }: PageProps) {
     allClients,
     allItems,
     rawAllocations,
+    otherEventAllocations,
     tasks,
     eventQuotes,
     rawMedia,
@@ -98,10 +99,26 @@ export default async function EventPage({ params }: PageProps) {
         itemWarehouseLocation: inventoryItems.warehouseLocation,
         itemImageUrl: inventoryItems.imageUrl,
         itemTotalQuantity: inventoryItems.totalQuantity,
+        itemIsConsumable: inventoryItems.isConsumable,
+        itemPackageUnits: inventoryItems.packageUnits,
       })
       .from(eventAllocations)
       .innerJoin(inventoryItems, eq(eventAllocations.itemId, inventoryItems.id))
       .where(eq(eventAllocations.eventId, id))
+      .catch(() => []),
+    db
+      .select({
+        id: eventAllocations.id,
+        eventId: eventAllocations.eventId,
+        eventName: events.name,
+        eventStartDate: events.startDate,
+        eventStatus: events.status,
+        itemId: eventAllocations.itemId,
+        quantity: eventAllocations.quantity,
+      })
+      .from(eventAllocations)
+      .innerJoin(events, eq(eventAllocations.eventId, events.id))
+      .where(ne(eventAllocations.eventId, id))
       .catch(() => []),
     db.query.eventTasks.findMany({
       where: eq(eventTasks.eventId, id),
@@ -221,6 +238,7 @@ export default async function EventPage({ params }: PageProps) {
       allClients={allClients || []}
       allItems={allItems || []}
       initialAllocations={rawAllocations || []}
+      otherEventAllocations={otherEventAllocations || []}
       initialCustomItems={customItems || []}
       initialTasks={tasks || []}
       initialMedia={media || []}
