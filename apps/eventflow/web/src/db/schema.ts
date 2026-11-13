@@ -59,6 +59,7 @@ export const inventoryItems = sqliteTable("inventory_items", {
   barcode: text("barcode"), // EAN-13, UPC-A, Code-128 etc.
   damagedQuantity: integer("damaged_quantity").default(0),
   inMaintenanceQuantity: integer("in_maintenance_quantity").default(0),
+  deletedAt: integer("deleted_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
   lastUpdatedByUserId: text("last_updated_by_user_id"),

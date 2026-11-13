@@ -40,6 +40,7 @@ export async function ensureDbMigrated(): Promise<void> {
       // 2.1 Inventory Items columns
       "ALTER TABLE inventory_items ADD COLUMN purchase_status TEXT DEFAULT 'bought'",
       "ALTER TABLE inventory_items ADD COLUMN purchase_cost REAL DEFAULT 0",
+      "ALTER TABLE inventory_items ADD COLUMN deleted_at INTEGER",
 
       // 3. Moodboard Comments table
       `CREATE TABLE IF NOT EXISTS moodboard_comments (

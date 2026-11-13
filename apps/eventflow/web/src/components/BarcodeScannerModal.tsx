@@ -19,8 +19,11 @@ import {
   ArrowRight,
   ChevronRight,
   Info,
+  Upload,
+  ImageIcon,
+  Loader2,
 } from "lucide-react";
-import { searchBarcodeAction, addBarcodeStockAction, createItemAction } from "@/app/actions";
+import { searchBarcodeAction, addBarcodeStockAction, createItemAction, uploadItemPhotoAction } from "@/app/actions";
 import type { BarcodeSearchResult } from "@/app/actions";
 import { readBarcodes } from "zxing-wasm/reader";
 
@@ -85,6 +88,7 @@ export default function BarcodeScannerModal({
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [manualCodeInput, setManualCodeInput] = useState("");
   const [showManualInput, setShowManualInput] = useState(false);
+  const [scanCycle, setScanCycle] = useState(0);
 
   // Estado do Resultado da Leitura
   const [activeBarcode, setActiveBarcode] = useState<string | null>(null);
@@ -103,12 +107,15 @@ export default function BarcodeScannerModal({
   const [newItemIsConsumable, setNewItemIsConsumable] = useState(false);
   const [newItemPrice, setNewItemPrice] = useState<string>("0");
   const [newItemImageUrl, setNewItemImageUrl] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const isScanningLockedRef = useRef(false);
   const scanLoopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const photoCameraInputRef = useRef<HTMLInputElement | null>(null);
+  const photoFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Iniciar Leitura da Câmara com zxing-wasm
   useEffect(() => {
@@ -178,7 +185,15 @@ export default function BarcodeScannerModal({
         }
 
         streamRef.current = stream;
-        if (videoRef.current) {
+
+        // Aguardar que o elemento <video> seja montado no DOM se estava oculto
+        let retries = 0;
+        while (!videoRef.current && retries < 20 && isMounted) {
+          await new Promise((r) => setTimeout(r, 50));
+          retries++;
+        }
+
+        if (videoRef.current && isMounted) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play().catch(() => {});
         }
@@ -204,7 +219,7 @@ export default function BarcodeScannerModal({
       isMounted = false;
       stopCamera();
     };
-  }, [isOpen, facingMode]);
+  }, [isOpen, facingMode, scanCycle]);
 
   function stopCamera() {
     if (scanLoopTimeoutRef.current) {
@@ -338,16 +353,42 @@ export default function BarcodeScannerModal({
     }
   }
 
-  // Reiniciar para nova leitura
+  // Fotografar ou carregar imagem do artigo
+  async function handlePhotoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    setCreateError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await uploadItemPhotoAction(fd);
+      if (res.success && res.url) {
+        setNewItemImageUrl(res.url);
+      } else {
+        setCreateError(res.error || "Não foi possível carregar a fotografia.");
+      }
+    } catch (err: any) {
+      setCreateError(err?.message || "Erro ao processar fotografia.");
+    } finally {
+      setIsUploadingPhoto(false);
+      e.target.value = "";
+    }
+  }
+
+  // Reiniciar para nova leitura com abertura garantida da câmara
   function resetForNextScan() {
+    stopCamera();
     setActiveBarcode(null);
     setSearchResult(null);
     setStockSuccessMsg(null);
     setCreateError(null);
     isScanningLockedRef.current = false;
-    setIsCameraActive(true);
     setManualCodeInput("");
     setShowManualInput(false);
+    setNewItemImageUrl(null);
+    setScanCycle((c) => c + 1);
   }
 
   if (!isOpen) return null;
@@ -703,22 +744,82 @@ export default function BarcodeScannerModal({
                 </div>
               )}
 
-              {/* Pré-visualização da Imagem se existente */}
-              {newItemImageUrl && (
-                <div className="flex items-center gap-3 p-3 bg-[#f9f9fb] border border-[#ececf0] rounded-2xl">
-                  <img
-                    src={newItemImageUrl}
-                    alt="Artigo"
-                    className="w-14 h-14 rounded-xl object-cover bg-white border border-[#ececf0]"
-                  />
-                  <div className="text-xs min-w-0">
-                    <span className="text-[10px] uppercase font-bold text-emerald-600 block">
-                      Fotografia Detetada
+              {/* Opção de Fotografia do Artigo */}
+              <div className="bg-[#f9f9fb] border border-[#ececf0] rounded-2xl p-3 space-y-2">
+                <input
+                  ref={photoCameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handlePhotoFileChange}
+                />
+                <input
+                  ref={photoFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handlePhotoFileChange}
+                />
+
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-[#636366] flex items-center gap-1.5">
+                    <Camera className="w-3.5 h-3.5 text-[#007aff]" />
+                    <span>Fotografia do Artigo</span>
+                  </label>
+                  {isUploadingPhoto && (
+                    <span className="text-[11px] text-[#007aff] font-semibold flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>A carregar...</span>
                     </span>
-                    <p className="font-medium text-[#111] truncate">{newItemName}</p>
-                  </div>
+                  )}
                 </div>
-              )}
+
+                {newItemImageUrl ? (
+                  <div className="flex items-center gap-3 p-2 bg-white border border-[#ececf0] rounded-xl">
+                    <img
+                      src={newItemImageUrl}
+                      alt="Artigo"
+                      className="w-14 h-14 rounded-lg object-cover bg-[#f2f2f5] border border-[#ececf0] shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] uppercase font-bold text-emerald-600 block">
+                        Foto Carregada
+                      </span>
+                      <p className="font-medium text-xs text-[#111] truncate">{newItemName || "Artigo"}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setNewItemImageUrl(null)}
+                      className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-600 transition"
+                      title="Remover foto"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => photoCameraInputRef.current?.click()}
+                      disabled={isUploadingPhoto}
+                      className="p-2.5 rounded-xl border border-dashed border-[#c6c6c8] hover:border-[#007aff] bg-white text-[#111] hover:text-[#007aff] flex items-center justify-center gap-1.5 text-xs font-semibold transition cursor-pointer"
+                    >
+                      <Camera className="w-4 h-4 text-[#007aff]" />
+                      <span>Tirar Foto</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => photoFileInputRef.current?.click()}
+                      disabled={isUploadingPhoto}
+                      className="p-2.5 rounded-xl border border-dashed border-[#c6c6c8] hover:border-[#007aff] bg-white text-[#111] hover:text-[#007aff] flex items-center justify-center gap-1.5 text-xs font-semibold transition cursor-pointer"
+                    >
+                      <Upload className="w-4 h-4 text-[#636366]" />
+                      <span>Carregar Foto</span>
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {/* Campos Essenciais do Formulário */}
               <div className="space-y-3">

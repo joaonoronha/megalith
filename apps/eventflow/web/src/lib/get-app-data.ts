@@ -13,7 +13,7 @@ import {
   eventMeetings,
   alerts,
 } from "@/db/schema";
-import { desc, asc } from "drizzle-orm";
+import { desc, asc, isNull } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 
 export async function getAppInitialData() {
@@ -50,7 +50,9 @@ export async function getAppInitialData() {
         console.error("getAppInitialData: error loading events", e);
         return [];
       }),
-      db.query.inventoryItems.findMany().catch((e) => {
+      db.query.inventoryItems.findMany({
+        where: isNull(inventoryItems.deletedAt),
+      }).catch((e) => {
         console.error("getAppInitialData: error loading items", e);
         return [];
       }),
