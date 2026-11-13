@@ -768,24 +768,6 @@ export default function BarcodeScannerModal({
                     </select>
                   </div>
                 )}
-
-                {/* Consumível (Checkbox Amigável) */}
-                <label className="flex items-center gap-2 p-2.5 rounded-xl bg-[#f9f9fb] border border-[#ececf0] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={newItemIsConsumable}
-                    onChange={(e) => setNewItemIsConsumable(e.target.checked)}
-                    className="w-4 h-4 text-[#007aff] rounded-md focus:ring-[#007aff]"
-                  />
-                  <div className="text-xs">
-                    <span className="font-semibold text-[#111] block">
-                      Artigo de consumo único
-                    </span>
-                    <span className="text-[10px] text-[#8e8e93]">
-                      Ex: bebidas, velas, guardanapos, descartáveis
-                    </span>
-                  </div>
-                </label>
               </div>
 
               {/* Botões de Ação */}
