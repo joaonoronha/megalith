@@ -1901,7 +1901,7 @@ export default function EventDetailView({
   const [newMediaDescription, setNewMediaDescription] = useState("");
   const [stagedMedia, setStagedMedia] = useState<StagedMediaItem[]>([]);
   const [urlInputValue, setUrlInputValue] = useState("");
-  const [activeInputTab, setActiveInputTab] = useState<"upload" | "url" | "presets">("upload");
+  const [activeInputTab, setActiveInputTab] = useState<"upload" | "url">("upload");
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -2660,8 +2660,8 @@ export default function EventDetailView({
       setBoardTitleInput(targetBoard.title);
     } else {
       setTargetBoardForUpload(null);
-      setNewMediaType(mediaFilter === "final_outcome" ? "final_outcome" : "idea_board");
-      setNewMediaTag(mediaFilter === "final_outcome" ? "Resultado Real" : "Flores & Centros");
+      setNewMediaType("idea_board");
+      setNewMediaTag("Flores & Centros");
       setBoardTitleInput("");
     }
     setStagedMedia([]);
@@ -5329,9 +5329,7 @@ export default function EventDetailView({
                   <h3 className="font-bold text-base text-[#111]">
                     {targetBoardForUpload
                       ? `Adicionar Fotos a: ${targetBoardForUpload.title}`
-                      : newMediaType === "idea_board"
-                      ? "Novo Painel de Ideias / Moodboard"
-                      : "Novas Fotografias do Resultado Real"}
+                      : "Novo Moodboard"}
                   </h3>
                   <p className="text-[11px] text-[#8e8e93]">
                     {targetBoardForUpload
@@ -5356,69 +5354,15 @@ export default function EventDetailView({
               {!targetBoardForUpload && (
                 <div>
                   <label className="block text-xs font-bold text-[#111] mb-1">
-                    Título do {newMediaType === "idea_board" ? "Moodboard" : "Álbum de Resultado"}
+                    Dá um nome á tua ideia
                   </label>
                   <input
                     type="text"
                     value={boardTitleInput}
                     onChange={(e) => setBoardTitleInput(e.target.value)}
-                    placeholder={
-                      newMediaType === "idea_board"
-                        ? "Ex: Paleta Floral & Terracotta, Lounge Exterior, Iluminação..."
-                        : "Ex: Montagem da Cerimónia, Altar Concluído, Salão Principal..."
-                    }
+                    placeholder="Ex: Paleta Floral & Terracotta, Lounge Exterior, Iluminação..."
                     className="w-full px-3.5 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                   />
-                </div>
-              )}
-
-              {/* Target Type Selector (if creating new) */}
-              {!targetBoardForUpload && (
-                <div>
-                  <label className="block text-xs font-bold text-[#111] mb-1.5">Destino do Painel</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewMediaType("idea_board");
-                        if (newMediaTag === "Resultado Real") setNewMediaTag("Flores & Centros");
-                      }}
-                      className={`p-3 rounded-[14px] border text-left transition cursor-pointer ${
-                        newMediaType === "idea_board"
-                          ? "bg-amber-50 border-amber-300 ring-2 ring-amber-400/30"
-                          : "bg-[#fafafc] border-[#ececf0] hover:border-[#d2d2d7]"
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 mb-0.5">
-                        <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Painel de Ideias / Moodboard</span>
-                      </div>
-                      <p className="text-[11px] text-amber-700/80">
-                        Conceito, inspiração e referências visuais pré-evento.
-                      </p>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewMediaType("final_outcome");
-                        setNewMediaTag("Resultado Real");
-                      }}
-                      className={`p-3 rounded-[14px] border text-left transition cursor-pointer ${
-                        newMediaType === "final_outcome"
-                          ? "bg-emerald-50 border-emerald-300 ring-2 ring-emerald-400/30"
-                          : "bg-[#fafafc] border-[#ececf0] hover:border-[#d2d2d7]"
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 mb-0.5">
-                        <Camera className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Resultado Final (Fotos Reais)</span>
-                      </div>
-                      <p className="text-[11px] text-emerald-700/80">
-                        Fotografias reais da montagem e do evento executado.
-                      </p>
-                    </button>
-                  </div>
                 </div>
               )}
 
@@ -5433,7 +5377,7 @@ export default function EventDetailView({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#f2f2f5] rounded-[14px]">
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#f2f2f5] rounded-[14px]">
                   <button
                     type="button"
                     onClick={() => setActiveInputTab("upload")}
@@ -5458,19 +5402,6 @@ export default function EventDetailView({
                   >
                     <Link2 className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Inserir URLs</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveInputTab("presets")}
-                    className={`py-2 px-3 rounded-[10px] text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                      activeInputTab === "presets"
-                        ? "bg-white text-[#111] shadow-xs"
-                        : "text-[#636366] hover:text-[#111]"
-                    }`}
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Sugestões CFM</span>
                   </button>
                 </div>
               </div>
@@ -5563,42 +5494,7 @@ export default function EventDetailView({
                 </div>
               )}
 
-              {/* TAB 3: Curated CFM Presets */}
-              {activeInputTab === "presets" && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold text-[#111]">
-                      Sugestões Rápidas de Inspiração CFM
-                    </label>
-                    <span className="text-[10px] text-[#8e8e93]">Clique para adicionar à lista</span>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-                    {MEDIA_INSPIRATION_PRESETS.filter((p) => p.type === newMediaType).map((preset, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleAddPreset(preset)}
-                        className="p-2 rounded-[12px] border text-left flex items-center gap-2 transition cursor-pointer bg-[#fafafc] border-[#ececf0] hover:bg-blue-50/50 hover:border-blue-200 group"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={preset.url}
-                          alt={preset.title}
-                          className="w-10 h-10 rounded-[8px] object-cover flex-shrink-0"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[11px] font-bold text-[#111] truncate group-hover:text-[#007aff]">
-                            {preset.title}
-                          </div>
-                          <div className="text-[10px] text-[#8e8e93] truncate">{preset.tag}</div>
-                        </div>
-                        <Plus className="w-4 h-4 text-[#8e8e93] group-hover:text-[#007aff] flex-shrink-0" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* STAGED QUEUE: Preview list of items to be uploaded/added */}
               <div className="border-t border-[#ececf0] pt-3">
@@ -5692,47 +5588,18 @@ export default function EventDetailView({
                 )}
               </div>
 
-              {/* Batch Defaults */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#ececf0]">
-                {/* Default Category */}
-                <div>
-                  <label className="block text-xs font-bold text-[#111] mb-1">Categoria Padrão</label>
-                  <select
-                    value={newMediaTag}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setNewMediaTag(val);
-                      // Update staged items that have the previous default tag
-                      setStagedMedia((prev) =>
-                        prev.map((item) => ({ ...item, tag: val }))
-                      );
-                    }}
-                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] text-[#111]"
-                  >
-                    <option value="Flores & Centros">Flores & Centros de Mesa</option>
-                    <option value="Iluminação & Ambiente">Iluminação & Ambiente</option>
-                    <option value="Cerimónia & Altar">Cerimónia & Altar</option>
-                    <option value="Lounge & Mobiliário">Lounge & Mobiliário</option>
-                    <option value="Mesa & Louça">Mesa, Toalhas & Louça</option>
-                    <option value="Palco & Som">Palco & Estruturas</option>
-                    <option value="Bolo & Doces">Bolo & Candy Bar</option>
-                    <option value="Zona de Fotos">Zona de Fotos / Backdrop</option>
-                    <option value="Resultado Real">Resultado Real Concluído</option>
-                    <option value="Geral">Geral</option>
-                  </select>
-                </div>
-
-                {/* Batch Description / Notes */}
-                <div>
-                  <label className="block text-xs font-bold text-[#111] mb-1">Notas do Moodboard (Opcional)</label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Fornecedor Quinta, aprovado pelo cliente..."
-                    value={batchDescription}
-                    onChange={(e) => setBatchDescription(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                  />
-                </div>
+              {/* Idea Description */}
+              <div className="pt-2 border-t border-[#ececf0]">
+                <label className="block text-xs font-bold text-[#111] mb-1">
+                  Descreve a tua ideia
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Ex: Estilo minimalista com flores secas, iluminação quente e lounge em linho..."
+                  value={batchDescription}
+                  onChange={(e) => setBatchDescription(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff] resize-none"
+                />
               </div>
             </div>
 
