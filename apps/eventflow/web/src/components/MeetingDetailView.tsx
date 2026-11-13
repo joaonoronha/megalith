@@ -468,9 +468,6 @@ export default function MeetingDetailView({
                 <Video className="w-3 h-3" />
                 <span>Reunião & Briefing</span>
               </span>
-              <span className="text-xs text-[#8e8e93] font-mono hidden md:inline">
-                #{meeting.id}
-              </span>
             </div>
           </div>
 
@@ -530,18 +527,25 @@ export default function MeetingDetailView({
             <button
               type="button"
               onClick={() => {
-                navigator.clipboard.writeText(meeting.id);
-                setCopiedId(true);
-                setTimeout(() => setCopiedId(false), 2000);
+                if (typeof window !== "undefined") {
+                  navigator.clipboard.writeText(window.location.href);
+                  setCopiedId(true);
+                  setTimeout(() => setCopiedId(false), 2000);
+                }
               }}
-              className="self-start sm:self-auto px-2.5 py-1 rounded-full text-xs font-mono bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#636366] transition flex items-center gap-1.5 cursor-pointer"
-              title="Copiar ID da reunião"
+              className="self-start sm:self-auto px-3 py-1.5 rounded-full text-xs font-semibold bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#111] transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              title="Copiar link direto para esta reunião"
             >
-              <span>#{meeting.id}</span>
               {copiedId ? (
-                <Check className="w-3 h-3 text-emerald-600" />
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-emerald-700">Link copiado!</span>
+                </>
               ) : (
-                <Copy className="w-3 h-3 text-[#8e8e93]" />
+                <>
+                  <Share2 className="w-3.5 h-3.5 text-[#8e8e93]" />
+                  <span>Partilhar</span>
+                </>
               )}
             </button>
           </div>

@@ -2989,18 +2989,15 @@ export default function EventDetailView({
               </select>
             </div>
 
-            {/* Auditing Log & Last Updated */}
-            <div className="flex items-center gap-1.5 sm:gap-2 pl-1.5 sm:pl-2 border-l border-[#ececf0] flex-shrink-0">
-              <span className="hidden lg:inline text-[11px] text-[#8e8e93]">
-                Last updated by <strong className="text-[#3a3a3c] font-semibold">{event.lastUpdatedByName || "Administrador CFM"}</strong> {formatRelativeTime(event.updatedAt, "en")}
-              </span>
+            {/* Auditing Log */}
+            <div className="flex items-center gap-1.5 pl-1.5 sm:pl-2 border-l border-[#ececf0] flex-shrink-0">
               <button
                 type="button"
                 onClick={() => setShowAuditModal(true)}
-                className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#007aff] hover:text-[#005bb5] font-semibold text-xs transition cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#636366] hover:text-[#111] font-semibold text-xs transition cursor-pointer"
                 title="Ver histórico de alterações do evento"
               >
-                <History className="w-3.5 h-3.5" />
+                <History className="w-3.5 h-3.5 text-[#8e8e93]" />
                 <span className="hidden sm:inline">Histórico</span>
               </button>
             </div>
@@ -3092,22 +3089,29 @@ export default function EventDetailView({
                   </a>
                 )}
 
-                {/* Event Unique ID Badge */}
+                {/* Share Link Button */}
                 <button
                   type="button"
                   onClick={() => {
-                    navigator.clipboard.writeText(event.id);
-                    setCopiedEventId(true);
-                    setTimeout(() => setCopiedEventId(false), 2000);
+                    if (typeof window !== "undefined") {
+                      navigator.clipboard.writeText(window.location.href);
+                      setCopiedEventId(true);
+                      setTimeout(() => setCopiedEventId(false), 2000);
+                    }
                   }}
-                  className="px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-black/50 hover:bg-black/75 backdrop-blur-md text-white/90 border border-white/20 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-                  title="Clique para copiar o ID do evento"
+                  className="px-3 py-1 rounded-full text-xs font-semibold bg-black/40 hover:bg-black/60 backdrop-blur-md text-white/95 border border-white/20 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  title="Copiar link direto para este evento"
                 >
-                  <span>#{event.id}</span>
                   {copiedEventId ? (
-                    <Check className="w-3 h-3 text-emerald-400" />
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Link copiado!</span>
+                    </>
                   ) : (
-                    <Copy className="w-3 h-3 text-white/70" />
+                    <>
+                      <Share2 className="w-3.5 h-3.5 text-white/80" />
+                      <span>Partilhar</span>
+                    </>
                   )}
                 </button>
 
@@ -3558,18 +3562,10 @@ export default function EventDetailView({
                                 <Link
                                   href={`/inventario/${a.itemId}`}
                                   prefetch={false}
-                                  className="font-mono bg-white hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] text-[10px] transition"
+                                  className="font-mono bg-white hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] text-[10px] text-[#48484a] font-semibold transition"
                                   title="SKU do Artigo"
                                 >
                                   {a.itemSku}
-                                </Link>
-                                <Link
-                                  href={`/inventario/${a.itemId}`}
-                                  prefetch={false}
-                                  className="font-mono text-[#8e8e93] hover:text-[#007aff] text-[10px] transition"
-                                  title="ID do Artigo"
-                                >
-                                  #{a.itemId}
                                 </Link>
                                 <span>•</span>
                                 <span>{a.itemCategory}</span>
@@ -3771,8 +3767,8 @@ export default function EventDetailView({
                                       <CheckCircle className="w-3 h-3 text-emerald-600" />
                                       <span>Adquirido & no Inventário</span>
                                       {item.convertedItemId && (
-                                        <Link href={`/inventario/${item.convertedItemId}`} prefetch={false} className="underline hover:text-emerald-950 font-mono text-[9px]">
-                                          #{item.convertedItemId}
+                                        <Link href={`/inventario/${item.convertedItemId}`} prefetch={false} className="underline hover:text-emerald-950 font-bold text-[10px] ml-1">
+                                          Ver no Armazém →
                                         </Link>
                                       )}
                                     </span>
@@ -4094,9 +4090,6 @@ export default function EventDetailView({
                       </div>
 
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="font-mono text-[10px] text-[#8e8e93]" title="ID da Tarefa">
-                          #{t.id}
-                        </span>
                         {/* Priority tag */}
                         {t.priority && (
                           <span
@@ -4230,23 +4223,15 @@ export default function EventDetailView({
                   <User className="w-4 h-4 text-[#111]" />
                   <h3 className="text-sm font-bold text-[#111]">Ficha do Cliente</h3>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  {client?.id && (
-                    <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0]">
-                      #{client.id}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateClientModal(true)}
-                    className="p-1 rounded-md text-[#007aff] hover:bg-[#f2f2f5] transition cursor-pointer flex items-center gap-1 text-[11px] font-bold"
-                    title="Criar novo cliente"
-                    aria-label="Criar novo cliente"
-                  >
-                    <UserPlus className="w-3.5 h-3.5" />
-                    <span>Novo</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateClientModal(true)}
+                  className="px-2.5 py-1 rounded-lg text-[#007aff] hover:bg-[#f2f2f5] transition cursor-pointer flex items-center gap-1 text-[11px] font-bold"
+                  title="Registar novo cliente"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Novo Cliente</span>
+                </button>
               </div>
 
               {client ? (
@@ -4260,24 +4245,14 @@ export default function EventDetailView({
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowCreateClientModal(true)}
-                        className="text-[11px] text-[#007aff] hover:text-[#0051a8] font-semibold transition cursor-pointer"
-                        title="Criar novo cliente"
-                      >
-                        + Novo
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleClientChange("")}
-                        className="text-[11px] text-[#8e8e93] hover:text-rose-600 font-medium transition cursor-pointer"
-                        title="Desassociar cliente deste evento"
-                      >
-                        Desassociar
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleClientChange("")}
+                      className="text-[11px] text-[#8e8e93] hover:text-rose-600 font-medium transition cursor-pointer"
+                      title="Desassociar cliente deste evento"
+                    >
+                      Desassociar
+                    </button>
                   </div>
 
                   <div className="space-y-2 pt-1 border-t border-[#ececf0]">
@@ -4780,7 +4755,6 @@ export default function EventDetailView({
                       <div>
                         <div className="flex items-center gap-1.5">
                           <span className="font-bold text-xs text-[#111]">{q.quoteNumber}</span>
-                          <span className="font-mono text-[10px] text-[#8e8e93]">#{q.id}</span>
                         </div>
                         <div className="text-[11px] font-semibold text-[#137333]">
                           €{q.total.toFixed(2)}
