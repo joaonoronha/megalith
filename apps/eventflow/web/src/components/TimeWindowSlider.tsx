@@ -12,6 +12,8 @@ export interface TimeWindowSliderProps {
   eventEnd: string;
   teardownStart: string;
   teardownEnd: string;
+  embedded?: boolean;
+  className?: string;
   onChange: (ranges: {
     prepStart: string;
     prepEnd: string;
@@ -58,6 +60,8 @@ export default function TimeWindowSlider({
   eventEnd,
   teardownStart,
   teardownEnd,
+  embedded = false,
+  className = "",
   onChange,
 }: TimeWindowSliderProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -314,8 +318,12 @@ export default function TimeWindowSlider({
     return ticks;
   }, [windowStart, windowEnd, windowDuration]);
 
+  const containerClasses = embedded
+    ? `border-t border-[#ececf0] p-5 sm:p-6 bg-white space-y-5 ${className}`
+    : `bg-white border border-[#ececf0] rounded-[24px] p-5 sm:p-6 shadow-xs space-y-5 ${className}`;
+
   return (
-    <section className="bg-white border border-[#ececf0] rounded-[24px] p-5 sm:p-6 shadow-xs space-y-5">
+    <div className={containerClasses.trim()}>
       {/* Cabeçalho: Seletor de Data & Badges dos 3 Intervalos Operacionais */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[#ececf0]">
         {/* Seletor de Data */}
@@ -606,6 +614,6 @@ export default function TimeWindowSlider({
           })}
         </div>
       </div>
-    </section>
+    </div>
   );
 }
