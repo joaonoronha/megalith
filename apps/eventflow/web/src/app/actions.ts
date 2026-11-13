@@ -406,35 +406,45 @@ export async function deleteStorageLocationAction(locationId: string) {
 
 // 5. Create Inventory Item
 export async function createItemAction(formData: FormData) {
-  let sku = ((formData.get("sku") as string) || "").trim();
-  const name = ((formData.get("name") as string) || "").trim();
-  const category = ((formData.get("category") as string) || "").trim();
-  const totalQuantity = parseInt((formData.get("totalQuantity") as string) || "1", 10);
-  const minStock = parseInt((formData.get("minStock") as string) || "0", 10);
-  let warehouseLocation = formData.get("warehouseLocation") as string;
-  let locationId = (formData.get("locationId") as string)?.trim() || null;
-  const dimensions = formData.get("dimensions") as string;
-  const rawUnitPrice = parseFloat((formData.get("unitPrice") as string) || "0");
-  const rawReplacementCost = parseFloat((formData.get("replacementCost") as string) || "0");
-  const rawPurchasePrice = parseFloat((formData.get("purchasePrice") as string) || "0");
-  const price = rawPurchasePrice || rawReplacementCost || rawUnitPrice || 0;
-  const unitPrice = price;
-  const replacementCost = price;
-  const imageUrl = formData.get("imageUrl") as string;
+  try {
+    let sku = ((formData.get("sku") as string) || "").trim();
+    const name = ((formData.get("name") as string) || "").trim();
+    const category = ((formData.get("category") as string) || "").trim();
+    const totalQuantity = parseInt((formData.get("totalQuantity") as string) || "1", 10);
+    const minStock = parseInt((formData.get("minStock") as string) || "0", 10);
+    let warehouseLocation = formData.get("warehouseLocation") as string;
+    let locationId = (formData.get("locationId") as string)?.trim() || null;
+    const dimensions = formData.get("dimensions") as string;
+    const rawUnitPrice = parseFloat((formData.get("unitPrice") as string) || "0");
+    const rawReplacementCost = parseFloat((formData.get("replacementCost") as string) || "0");
+    const rawPurchasePrice = parseFloat((formData.get("purchasePrice") as string) || "0");
+    const price = rawPurchasePrice || rawReplacementCost || rawUnitPrice || 0;
+    const unitPrice = price;
+    const replacementCost = price;
+    const imageUrl = formData.get("imageUrl") as string;
 
-  // Auto-generate slug SKU if not supplied
-  if (!sku && name) {
-    sku = name
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .toUpperCase();
-    if (!sku) {
-      sku = `ART-${Date.now()}`;
+    // Auto-generate slug SKU if not supplied
+    if (!sku && name) {
+      const baseSlug = name
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .toUpperCase();
+      sku = baseSlug || `ART-${Date.now()}`;
     }
-  }
+
+    if (sku) {
+      const existingSku = await db
+        .select({ id: inventoryItems.id })
+        .from(inventoryItems)
+        .where(eq(inventoryItems.sku, sku))
+        .limit(1);
+      if (existingSku.length > 0) {
+        sku = `${sku}-${Date.now().toString().slice(-4)}`;
+      }
+    }
 
   // Check if a new location was specified directly on item creation
   const newLocationName = (formData.get("newLocationName") as string)?.trim();
@@ -549,6 +559,13 @@ export async function createItemAction(formData: FormData) {
 
   invalidateAllCaches();
   return { success: true, id, item, movement: createdMovement };
+  } catch (err: any) {
+    console.error("createItemAction error:", err);
+    return {
+      success: false,
+      error: err?.message || "Ocorreu um erro ao registar o artigo no inventário.",
+    };
+  }
 }
 
 // 6. Update Stock Triage (Damaged / Repaired)
