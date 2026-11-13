@@ -183,7 +183,7 @@ export default function UserDetailView({
     switch (role) {
       case "owner":
         return {
-          label: "Proprietário (Owner)",
+          label: "Programador (Owner)",
           bg: "bg-[#f5f3ff] text-[#6d28d9] border-[#ddd6fe]",
         };
       case "admin":
@@ -650,7 +650,7 @@ export default function UserDetailView({
 }
 
 const roleDescriptions: Record<string, string> = {
-  owner: "Proprietário (Owner)",
+  owner: "Programador (Owner)",
   admin: "Administrador",
   producer: "Gestor / Produtor de Eventos",
   warehouse: "Armazém / Logística",
@@ -785,7 +785,7 @@ function EditUserModal({
                 onChange={(e) => setRole(e.target.value as TeamUser["role"])}
                 className="w-full px-3 py-2 bg-white border border-[#ececf0] rounded-[10px] text-xs font-medium"
               >
-                <option value="owner">Proprietário (Acesso Total & Gestão de Utilizadores)</option>
+                <option value="owner">Programador (Acesso Total & Gestão de Utilizadores)</option>
                 <option value="admin">Administrador (Negócio, Eventos & Inventário)</option>
                 <option value="producer">Gestor / Produtor de Eventos</option>
                 <option value="warehouse">Armazém / Logística</option>
@@ -793,7 +793,7 @@ function EditUserModal({
             ) : (
               <div className="w-full px-3 py-2 bg-[#f2f2f7] text-[#636366] border border-[#ececf0] rounded-[10px] text-xs flex items-center justify-between">
                 <span className="font-semibold">{roleDescriptions[user.role] || user.role}</span>
-                <span className="text-[10px] text-[#8e8e93] italic">Apenas o Proprietário pode alterar</span>
+                <span className="text-[10px] text-[#8e8e93] italic">Apenas o Programador pode alterar</span>
               </div>
             )}
           </div>
