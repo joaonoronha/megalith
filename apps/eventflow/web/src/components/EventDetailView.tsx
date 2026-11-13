@@ -3122,7 +3122,7 @@ export default function EventDetailView({
       </header>
 
       {/* Main Container */}
-      <main className="max-w-[1100px] mx-auto px-4 pt-6 space-y-6">
+      <main className="max-w-[1100px] mx-auto px-4 pt-6 pb-[max(6.5rem,calc(5.5rem+env(safe-area-inset-bottom)))] space-y-6">
         {/* ================================================================= */}
         {/* HERO / EVENT VIBE & THEME HEADER */}
         {/* ================================================================= */}
@@ -3514,62 +3514,7 @@ export default function EventDetailView({
           onChange={(ranges) => handleScheduleChange(ranges)}
         />
 
-        {/* ================================================================= */}
-        {/* 3-TAB MAIN NAVIGATION BAR */}
-        {/* ================================================================= */}
-        <div className="flex items-center gap-2 p-1.5 bg-[#f2f2f5] rounded-2xl w-full sm:w-auto self-start border border-[#e5e5ea] overflow-x-auto">
-          <button
-            type="button"
-            onClick={() => setActiveMainTab("planning")}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shrink-0 ${
-              activeMainTab === "planning"
-                ? "bg-white text-[#111] shadow-xs"
-                : "text-[#636366] hover:text-[#111]"
-            }`}
-          >
-            <LayoutGrid className="w-4 h-4 text-[#007aff]" />
-            <span>Moodboards & Tarefas</span>
-            {pendingTasksCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
-                {pendingTasksCount}
-              </span>
-            )}
-          </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveMainTab("materials")}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shrink-0 ${
-              activeMainTab === "materials"
-                ? "bg-white text-[#111] shadow-xs"
-                : "text-[#636366] hover:text-[#111]"
-            }`}
-          >
-            <Package className="w-4 h-4 text-amber-500" />
-            <span>Materiais do Evento</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] bg-[#111]/5 text-[#48484a] font-bold">
-              {allocations.length + customItems.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveMainTab("client")}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shrink-0 ${
-              activeMainTab === "client"
-                ? "bg-white text-[#111] shadow-xs"
-                : "text-[#636366] hover:text-[#111]"
-            }`}
-          >
-            <User className="w-4 h-4 text-indigo-500" />
-            <span>Cliente & Gestão</span>
-            {quotesList.length > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-100 text-blue-800 font-bold">
-                {quotesList.length}
-              </span>
-            )}
-          </button>
-        </div>
 
         {activeMainTab === "planning" && (
           <div className="space-y-6">
@@ -4626,6 +4571,61 @@ export default function EventDetailView({
         )}
 
       </main>
+
+      {/* ===================================================================== */}
+      {/* FLOATING BOTTOM NAVIGATION BAR (Apple-style matching main app)         */}
+      {/* ===================================================================== */}
+      <aside className="fixed bottom-0 left-0 right-0 z-40 bg-[rgba(249,249,251,0.96)] backdrop-blur-[24px] border-t border-[#ececf0] pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] px-3 flex items-center justify-center shadow-[0_-1px_12px_rgba(0,0,0,0.04)]">
+        <div className="w-full max-w-[420px] flex items-center justify-around h-[52px]">
+          {/* 1. Moodboards & Tarefas */}
+          <button
+            type="button"
+            onClick={() => setActiveMainTab("planning")}
+            className="w-[48px] h-[48px] sm:w-[44px] sm:h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
+            style={{
+              backgroundColor:
+                activeMainTab === "planning" ? "rgba(0,122,255,0.11)" : "transparent",
+              color: activeMainTab === "planning" ? "#007aff" : "#8e8e93",
+            }}
+            title="Moodboards & Tarefas"
+            aria-label="Moodboards & Tarefas"
+          >
+            <LayoutGrid className="w-6 h-6" strokeWidth={1.75} />
+          </button>
+
+          {/* 2. Materiais do Evento */}
+          <button
+            type="button"
+            onClick={() => setActiveMainTab("materials")}
+            className="w-[48px] h-[48px] sm:w-[44px] sm:h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
+            style={{
+              backgroundColor:
+                activeMainTab === "materials" ? "rgba(0,122,255,0.11)" : "transparent",
+              color: activeMainTab === "materials" ? "#007aff" : "#8e8e93",
+            }}
+            title="Materiais do Evento"
+            aria-label="Materiais do Evento"
+          >
+            <Package className="w-6 h-6" strokeWidth={1.75} />
+          </button>
+
+          {/* 3. Cliente & Gestão */}
+          <button
+            type="button"
+            onClick={() => setActiveMainTab("client")}
+            className="w-[48px] h-[48px] sm:w-[44px] sm:h-[44px] rounded-[13px] flex items-center justify-center transition cursor-pointer"
+            style={{
+              backgroundColor:
+                activeMainTab === "client" ? "rgba(0,122,255,0.11)" : "transparent",
+              color: activeMainTab === "client" ? "#007aff" : "#8e8e93",
+            }}
+            title="Cliente & Gestão"
+            aria-label="Cliente & Gestão"
+          >
+            <User className="w-6 h-6" strokeWidth={1.75} />
+          </button>
+        </div>
+      </aside>
 
       {/* ===================================================================== */}
       {/* MODAL: EVENT QUOTE GENERATOR (Generated inside event configuration) */}
