@@ -3497,22 +3497,23 @@ export default function EventDetailView({
               </div>
             </div>
           </div>
-        </section>
 
-                {/* ================================================================= */}
-        {/* SELETOR DE HORÁRIO OPERACIONAL (3 Intervalos: Montagem, Evento, Desmontagem) */}
-        {/* ================================================================= */}
-        <TimeWindowSlider
-          date={operationalSchedule.date}
-          onDateChange={(newDate) => handleScheduleChange({ date: newDate })}
-          prepStart={operationalSchedule.prepStart}
-          prepEnd={operationalSchedule.prepEnd}
-          eventStart={operationalSchedule.eventStart}
-          eventEnd={operationalSchedule.eventEnd}
-          teardownStart={operationalSchedule.teardownStart}
-          teardownEnd={operationalSchedule.teardownEnd}
-          onChange={(ranges) => handleScheduleChange(ranges)}
-        />
+          {/* ================================================================= */}
+          {/* SELETOR DE HORÁRIO OPERACIONAL (Integrado no cartão de detalhes)   */}
+          {/* ================================================================= */}
+          <TimeWindowSlider
+            embedded
+            date={operationalSchedule.date}
+            onDateChange={(newDate) => handleScheduleChange({ date: newDate })}
+            prepStart={operationalSchedule.prepStart}
+            prepEnd={operationalSchedule.prepEnd}
+            eventStart={operationalSchedule.eventStart}
+            eventEnd={operationalSchedule.eventEnd}
+            teardownStart={operationalSchedule.teardownStart}
+            teardownEnd={operationalSchedule.teardownEnd}
+            onChange={(ranges) => handleScheduleChange(ranges)}
+          />
+        </section>
 
 
 
