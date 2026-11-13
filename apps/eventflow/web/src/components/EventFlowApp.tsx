@@ -2866,7 +2866,7 @@ export default function EventFlowApp({
                   </p>
                 </div>
 
-                {user?.role === "admin" && (
+                {user?.role === "owner" && (
                   <button
                     onClick={() => setShowNewUserModal(true)}
                     className="px-3.5 py-1.5 rounded-[10px] bg-[#111111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
@@ -2884,8 +2884,16 @@ export default function EventFlowApp({
                     className="p-3.5 bg-white flex items-center justify-between text-xs"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#f2f2f7] text-[#111111] flex items-center justify-center font-bold text-xs">
-                        {u.name.slice(0, 2).toUpperCase()}
+                      <div className="w-8 h-8 rounded-full bg-[#f2f2f7] text-[#111111] flex items-center justify-center font-bold text-xs overflow-hidden flex-shrink-0">
+                        {u.avatarUrl ? (
+                          <img
+                            src={u.avatarUrl}
+                            alt={u.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          u.name.slice(0, 2).toUpperCase()
+                        )}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -2896,16 +2904,37 @@ export default function EventFlowApp({
                           >
                             {u.name}
                           </Link>
+                          {user?.id === u.id && (
+                            <span className="text-[10px] font-semibold text-[#007aff] bg-[#007aff]/10 px-1.5 py-0.2 rounded">
+                              Você
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-[#8e8e93]">{u.email}</div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2.5">
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#eaf8ee] text-[#24793a] capitalize">
-                        {u.role}
+                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                        u.role === "owner"
+                          ? "bg-[#f5f3ff] text-[#6d28d9] border-[#ddd6fe]"
+                          : u.role === "admin"
+                          ? "bg-[#eaf8ee] text-[#24793a] border-[#cbeed4]"
+                          : u.role === "producer"
+                          ? "bg-[#f0f7ff] text-[#0066cc] border-[#d6e7ff]"
+                          : "bg-[#fef7e0] text-[#b06000] border-[#feefc3]"
+                      }`}>
+                        {u.role === "owner"
+                          ? "Proprietário"
+                          : u.role === "admin"
+                          ? "Administrador"
+                          : u.role === "producer"
+                          ? "Produtor"
+                          : u.role === "warehouse"
+                          ? "Armazém"
+                          : u.role}
                       </span>
-                      {user?.role === "admin" && (
+                      {(user?.role === "owner" || user?.id === u.id) && (
                         <button
                           onClick={() => setEditingTeamUser(u)}
                           className="text-[11px] font-semibold text-[#007aff] hover:underline cursor-pointer"
@@ -3693,6 +3722,7 @@ export default function EventFlowApp({
       {editingTeamUser && (
         <EditUserModal
           user={editingTeamUser}
+          currentUser={user}
           onClose={() => setEditingTeamUser(null)}
           onUpdated={(updated) => {
             const oldName = editingTeamUser.name;

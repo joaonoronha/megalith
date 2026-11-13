@@ -62,7 +62,7 @@ export default async function UserPage({ params }: PageProps) {
       currentUser={currentUser}
       assignedTasks={tasks}
       managedLocations={managedLocs}
-      canEdit={currentUser?.role === "admin" || currentUser?.id === user.id}
+      canEdit={currentUser?.role === "owner" || currentUser?.id === user.id}
     />
   );
 }

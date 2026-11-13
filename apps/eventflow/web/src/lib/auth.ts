@@ -10,6 +10,8 @@ import {
   type SessionPayload,
 } from "./session";
 
+export type UserRole = "owner" | "admin" | "producer" | "warehouse";
+
 export async function getCurrentUser() {
   try {
     const cookieStore = await cookies();
@@ -27,7 +29,7 @@ export async function getCurrentUser() {
         id: dbUser.id,
         name: dbUser.name,
         email: dbUser.email,
-        role: dbUser.role as "admin" | "producer" | "warehouse",
+        role: dbUser.role as UserRole,
         avatarUrl: dbUser.avatarUrl || null,
       };
     }
@@ -36,7 +38,7 @@ export async function getCurrentUser() {
       id: session.userId,
       name: session.name,
       email: session.email,
-      role: session.role as "admin" | "producer" | "warehouse",
+      role: session.role as UserRole,
       avatarUrl: session.avatarUrl || null,
     };
   } catch {
@@ -47,7 +49,7 @@ export async function getCurrentUser() {
 export async function loginUser(email: string, password: string): Promise<{
   success: boolean;
   error?: string;
-  user?: { id: string; name: string; email: string; role: "admin" | "producer" | "warehouse"; avatarUrl?: string | null };
+  user?: { id: string; name: string; email: string; role: UserRole; avatarUrl?: string | null };
 }> {
   const cleanEmail = email.toLowerCase().trim();
   const user = await db.query.users.findFirst({
@@ -89,7 +91,7 @@ export async function loginUser(email: string, password: string): Promise<{
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role as "admin" | "producer" | "warehouse",
+      role: user.role as UserRole,
       avatarUrl: user.avatarUrl || null,
     },
   };
@@ -102,7 +104,7 @@ export async function logoutUser() {
 
 import { generateId } from "./id";
 
-export async function createTeamUser(data: { name: string; email: string; password: string; role: "admin" | "producer" | "warehouse"; customId?: string }) {
+export async function createTeamUser(data: { name: string; email: string; password: string; role: UserRole; customId?: string }) {
   const passwordHash = await bcrypt.hash(data.password, 10);
   const id = data.customId?.trim() ? data.customId.trim() : generateId("usr");
   await db.insert(users).values({
