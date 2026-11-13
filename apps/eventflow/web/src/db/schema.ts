@@ -56,6 +56,7 @@ export const inventoryItems = sqliteTable("inventory_items", {
   isConsumable: integer("is_consumable", { mode: "boolean" }).default(false).notNull(), // true = consumível (velas, guardanapos, fitas, flores), false = equipamento reutilizável
   packageUnits: integer("package_units").default(1), // unidades por embalagem / pack
   imageUrl: text("image_url"),
+  barcode: text("barcode"), // EAN-13, UPC-A, Code-128 etc.
   damagedQuantity: integer("damaged_quantity").default(0),
   inMaintenanceQuantity: integer("in_maintenance_quantity").default(0),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
