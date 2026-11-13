@@ -78,12 +78,12 @@ export default function TimeWindowSlider({
   const eEndMin = timeToMinutes(eventEnd || "20:00");
   const tEndMin = timeToMinutes(teardownEnd || "23:00");
 
-  // Dragging state
-  // Handle 1 = Setting up Start
-  // Handle 2 = Setting up End / Event Start boundary
-  // Handle 3 = Event End / Tearing down Start boundary
-  // Handle 4 = Tearing down End
-  // "range1" | "range2" | "range3" = dragging entire colored block
+  // Estado de arrasto
+  // Manipulador 1 = Início da Montagem
+  // Manipulador 2 = Fronteira entre Montagem & Início do Evento
+  // Manipulador 3 = Fronteira entre Fim do Evento & Desmontagem
+  // Manipulador 4 = Fim da Desmontagem
+  // "range1" | "range2" | "range3" = arrastar o bloco colorido por inteiro
   const [activeDrag, setActiveDrag] = useState<
     1 | 2 | 3 | 4 | "range1" | "range2" | "range3" | null
   >(null);
@@ -160,28 +160,28 @@ export default function TimeWindowSlider({
       let nextTEnd = tEndMin;
 
       if (activeDrag === 1) {
-        // Handle 1: Setting up Start
+        // Manipulador 1: Início da Montagem
         nextPStart = Math.max(0, Math.min(initialEStart - MIN_DURATION, initialPStart + deltaMinutes));
       } else if (activeDrag === 2) {
-        // Handle 2: Boundary between Setting up & Event
+        // Manipulador 2: Fronteira entre Montagem & Evento
         nextEStart = Math.max(
           initialPStart + MIN_DURATION,
           Math.min(initialEEnd - MIN_DURATION, initialEStart + deltaMinutes)
         );
       } else if (activeDrag === 3) {
-        // Handle 3: Boundary between Event & Tearing down
+        // Manipulador 3: Fronteira entre Evento & Desmontagem
         nextEEnd = Math.max(
           initialEStart + MIN_DURATION,
           Math.min(initialTEnd - MIN_DURATION, initialEEnd + deltaMinutes)
         );
       } else if (activeDrag === 4) {
-        // Handle 4: Tearing down End
+        // Manipulador 4: Fim da Desmontagem
         nextTEnd = Math.max(
           initialEEnd + MIN_DURATION,
           Math.min(1440, initialTEnd + deltaMinutes)
         );
       } else if (activeDrag === "range1") {
-        // Slide Setting up window
+        // Deslocar todo o intervalo de Montagem
         const dur = initialEStart - initialPStart;
         const maxShift = initialEEnd - MIN_DURATION - initialEStart;
         const minShift = -initialPStart;
@@ -189,7 +189,7 @@ export default function TimeWindowSlider({
         nextPStart = initialPStart + clampedShift;
         nextEStart = initialEStart + clampedShift;
       } else if (activeDrag === "range2") {
-        // Slide Event time range window
+        // Deslocar todo o intervalo do Evento
         const dur = initialEEnd - initialEStart;
         const maxShift = initialTEnd - MIN_DURATION - initialEEnd;
         const minShift = initialPStart + MIN_DURATION - initialEStart;
@@ -197,7 +197,7 @@ export default function TimeWindowSlider({
         nextEStart = initialEStart + clampedShift;
         nextEEnd = initialEEnd + clampedShift;
       } else if (activeDrag === "range3") {
-        // Slide Tearing down window
+        // Deslocar todo o intervalo de Desmontagem
         const dur = initialTEnd - initialEEnd;
         const maxShift = 1440 - initialTEnd;
         const minShift = initialEEnd + MIN_DURATION - initialTEnd;
@@ -304,32 +304,32 @@ export default function TimeWindowSlider({
           </div>
         </div>
 
-        {/* 3 Color Badges Header */}
+        {/* 3 Badges de Cores dos Intervalos */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          {/* Setting up */}
+          {/* Montagem */}
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-900 font-semibold shadow-2xs">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-            <span className="font-bold">Setting up:</span>
+            <span className="font-bold">Montagem:</span>
             <span>{minutesToTime(pStartMin)} - {minutesToTime(eStartMin)}</span>
             <span className="text-[10px] text-amber-700 bg-amber-100/70 px-1.5 py-0.2 rounded-md font-bold">
               {formatDuration(pStartMin, eStartMin)}
             </span>
           </div>
 
-          {/* Event time range */}
+          {/* Horário do Evento */}
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-950 font-semibold shadow-2xs">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-            <span className="font-bold">Event time:</span>
+            <span className="font-bold">Evento:</span>
             <span>{minutesToTime(eStartMin)} - {minutesToTime(eEndMin)}</span>
             <span className="text-[10px] text-emerald-800 bg-emerald-100/80 px-1.5 py-0.2 rounded-md font-bold">
               {formatDuration(eStartMin, eEndMin)}
             </span>
           </div>
 
-          {/* Tearing down */}
+          {/* Desmontagem */}
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-950 font-semibold shadow-2xs">
             <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 shrink-0" />
-            <span className="font-bold">Tearing down:</span>
+            <span className="font-bold">Desmontagem:</span>
             <span>{minutesToTime(eEndMin)} - {minutesToTime(tEndMin)}</span>
             <span className="text-[10px] text-indigo-800 bg-indigo-100/70 px-1.5 py-0.2 rounded-md font-bold">
               {formatDuration(eEndMin, tEndMin)}
@@ -360,7 +360,7 @@ export default function TimeWindowSlider({
           })}
 
           {/* ------------------------------------------------------------- */}
-          {/* RANGE 1: SETTING UP (Montagem) - AMBER                        */}
+          {/* INTERVALO 1: MONTAGEM (Preparação) - ÂMBAR                   */}
           {/* ------------------------------------------------------------- */}
           <div
             style={{
@@ -374,13 +374,13 @@ export default function TimeWindowSlider({
             className={`absolute top-1 bottom-1 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-white shadow-md flex items-center justify-between px-2 overflow-hidden cursor-grab active:cursor-grabbing border border-amber-300 transition-opacity ${
               activeDrag === "range1" ? "opacity-90 ring-2 ring-amber-400" : "hover:brightness-105"
             }`}
-            title="Arrastar período de Setting up (Montagem)"
+            title="Arrastar período de Montagem (Preparação)"
           >
             <div className="flex items-center gap-1.5 min-w-0 pointer-events-none">
               <Wrench className="w-3.5 h-3.5 shrink-0 text-amber-100 drop-shadow-xs" />
               <div className="min-w-0">
                 <span className="text-[11px] font-black block truncate leading-none drop-shadow-xs">
-                  Setting up
+                  Montagem
                 </span>
                 <span className="text-[10px] font-medium text-amber-100 block truncate leading-tight mt-0.5">
                   {minutesToTime(pStartMin)} - {minutesToTime(eStartMin)}
@@ -393,7 +393,7 @@ export default function TimeWindowSlider({
           </div>
 
           {/* ------------------------------------------------------------- */}
-          {/* RANGE 2: EVENT TIME RANGE (Festa / Evento) - EMERALD         */}
+          {/* INTERVALO 2: HORÁRIO DO EVENTO (Festa) - ESMERALDA           */}
           {/* ------------------------------------------------------------- */}
           <div
             style={{
@@ -407,13 +407,13 @@ export default function TimeWindowSlider({
             className={`absolute top-1 bottom-1 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md flex items-center justify-between px-2 overflow-hidden cursor-grab active:cursor-grabbing border border-emerald-400 transition-opacity ${
               activeDrag === "range2" ? "opacity-90 ring-2 ring-emerald-400" : "hover:brightness-105"
             }`}
-            title="Arrastar período de Event time range (Festa)"
+            title="Arrastar período do Evento (Festa)"
           >
             <div className="flex items-center gap-1.5 min-w-0 pointer-events-none">
               <PartyPopper className="w-3.5 h-3.5 shrink-0 text-emerald-100 drop-shadow-xs" />
               <div className="min-w-0">
                 <span className="text-[11px] font-black block truncate leading-none drop-shadow-xs">
-                  Event time
+                  Evento
                 </span>
                 <span className="text-[10px] font-medium text-emerald-100 block truncate leading-tight mt-0.5">
                   {minutesToTime(eStartMin)} - {minutesToTime(eEndMin)}
@@ -426,7 +426,7 @@ export default function TimeWindowSlider({
           </div>
 
           {/* ------------------------------------------------------------- */}
-          {/* RANGE 3: TEARING DOWN (Desmontagem) - INDIGO                 */}
+          {/* INTERVALO 3: DESMONTAGEM (Recolha) - ÍNDIGO                  */}
           {/* ------------------------------------------------------------- */}
           <div
             style={{
@@ -440,13 +440,13 @@ export default function TimeWindowSlider({
             className={`absolute top-1 bottom-1 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-md flex items-center justify-between px-2 overflow-hidden cursor-grab active:cursor-grabbing border border-indigo-400 transition-opacity ${
               activeDrag === "range3" ? "opacity-90 ring-2 ring-indigo-400" : "hover:brightness-105"
             }`}
-            title="Arrastar período de Tearing down (Desmontagem)"
+            title="Arrastar período de Desmontagem (Recolha)"
           >
             <div className="flex items-center gap-1.5 min-w-0 pointer-events-none">
               <Truck className="w-3.5 h-3.5 shrink-0 text-indigo-100 drop-shadow-xs" />
               <div className="min-w-0">
                 <span className="text-[11px] font-black block truncate leading-none drop-shadow-xs">
-                  Tearing down
+                  Desmontagem
                 </span>
                 <span className="text-[10px] font-medium text-indigo-100 block truncate leading-tight mt-0.5">
                   {minutesToTime(eEndMin)} - {minutesToTime(tEndMin)}
@@ -459,9 +459,9 @@ export default function TimeWindowSlider({
           </div>
 
           {/* ------------------------------------------------------------- */}
-          {/* DRAGGABLE THUMBS / HANDLES                                   */}
+          {/* CONTROLADORES DE ARRASTO (HANDLES)                            */}
           {/* ------------------------------------------------------------- */}
-          {/* Handle 1: Setting up Start */}
+          {/* Manipulador 1: Início da Montagem */}
           <div
             style={{ left: `${p1Left}%` }}
             onMouseDown={(e) => handlePointerDown(1, e)}
@@ -483,7 +483,7 @@ export default function TimeWindowSlider({
             )}
           </div>
 
-          {/* Handle 2: Boundary between Setting up & Event */}
+          {/* Manipulador 2: Fronteira entre Montagem & Início do Evento */}
           <div
             style={{ left: `${p2Left}%` }}
             onMouseDown={(e) => handlePointerDown(2, e)}
@@ -505,7 +505,7 @@ export default function TimeWindowSlider({
             )}
           </div>
 
-          {/* Handle 3: Boundary between Event & Tearing down */}
+          {/* Manipulador 3: Fronteira entre Fim do Evento & Desmontagem */}
           <div
             style={{ left: `${p3Left}%` }}
             onMouseDown={(e) => handlePointerDown(3, e)}
@@ -527,7 +527,7 @@ export default function TimeWindowSlider({
             )}
           </div>
 
-          {/* Handle 4: Tearing down End */}
+          {/* Manipulador 4: Fim da Desmontagem */}
           <div
             style={{ left: `${(tEndMin / 1440) * 100}%` }}
             onMouseDown={(e) => handlePointerDown(4, e)}
@@ -571,16 +571,16 @@ export default function TimeWindowSlider({
       </div>
 
       {/* =================================================================== */}
-      {/* 3 RANGE CARDS WITH QUICK NUDGE CONTROLS                            */}
+      {/* 3 CARTÕES DE INTERVALOS COM AJUSTES RÁPIDOS (+/- 15 min)           */}
       {/* =================================================================== */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-        {/* Card 1: Setting up */}
+        {/* Cartão 1: Montagem */}
         <div className="p-3.5 rounded-2xl bg-amber-50/60 border border-amber-200/80 flex flex-col justify-between gap-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-              <span>Setting up</span>
-              <span className="text-[10px] font-medium text-amber-700">(Montagem)</span>
+              <span>Montagem</span>
+              <span className="text-[10px] font-medium text-amber-700">(Preparação)</span>
             </div>
             <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-200/80 text-amber-900">
               {formatDuration(pStartMin, eStartMin)}
@@ -636,12 +636,12 @@ export default function TimeWindowSlider({
           </div>
         </div>
 
-        {/* Card 2: Event time range */}
+        {/* Cartão 2: Horário do Evento */}
         <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/90 flex flex-col justify-between gap-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-950">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-              <span>Event time range</span>
+              <span>Horário do Evento</span>
               <span className="text-[10px] font-medium text-emerald-700">(Festa)</span>
             </div>
             <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-200/80 text-emerald-950">
@@ -698,13 +698,13 @@ export default function TimeWindowSlider({
           </div>
         </div>
 
-        {/* Card 3: Tearing down */}
+        {/* Cartão 3: Desmontagem */}
         <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-200/80 flex flex-col justify-between gap-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950">
               <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 shrink-0" />
-              <span>Tearing down</span>
-              <span className="text-[10px] font-medium text-indigo-700">(Desmontagem)</span>
+              <span>Desmontagem</span>
+              <span className="text-[10px] font-medium text-indigo-700">(Recolha)</span>
             </div>
             <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-200/80 text-indigo-950">
               {formatDuration(eEndMin, tEndMin)}

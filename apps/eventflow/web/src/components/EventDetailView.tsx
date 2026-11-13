@@ -3500,7 +3500,7 @@ export default function EventDetailView({
         </section>
 
                 {/* ================================================================= */}
-        {/* OPERATIONAL TIME WINDOW SLIDER (3 Colored Ranges: Setting up, Event, Tearing down) */}
+        {/* SELETOR DE HORÁRIO OPERACIONAL (3 Intervalos: Montagem, Evento, Desmontagem) */}
         {/* ================================================================= */}
         <TimeWindowSlider
           date={operationalSchedule.date}
