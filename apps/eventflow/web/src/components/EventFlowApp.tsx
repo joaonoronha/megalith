@@ -4692,6 +4692,7 @@ function LoginModal({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="exemplo@email.com"
               className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
             />
           </div>
@@ -4703,7 +4704,7 @@ function LoginModal({
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••••"
+              placeholder="Introduza a sua palavra-passe"
               className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
             />
           </div>
