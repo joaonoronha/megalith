@@ -4849,7 +4849,8 @@ function NewUserModal({
               onChange={(e) => setRole(e.target.value)}
               className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
             >
-              <option value="admin">Administrador (Total)</option>
+              <option value="owner">Proprietário (Acesso Total & Gestão de Utilizadores)</option>
+              <option value="admin">Administrador (Negócio, Eventos & Inventário)</option>
               <option value="producer">Gestor / Produtor de Eventos</option>
               <option value="warehouse">Armazém / Logística</option>
             </select>
@@ -4873,13 +4874,17 @@ function NewUserModal({
 // -------------------------------------------------------------
 function EditUserModal({
   user,
+  currentUser,
   onClose,
   onUpdated,
 }: {
   user: any;
+  currentUser?: any;
   onClose: () => void;
   onUpdated: (user: any) => void;
 }) {
+  const isOwner = currentUser?.role === "owner";
+  const isSelf = currentUser?.id === user.id;
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [password, setPassword] = useState("");
@@ -4898,7 +4903,9 @@ function EditUserModal({
       formData.set("name", name);
       formData.set("email", email);
       if (password.trim()) formData.set("password", password.trim());
-      formData.set("role", role);
+      if (isOwner) {
+        formData.set("role", role);
+      }
 
       const res = await updateUserAction(formData);
       if (res.success) {
@@ -4906,7 +4913,7 @@ function EditUserModal({
           id: user.id,
           name,
           email,
-          role,
+          ...(isOwner ? { role } : { role: user.role }),
         });
       } else {
         setError(res.error || "Erro ao atualizar utilizador.");
@@ -4923,7 +4930,9 @@ function EditUserModal({
       <div className="bg-white rounded-[22px] w-full max-w-sm border border-[#ececf0] shadow-xl overflow-y-auto max-h-[calc(100dvh-2rem)] p-5 sm:p-6 text-xs">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-[17px] font-bold text-[#111111]">Editar Conta de Equipa</h2>
+            <h2 className="text-[17px] font-bold text-[#111111]">
+              {isSelf ? "Editar O Meu Perfil" : "Editar Conta de Membro"}
+            </h2>
           </div>
           <button
             onClick={onClose}
@@ -4977,15 +4986,33 @@ function EditUserModal({
 
           <div>
             <label className="block font-bold text-[#3a3a3c] mb-1">Nível de Acesso</label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-            >
-              <option value="admin">Administrador (Total)</option>
-              <option value="producer">Gestor / Produtor de Eventos</option>
-              <option value="warehouse">Armazém / Logística</option>
-            </select>
+            {isOwner ? (
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+              >
+                <option value="owner">Proprietário (Acesso Total & Gestão de Utilizadores)</option>
+                <option value="admin">Administrador (Negócio, Eventos & Inventário)</option>
+                <option value="producer">Gestor / Produtor de Eventos</option>
+                <option value="warehouse">Armazém / Logística</option>
+              </select>
+            ) : (
+              <div className="w-full px-3 py-2 bg-[#f2f2f7] text-[#636366] border border-[#ececf0] rounded-[12px] text-xs flex items-center justify-between">
+                <span className="font-semibold capitalize">
+                  {user.role === "owner"
+                    ? "Proprietário (Owner)"
+                    : user.role === "admin"
+                    ? "Administrador"
+                    : user.role === "producer"
+                    ? "Gestor / Produtor"
+                    : user.role === "warehouse"
+                    ? "Armazém"
+                    : user.role}
+                </span>
+                <span className="text-[10px] text-[#8e8e93] italic">Apenas o Proprietário pode alterar</span>
+              </div>
+            )}
           </div>
 
           <div className="pt-2 flex items-center justify-end gap-2">

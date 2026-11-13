@@ -37,14 +37,14 @@ export async function seed() {
     name: "Administrador CFM",
     email: "admin@cfmeventos.pt",
     passwordHash: "$2b$10$.Ip5sNNfFBhvE6w7pQ9W8u0nChg0z1BCZWuF8TxNqx9PJBOWfSzh2",
-    role: "admin",
+    role: "owner",
     createdAt: new Date(),
   }).onConflictDoUpdate({
     target: users.id,
     set: {
       passwordHash: "$2b$10$.Ip5sNNfFBhvE6w7pQ9W8u0nChg0z1BCZWuF8TxNqx9PJBOWfSzh2",
       email: "admin@cfmeventos.pt",
-      role: "admin",
+      role: "owner",
     },
   });
 
