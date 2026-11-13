@@ -961,7 +961,7 @@ export async function uploadUserProfilePictureAction(formData: FormData) {
     const isSelf = targetUserId === currentUser.id;
     const isOwner = currentUser.role === "owner";
     if (!isSelf && !isOwner) {
-      return { success: false, error: "Apenas o Proprietário (Owner) pode alterar a fotografia de outros membros." };
+      return { success: false, error: "Apenas o Programador (Owner) pode alterar a fotografia de outros membros." };
     }
 
     const file = formData.get("file") as File;
@@ -1060,7 +1060,7 @@ export async function removeUserProfilePictureAction(userId?: string) {
     const isSelf = targetUserId === currentUser.id;
     const isOwner = currentUser.role === "owner";
     if (!isSelf && !isOwner) {
-      return { success: false, error: "Apenas o Proprietário (Owner) pode remover a fotografia de outros membros." };
+      return { success: false, error: "Apenas o Programador (Owner) pode remover a fotografia de outros membros." };
     }
 
     await db.update(users).set({ avatarUrl: null }).where(eq(users.id, targetUserId));
@@ -1173,7 +1173,7 @@ export async function createUserAction(formData: FormData) {
   const { getCurrentUser, createTeamUser } = await import("@/lib/auth");
   const currentUser = await getCurrentUser();
   if (!currentUser || currentUser.role !== "owner") {
-    return { success: false, error: "Apenas o Proprietário (Owner) pode criar novas contas de equipa." };
+    return { success: false, error: "Apenas o Programador (Owner) pode criar novas contas de equipa." };
   }
 
   const name = formData.get("name") as string;
@@ -1223,7 +1223,7 @@ export async function updateUserAction(formData: FormData) {
 
   // Admins can only edit themselves and cannot edit other users' information
   if (!isOwner && !isSelf) {
-    return { success: false, error: "Apenas o Proprietário (Owner) pode editar informações de outros utilizadores." };
+    return { success: false, error: "Apenas o Programador (Owner) pode editar informações de outros utilizadores." };
   }
 
   const oldUser = await db.query.users.findFirst({

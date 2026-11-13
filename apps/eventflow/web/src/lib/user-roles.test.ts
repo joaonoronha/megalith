@@ -57,7 +57,7 @@ function resolveUserUpdate(
   if (!isSelf && !isOwner) {
     return {
       success: false,
-      error: "Apenas o Proprietário tem permissão para alterar contas de outros membros.",
+      error: "Apenas o Programador tem permissão para alterar contas de outros membros.",
     };
   }
 
@@ -77,7 +77,7 @@ function resolveUserUpdate(
 describe("CFM Events: Owner & Admin Role Permissions Matrix", () => {
   const ownerUser: User = {
     id: "usr-owner-1",
-    name: "Proprietário CFM",
+    name: "Programador CFM",
     email: "owner@cfmeventos.pt",
     role: "owner",
   };
@@ -139,7 +139,7 @@ describe("CFM Events: Owner & Admin Role Permissions Matrix", () => {
       name: "Tentativa de Edição",
     });
     assert.strictEqual(attempt.success, false);
-    assert.match(attempt.error || "", /Apenas o Proprietário/);
+    assert.match(attempt.error || "", /Apenas o Programador/);
   });
 
   it("Admin CANNOT remove admin permissions or alter roles of other users", () => {
