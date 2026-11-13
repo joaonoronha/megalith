@@ -581,27 +581,13 @@ export default function InventoryDetailView({
                     step="0.01"
                     min="0"
                     value={item.unitPrice}
-                    onChange={(e) =>
-                      handleFieldChange("unitPrice", parseFloat(e.target.value) || 0)
-                    }
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      handleFieldChange("unitPrice", val);
+                      handleFieldChange("replacementCost", val);
+                    }}
                     className="text-2xl font-extrabold text-[#111] bg-transparent border-b border-transparent hover:border-[#ececf0] focus:border-[#007aff] focus:bg-[#fafafa] px-1 rounded-[6px] focus:outline-none w-24 text-right"
-                    title="Preço unitário por evento (guarda automaticamente)"
-                  />
-                  <span className="text-xs font-normal text-[#8e8e93]">/evento</span>
-                </div>
-
-                <div className="flex items-center md:justify-end gap-1 text-[11px] text-[#8e8e93] mt-0.5">
-                  <span>Reposição: €</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={item.replacementCost || 0}
-                    onChange={(e) =>
-                      handleFieldChange("replacementCost", parseFloat(e.target.value) || 0)
-                    }
-                    className="w-16 bg-transparent border-b border-transparent hover:border-[#ececf0] focus:border-[#007aff] focus:bg-[#fafafa] px-1 rounded-[4px] focus:outline-none text-right font-medium text-[#3a3a3c]"
-                    title="Custo de reposição em caso de perda ou perda total"
+                    title="Preço do artigo (guarda automaticamente)"
                   />
                 </div>
               </div>

@@ -406,17 +406,35 @@ export async function deleteStorageLocationAction(locationId: string) {
 
 // 5. Create Inventory Item
 export async function createItemAction(formData: FormData) {
-  const sku = formData.get("sku") as string;
-  const name = formData.get("name") as string;
-  const category = formData.get("category") as string;
+  let sku = ((formData.get("sku") as string) || "").trim();
+  const name = ((formData.get("name") as string) || "").trim();
+  const category = ((formData.get("category") as string) || "").trim();
   const totalQuantity = parseInt((formData.get("totalQuantity") as string) || "1", 10);
   const minStock = parseInt((formData.get("minStock") as string) || "0", 10);
   let warehouseLocation = formData.get("warehouseLocation") as string;
   let locationId = (formData.get("locationId") as string)?.trim() || null;
   const dimensions = formData.get("dimensions") as string;
-  const unitPrice = parseFloat((formData.get("unitPrice") as string) || "0");
-  const replacementCost = parseFloat((formData.get("replacementCost") as string) || "0");
+  const rawUnitPrice = parseFloat((formData.get("unitPrice") as string) || "0");
+  const rawReplacementCost = parseFloat((formData.get("replacementCost") as string) || "0");
+  const rawPurchasePrice = parseFloat((formData.get("purchasePrice") as string) || "0");
+  const price = rawPurchasePrice || rawReplacementCost || rawUnitPrice || 0;
+  const unitPrice = price;
+  const replacementCost = price;
   const imageUrl = formData.get("imageUrl") as string;
+
+  // Auto-generate slug SKU if not supplied
+  if (!sku && name) {
+    sku = name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .toUpperCase();
+    if (!sku) {
+      sku = `ART-${Date.now()}`;
+    }
+  }
 
   // Check if a new location was specified directly on item creation
   const newLocationName = (formData.get("newLocationName") as string)?.trim();
@@ -450,13 +468,11 @@ export async function createItemAction(formData: FormData) {
   }
 
   if (!sku || !name || !category) {
-    return { success: false, error: "SKU, nome e categoria são obrigatórios." };
+    return { success: false, error: "Nome e categoria são obrigatórios." };
   }
 
   // Acquisition cost / purchase status calculation:
-  // Items can have a state of "bought" or "not_bought" (not yet bought).
-  // Only bought items can be accounted for finance (immediate expense).
-  // Not bought yet items are stored with purchaseCost to be deducted from projected value.
+  // Items default to "bought" (accounted for in finance)
   const rawPurchaseStatus = formData.get("purchaseStatus") as string;
   const purchaseStatus: "bought" | "not_bought" =
     rawPurchaseStatus === "not_bought" ? "not_bought" : "bought";
@@ -464,15 +480,14 @@ export async function createItemAction(formData: FormData) {
   const isConsumable = formData.get("isConsumable") === "true" || formData.get("isConsumable") === "1" || formData.get("isConsumable") === "on";
   const packageUnits = parseInt((formData.get("packageUnits") as string) || "1", 10) || 1;
 
-  const rawPurchasePrice = formData.get("purchasePrice") as string;
   const rawTotalPurchasePrice = formData.get("totalPurchasePrice") as string;
   let totalCost = 0;
   if (rawTotalPurchasePrice && !isNaN(parseFloat(rawTotalPurchasePrice)) && parseFloat(rawTotalPurchasePrice) > 0) {
     totalCost = parseFloat(rawTotalPurchasePrice);
-  } else if (rawPurchasePrice && !isNaN(parseFloat(rawPurchasePrice)) && parseFloat(rawPurchasePrice) > 0) {
-    totalCost = parseFloat(rawPurchasePrice) * totalQuantity;
-  } else if (replacementCost > 0 && formData.get("skipAutoExpense") !== "true") {
-    totalCost = replacementCost * totalQuantity;
+  } else if (rawPurchasePrice > 0) {
+    totalCost = rawPurchasePrice * totalQuantity;
+  } else if (price > 0 && formData.get("skipAutoExpense") !== "true") {
+    totalCost = price * totalQuantity;
   }
 
   const rawCustomId = (formData.get("customId") as string) || "";
@@ -582,8 +597,12 @@ export async function updateItemAction(formData: FormData) {
   const warehouseLocation = formData.get("warehouseLocation") as string;
   const locationId = (formData.get("locationId") as string)?.trim() || null;
   const dimensions = formData.get("dimensions") as string;
-  const unitPrice = parseFloat((formData.get("unitPrice") as string) || "0");
-  const replacementCost = parseFloat((formData.get("replacementCost") as string) || "0");
+  const rawUnitPrice = parseFloat((formData.get("unitPrice") as string) || "0");
+  const rawReplacementCost = parseFloat((formData.get("replacementCost") as string) || "0");
+  const rawPurchasePrice = parseFloat((formData.get("purchasePrice") as string) || "0");
+  const price = rawPurchasePrice || rawReplacementCost || rawUnitPrice || 0;
+  const unitPrice = price;
+  const replacementCost = price;
   const imageUrl = formData.get("imageUrl") as string;
 
   if (!name || !category) {
@@ -611,7 +630,7 @@ export async function updateItemAction(formData: FormData) {
     entityId: itemId,
     action: "atualizado",
     title: "Artigo atualizado",
-    details: `Dados atualizados: ${name} (${totalQuantity} un., €${unitPrice}/evento, local: ${warehouseLocation || "Armazém Principal"})`,
+    details: `Dados atualizados: ${name} (${totalQuantity} un., €${unitPrice.toFixed(2)}, local: ${warehouseLocation || "Armazém Principal"})`,
   });
 
   invalidateAllCaches();
