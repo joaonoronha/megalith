@@ -33,6 +33,7 @@ import {
   Clock,
   CheckCheck,
   LogOut,
+  LogIn,
   TrendingUp,
   AlertCircle,
   RefreshCw,
@@ -1049,7 +1050,7 @@ export default function EventFlowApp({
             {user ? (
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <div
-                  className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold shadow-2xs"
+                  className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold shadow-2xs"
                   title={`${user.name} (${user.email}) · Acesso ${user.role}`}
                 >
                   <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold">
@@ -1064,7 +1065,7 @@ export default function EventFlowApp({
                     await logoutAction();
                     setUser(null);
                   }}
-                  className="min-h-[36px] px-2.5 py-1 rounded-xl bg-white border border-[#ececf0] hover:border-rose-200 active:bg-rose-100 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer flex items-center gap-1.5 shadow-2xs touch-manipulation"
+                  className="min-h-[36px] p-2 sm:px-2.5 sm:py-1 rounded-xl bg-white border border-[#ececf0] hover:border-rose-200 active:bg-rose-100 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer flex items-center gap-1.5 shadow-2xs touch-manipulation"
                   title="Terminar sessão"
                 >
                   <LogOut className="w-3.5 h-3.5" />
@@ -1074,9 +1075,11 @@ export default function EventFlowApp({
             ) : (
               <button
                 onClick={() => setShowLoginModal(true)}
-                className="min-h-[36px] px-3 py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold text-[#111] hover:bg-[#fafafc] active:bg-[#f2f2f5] transition cursor-pointer shadow-2xs touch-manipulation"
+                className="min-h-[36px] p-2 sm:px-3 sm:py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold text-[#111] hover:bg-[#fafafc] active:bg-[#f2f2f5] transition cursor-pointer shadow-2xs touch-manipulation flex items-center gap-1.5"
+                title="Iniciar sessão"
               >
-                Entrar
+                <LogIn className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Entrar</span>
               </button>
             )}
           </div>

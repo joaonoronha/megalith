@@ -494,11 +494,12 @@ export default function MeetingDetailView({
                 href={meetUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="px-3.5 py-1.5 rounded-[10px] bg-[#4338ca] hover:bg-[#3730a3] text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition"
+                className="px-2.5 sm:px-3.5 py-1.5 rounded-[10px] bg-[#4338ca] hover:bg-[#3730a3] text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition"
+                title="Entrar no Google Meet"
               >
                 <Video className="w-3.5 h-3.5" />
-                <span>Entrar no Meet</span>
-                <ExternalLink className="w-3 h-3 opacity-80" />
+                <span className="hidden sm:inline">Entrar no Meet</span>
+                <ExternalLink className="w-3 h-3 opacity-80 hidden sm:inline" />
               </a>
             )}
           </div>

@@ -18,6 +18,7 @@ import {
   Plus,
   Trash2,
   ArrowLeft,
+  Save,
   DollarSign,
   Palette,
   ExternalLink,
@@ -3043,34 +3044,43 @@ export default function EventDetailView({
           <Link
             href="/eventos"
             prefetch={true}
-            className="inline-flex items-center gap-1.5 sm:gap-2 text-xs font-semibold text-[#636366] hover:text-[#111111] transition bg-[#f2f2f5] hover:bg-[#e5e5ea] px-2.5 sm:px-3 py-1.5 rounded-full flex-shrink-0"
+            className="inline-flex items-center gap-1.5 sm:gap-2 text-xs font-semibold text-[#636366] hover:text-[#111111] transition bg-[#f2f2f5] hover:bg-[#e5e5ea] p-1.5 sm:px-3 sm:py-1.5 rounded-full flex-shrink-0"
+            title="Voltar aos Eventos"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Voltar<span className="hidden sm:inline"> aos Eventos</span></span>
+            <span className="hidden sm:inline">Voltar aos Eventos</span>
           </Link>
 
           <div className="flex items-center gap-1.5 sm:gap-3">
-            {/* Auto-save Status Indicator */}
-            <div className="flex items-center gap-1.5 text-xs font-medium px-2 sm:px-2.5 py-1 rounded-full bg-[#fafafc] border border-[#ececf0] flex-shrink-0">
-              {saveStatus === "saving" ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#007aff]" />
-                  <span className="text-[#007aff] font-semibold text-[11px] sm:text-xs">A guardar...</span>
-                </>
-              ) : saveStatus === "saved" ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-emerald-700 font-semibold text-[11px] sm:text-xs">
-                    Guardado
-                  </span>
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                  <span className="text-rose-600 font-semibold text-[11px] sm:text-xs">Erro ao guardar</span>
-                </>
-              )}
-            </div>
+            {/* Auto-save Status Indicator / Button */}
+            {saveStatus === "saving" ? (
+              <div
+                className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200/80 text-[#007aff] flex-shrink-0"
+                title="A guardar alterações..."
+              >
+                <Save className="w-3.5 h-3.5 text-[#007aff]" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#007aff]" />
+                <span className="hidden sm:inline font-semibold text-[11px]">A guardar...</span>
+              </div>
+            ) : saveStatus === "saved" ? (
+              <div
+                className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 flex-shrink-0"
+                title="Todas as alterações guardadas"
+              >
+                <Save className="w-3.5 h-3.5 text-emerald-600" />
+                <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                <span className="hidden sm:inline font-semibold text-[11px]">Guardado</span>
+              </div>
+            ) : (
+              <div
+                className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-600 flex-shrink-0"
+                title="Erro ao guardar alterações"
+              >
+                <Save className="w-3.5 h-3.5 text-rose-600" />
+                <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                <span className="hidden sm:inline font-semibold text-[11px]">Erro</span>
+              </div>
+            )}
 
             {/* Status Dropdown */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
@@ -3078,7 +3088,7 @@ export default function EventDetailView({
               <select
                 value={event.status}
                 onChange={(e) => handleFieldChange("status", e.target.value, true)}
-                className={`text-[11px] sm:text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-full border outline-none cursor-pointer transition ${
+                className={`text-[11px] sm:text-xs font-bold px-2 sm:px-3 py-1.5 rounded-full border outline-none cursor-pointer transition ${
                   getStatusBadge(event.status).bg
                 }`}
               >
@@ -3098,7 +3108,7 @@ export default function EventDetailView({
               <button
                 type="button"
                 onClick={() => setShowAuditModal(true)}
-                className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#636366] hover:text-[#111] font-semibold text-xs transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-full bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#636366] hover:text-[#111] font-semibold text-xs transition cursor-pointer"
                 title="Ver histórico de alterações do evento"
               >
                 <History className="w-3.5 h-3.5 text-[#8e8e93]" />
@@ -3108,7 +3118,7 @@ export default function EventDetailView({
 
             {currentUserState && (
               <div
-                className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold shadow-2xs flex-shrink-0"
+                className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold shadow-2xs flex-shrink-0"
                 title={`${currentUserState.name} (${currentUserState.email}) · Acesso ${currentUserState.role}`}
               >
                 <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold">
