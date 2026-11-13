@@ -43,6 +43,7 @@ import {
   Upload,
   Trash2,
   Loader2,
+  Settings,
 } from "lucide-react";
 import AuditLogModal from "@/components/AuditLogModal";
 import AlertsDrawerModal from "@/components/AlertsDrawerModal";
@@ -421,6 +422,20 @@ export default function EventFlowApp({
         window.history.pushState({ tab }, "", href);
       }
       window.scrollTo({ top: 0, behavior: "instant" });
+    }
+  };
+
+  const handleNavigateUser = (userId: string, e?: React.MouseEvent) => {
+    if (e) {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("start-page-progress"));
+      window.location.assign(`/utilizadores/${userId}`);
     }
   };
 
@@ -1099,9 +1114,10 @@ export default function EventFlowApp({
 
             {user ? (
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <Link
+                <a
                   href={`/utilizadores/${user.id}`}
-                  className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-xl bg-white hover:bg-[#fafafc] border border-[#ececf0] text-xs font-semibold shadow-2xs transition group"
+                  onClick={(e) => handleNavigateUser(user.id, e)}
+                  className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-xl bg-white hover:bg-[#fafafc] border border-[#ececf0] text-xs font-semibold shadow-2xs transition group cursor-pointer"
                   title={`${user.name} (${user.email}) · Acesso ${user.role} · Ver Perfil`}
                 >
                   <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold overflow-hidden flex-shrink-0">
@@ -1112,7 +1128,7 @@ export default function EventFlowApp({
                     )}
                   </div>
                   <span className="text-[#111] group-hover:text-[#007aff] transition hidden sm:inline">{user.name.split(" ")[0]}</span>
-                </Link>
+                </a>
 
                 <button
                   type="button"
@@ -2793,70 +2809,22 @@ export default function EventFlowApp({
         )}
 
         {/* ========================================================= */}
-        {/* TAB 6: MORE (CRM, Quotes, Finance & Team) */}
+        {/* TAB 6: DEFINIÇÕES (CRM, Quotes & Team) */}
         {/* ========================================================= */}
         {activeTab === "more" && (
-          <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs space-y-6">
+          <section className="bg-white border border-[#ececf0] rounded-[18px] sm:rounded-[22px] p-4 sm:p-6 shadow-xs space-y-5 sm:space-y-6">
             <div>
-              <h2 className="text-[22px] font-bold text-[#111111]">
-                Gestão & Definições CFM
+              <h2 className="text-[20px] sm:text-[22px] font-bold text-[#111111]">
+                Definições
               </h2>
               <p className="text-xs text-[#8e8e93]">
                 Equipa de acesso administrativo, CRM de clientes e propostas comerciais
               </p>
             </div>
 
-            {/* Quick Access to Finance */}
-            <div
-              onClick={(e) => handleTabSwitch("finance", "/financas", e)}
-              className="p-4 rounded-[16px] bg-[#f8f8fa] hover:bg-[#f2f2f5] border border-[#ececf0] flex items-center justify-between cursor-pointer transition"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#eaf8ee] text-[#217a3b] flex items-center justify-center font-bold">
-                  <TrendingUp className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="font-bold text-sm text-[#111111]">
-                    Painel Financeiro & Despesas Mensais
-                  </div>
-                  <div className="text-xs text-[#8e8e93]">
-                    Lucro mês a mês, volume de eventos, controlo de despesas e inventário mais requisitado
-                  </div>
-                </div>
-              </div>
-              <span className="text-[#007aff] font-semibold text-xs flex items-center gap-1">
-                Abrir Painel →
-              </span>
-            </div>
-
-            {/* Session Card */}
-            <div className="p-4 rounded-[16px] bg-[#f8f8fa] border border-[#ececf0] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#111111] text-white flex items-center justify-center font-bold text-sm">
-                  {user ? user.name.slice(0, 2).toUpperCase() : "CFM"}
-                </div>
-                <div>
-                  <div className="font-bold text-sm text-[#111111]">
-                    {user ? user.name : "Sessão não iniciada"}
-                  </div>
-                  <div className="text-xs text-[#8e8e93]">
-                    {user
-                      ? `${user.email} · Acesso ${user.role}`
-                      : "Inicia sessão no topo da página"}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                  {user ? "Sessão Ativa" : "Visitante"}
-                </span>
-              </div>
-            </div>
-
             {/* Team Accounts Section */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div>
                   <h3 className="font-bold text-sm text-[#111111]">
                     Equipa CFM & Contas Administrativas
@@ -2869,7 +2837,7 @@ export default function EventFlowApp({
                 {user?.role === "owner" && (
                   <button
                     onClick={() => setShowNewUserModal(true)}
-                    className="px-3.5 py-1.5 rounded-[10px] bg-[#111111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-[10px] bg-[#111111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer self-start sm:self-auto"
                   >
                     <span>＋</span>
                     <span>Criar conta</span>
@@ -2881,10 +2849,10 @@ export default function EventFlowApp({
                 {teamUsers.map((u: any) => (
                   <div
                     key={u.id}
-                    className="p-3.5 bg-white flex items-center justify-between text-xs"
+                    className="p-3.5 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#f2f2f7] text-[#111111] flex items-center justify-center font-bold text-xs overflow-hidden flex-shrink-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-[#f2f2f7] text-[#111111] flex items-center justify-center font-bold text-xs overflow-hidden shrink-0">
                         {u.avatarUrl ? (
                           <img
                             src={u.avatarUrl}
@@ -2895,26 +2863,26 @@ export default function EventFlowApp({
                           u.name.slice(0, 2).toUpperCase()
                         )}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Link
                             href={`/utilizadores/${u.id}`}
-                            className="font-bold text-sm text-[#111111] hover:text-[#007aff] transition"
+                            className="font-bold text-sm text-[#111111] hover:text-[#007aff] transition truncate"
                             title="Ver perfil do utilizador"
                           >
                             {u.name}
                           </Link>
                           {user?.id === u.id && (
-                            <span className="text-[10px] font-semibold text-[#007aff] bg-[#007aff]/10 px-1.5 py-0.2 rounded">
+                            <span className="text-[10px] font-semibold text-[#007aff] bg-[#007aff]/10 px-1.5 py-0.2 rounded shrink-0">
                               Você
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-[#8e8e93]">{u.email}</div>
+                        <div className="text-[11px] text-[#8e8e93] truncate">{u.email}</div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2.5 flex-wrap sm:shrink-0">
                       <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
                         u.role === "owner"
                           ? "bg-[#f5f3ff] text-[#6d28d9] border-[#ddd6fe]"
@@ -2957,7 +2925,7 @@ export default function EventFlowApp({
 
             {/* CRM Clientes Section */}
             <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div>
                   <h3 className="font-bold text-sm text-[#111111]">
                     Clientes CRM
@@ -2969,7 +2937,7 @@ export default function EventFlowApp({
 
                 <button
                   onClick={() => setShowClientWizard(true)}
-                  className="px-3.5 py-1.5 rounded-[10px] bg-[#111111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-[10px] bg-[#111111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer self-start sm:self-auto"
                 >
                   <span>＋</span>
                   <span>Novo cliente</span>
@@ -2980,20 +2948,20 @@ export default function EventFlowApp({
                 {clientsList.map((client) => (
                   <div
                     key={client.id}
-                    className="p-3.5 bg-white flex items-center justify-between text-xs"
+                    className="p-3.5 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                   >
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-[#111]">{client.name}</span>
+                        <span className="font-bold text-sm text-[#111] truncate">{client.name}</span>
                       </div>
-                      <div className="text-[11px] text-[#8e8e93]">
+                      <div className="text-[11px] text-[#8e8e93] truncate">
                         {client.contactName ? `${client.contactName} · ` : ""}
                         {client.email || "Sem email"} · {client.phone || "Sem telefone"}
                       </div>
                     </div>
 
                     {client.nif && (
-                      <span className="text-[11px] text-[#8e8e93] bg-[#f2f2f7] px-2 py-0.5 rounded">
+                      <span className="text-[11px] text-[#8e8e93] bg-[#f2f2f7] px-2 py-0.5 rounded self-start sm:self-auto shrink-0">
                         NIF {client.nif}
                       </span>
                     )}
@@ -3004,7 +2972,7 @@ export default function EventFlowApp({
 
             {/* Generated Quotes Section */}
             <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div>
                   <h3 className="font-bold text-sm text-[#111111]">
                     Orçamentos & Links de Proposta
@@ -3017,7 +2985,7 @@ export default function EventFlowApp({
                 <button
                   type="button"
                   onClick={() => setActiveTab("events")}
-                  className="px-3.5 py-1.5 rounded-[10px] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[#111111] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  className="px-3.5 py-1.5 rounded-[10px] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[#111111] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs self-start sm:self-auto"
                   title="Abrir lista de eventos para aceder à configuração de evento"
                 >
                   <Package className="w-3.5 h-3.5 text-[#007aff]" />
@@ -3035,8 +3003,8 @@ export default function EventFlowApp({
                       key={q.id}
                       className="p-3.5 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
                     >
-                      <div>
-                        <div className="flex items-center gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-sm text-[#111]">
                             {q.quoteNumber}
                           </span>
@@ -3050,13 +3018,13 @@ export default function EventFlowApp({
                             {isApproved ? "Aprovado" : "Enviado"}
                           </span>
                         </div>
-                        <div className="text-[11px] text-[#8e8e93] mt-0.5">
+                        <div className="text-[11px] text-[#8e8e93] mt-0.5 truncate">
                           {client?.name || "Cliente"} · Total: €
                           {(q.total || 0).toLocaleString("pt-PT", {
                             minimumFractionDigits: 2,
                           })}
                         </div>
-                        <div className="flex items-center gap-1.5 text-[11px] text-[#8e8e93] mt-1">
+                        <div className="flex items-center gap-1.5 text-[11px] text-[#8e8e93] mt-1 flex-wrap">
                           <span>
                             Last updated by <strong className="text-[#3a3a3c] font-semibold">{q.lastUpdatedByName || "Administrador CFM"}</strong> {formatRelativeTime(q.updatedAt, "en")}
                           </span>
@@ -3079,7 +3047,7 @@ export default function EventFlowApp({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap sm:shrink-0">
                         <button
                           onClick={() => {
                             const url = `${window.location.origin}/proposta/${q.accessToken}`;
@@ -3121,7 +3089,7 @@ export default function EventFlowApp({
 
             {/* Calendly Integration Notice */}
             <div className="p-4 rounded-[16px] bg-[#f8f8fa] border border-[#ececf0] text-xs space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2 font-bold text-[#111]">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                   <span>Integração Calendly</span>
@@ -3135,16 +3103,16 @@ export default function EventFlowApp({
                 clientes CRM e eventos no estado <em>Planeamento</em>.
               </p>
               <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-[#ececf0]">
-                <div className="space-y-1 text-[11px] text-[#8e8e93]">
-                  <div>Webhook: <code className="bg-white px-1.5 py-0.5 rounded border border-[#ececf0] text-[#111]">/api/webhooks/calendly</code></div>
-                  <div>Callback: <code className="bg-white px-1.5 py-0.5 rounded border border-[#ececf0] text-[#111]">/api/auth/callback/calendly</code></div>
+                <div className="space-y-1 text-[11px] text-[#8e8e93] min-w-0">
+                  <div className="break-all">Webhook: <code className="bg-white px-1.5 py-0.5 rounded border border-[#ececf0] text-[#111]">/api/webhooks/calendly</code></div>
+                  <div className="break-all">Callback: <code className="bg-white px-1.5 py-0.5 rounded border border-[#ececf0] text-[#111]">/api/auth/callback/calendly</code></div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={() => handleSyncCalendly()}
                     disabled={isSyncingCalendly}
-                    className="px-3.5 py-2 rounded-[12px] bg-[#eeeffe] hover:bg-[#e0e3ff] text-[#4338ca] font-bold text-xs inline-flex items-center gap-1.5 transition self-start sm:self-auto cursor-pointer border border-indigo-200"
+                    className="px-3.5 py-2 rounded-[12px] bg-[#eeeffe] hover:bg-[#e0e3ff] text-[#4338ca] font-bold text-xs inline-flex items-center justify-center gap-1.5 transition self-stretch sm:self-auto cursor-pointer border border-indigo-200"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncingCalendly ? "animate-spin" : ""}`} />
                     <span>{isSyncingCalendly ? "A sincronizar..." : "Puxar Reuniões"}</span>
@@ -3158,7 +3126,7 @@ export default function EventFlowApp({
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3.5 py-2 rounded-[12px] bg-[#007aff] hover:bg-[#0062cc] text-white font-semibold text-xs inline-flex items-center gap-1.5 transition self-start sm:self-auto cursor-pointer shadow-xs"
+                    className="px-3.5 py-2 rounded-[12px] bg-[#007aff] hover:bg-[#0062cc] text-white font-semibold text-xs inline-flex items-center justify-center gap-1.5 transition self-stretch sm:self-auto cursor-pointer shadow-xs"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                     <span>Ligar / Autorizar Calendly</span>
@@ -3307,7 +3275,7 @@ export default function EventFlowApp({
             <TrendingUp className="w-5 h-5" />
           </Link>
 
-          {/* 6. Mais */}
+          {/* 6. Definições */}
           <Link
             href="/mais"
             onClick={(e) => handleTabSwitch("more", "/mais", e)}
@@ -3317,22 +3285,9 @@ export default function EventFlowApp({
                 activeTab === "more" ? "rgba(0,122,255,0.11)" : "transparent",
               color: activeTab === "more" ? "#007aff" : "#8e8e93",
             }}
-            title="Mais"
+            title="Definições"
           >
-            <svg
-              viewBox="0 0 24 24"
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect x="3.6" y="3.6" width="6.6" height="6.6" rx="1.85" />
-              <rect x="13.8" y="3.6" width="6.6" height="6.6" rx="1.85" />
-              <rect x="3.6" y="13.8" width="6.6" height="6.6" rx="1.85" />
-              <rect x="13.8" y="13.8" width="6.6" height="6.6" rx="1.85" />
-            </svg>
+            <Settings className="w-5 h-5" />
           </Link>
         </div>
       </aside>
