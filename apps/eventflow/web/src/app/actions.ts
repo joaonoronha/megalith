@@ -1166,7 +1166,7 @@ export async function loginAction(formData: FormData) {
 export async function logoutAction() {
   const { logoutUser } = await import("@/lib/auth");
   await logoutUser();
-  redirect("/login");
+  return { success: true };
 }
 
 export async function createUserAction(formData: FormData) {
