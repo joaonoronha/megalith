@@ -20,6 +20,7 @@ import {
   Briefcase,
   MapPin,
   Building,
+  Share2,
 } from "lucide-react";
 import { updateUserAction } from "@/app/actions";
 
@@ -204,17 +205,28 @@ export default function UserDetailView({
                     </span>
                   )}
 
-                  {/* Copyable ID Badge */}
+                  {/* Share Link Button */}
                   <button
-                    onClick={handleCopyId}
-                    className="px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-[#fafafc] hover:bg-[#f2f2f5] text-[#8e8e93] hover:text-[#111] border border-[#ececf0] transition flex items-center gap-1.5 cursor-pointer"
-                    title="Clique para copiar o ID do utilizador"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        navigator.clipboard.writeText(window.location.href);
+                        setCopiedId(true);
+                        setTimeout(() => setCopiedId(false), 2000);
+                      }
+                    }}
+                    className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#fafafc] hover:bg-[#f2f2f5] text-[#111] border border-[#ececf0] transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    title="Copiar link do perfil"
                   >
-                    <span>#{user.id}</span>
                     {copiedId ? (
-                      <Check className="w-3 h-3 text-emerald-600" />
+                      <>
+                        <Check className="w-3 h-3 text-emerald-600" />
+                        <span className="text-emerald-700">Link copiado!</span>
+                      </>
                     ) : (
-                      <Copy className="w-3 h-3" />
+                      <>
+                        <Share2 className="w-3 h-3 text-[#8e8e93]" />
+                        <span>Partilhar</span>
+                      </>
                     )}
                   </button>
                 </div>
@@ -394,9 +406,6 @@ export default function UserDetailView({
                         >
                           {t.title}
                         </span>
-                        <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0]">
-                          #{t.id}
-                        </span>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 text-xs text-[#8e8e93] mt-1">
@@ -519,7 +528,6 @@ function EditUserModal({
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-base font-bold text-[#111]">Editar Conta de Equipa</h3>
-            <p className="text-[11px] text-[#8e8e93]">#{user.id}</p>
           </div>
           <button
             onClick={onClose}

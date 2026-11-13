@@ -26,6 +26,7 @@ import {
   Camera,
   Boxes,
   ShieldAlert,
+  Share2,
 } from "lucide-react";
 import AuditLogModal from "@/components/AuditLogModal";
 import StorageLocationsModal, { StorageLocation, TeamUser } from "@/components/StorageLocationsModal";
@@ -378,18 +379,29 @@ export default function InventoryDetailView({
                     </select>
                   </div>
 
-                  {/* Copyable ID Badge */}
+                  {/* Share Link Button */}
                   <button
                     type="button"
-                    onClick={handleCopyId}
-                    className="px-2.5 py-1 rounded-full text-xs font-mono font-medium bg-[#fafafc] hover:bg-[#f2f2f5] text-[#8e8e93] hover:text-[#111] border border-[#ececf0] transition flex items-center gap-1.5 cursor-pointer"
-                    title="Clique para copiar o ID único do artigo"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        navigator.clipboard.writeText(window.location.href);
+                        setCopiedId(true);
+                        setTimeout(() => setCopiedId(false), 2000);
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fafafc] hover:bg-[#f2f2f5] text-[#111] border border-[#ececf0] transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    title="Copiar link direto para este artigo"
                   >
-                    <span>#{item.id}</span>
                     {copiedId ? (
-                      <Check className="w-3 h-3 text-emerald-600" />
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-emerald-700">Link copiado!</span>
+                      </>
                     ) : (
-                      <Copy className="w-3 h-3" />
+                      <>
+                        <Share2 className="w-3.5 h-3.5 text-[#8e8e93]" />
+                        <span>Partilhar</span>
+                      </>
                     )}
                   </button>
 
@@ -988,8 +1000,8 @@ export default function InventoryDetailView({
           <div className="bg-white rounded-[22px] w-full max-w-sm border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-base font-bold text-[#111]">Triagem e Danos</h3>
-                <p className="text-[11px] text-[#8e8e93]">Artigo #{item.id}</p>
+                <h3 className="text-base font-bold text-[#111]">Registo de Danos</h3>
+                <p className="text-[11px] text-[#8e8e93] font-semibold">{item.name} ({item.sku})</p>
               </div>
               <button
                 type="button"

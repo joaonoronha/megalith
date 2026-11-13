@@ -1405,12 +1405,6 @@ export default function EventFlowApp({
                               >
                                 {evt.name}
                               </span>
-                              <span
-                                className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] group-hover:bg-white px-1.5 py-0.5 rounded border border-[#ececf0] flex-shrink-0 transition"
-                                title="ID do Evento"
-                              >
-                                #{evt.id}
-                              </span>
                               {evt.theme && (
                                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#fef7e0] text-[#b06000] border border-[#feefc3] flex items-center gap-1 flex-shrink-0">
                                   <Sparkles className="w-2.5 h-2.5" />
@@ -1420,28 +1414,6 @@ export default function EventFlowApp({
                             </div>
                             <div className="text-[12px] text-[#8e8e93] mt-0.5 truncate">
                               {formatEventByline(evt.startDate, evt.venue)}
-                            </div>
-                            <div className="flex items-center gap-1.5 text-[11px] text-[#8e8e93] mt-1">
-                              <span>
-                                Last updated by <strong className="text-[#3a3a3c] font-semibold">{evt.lastUpdatedByName || "Administrador CFM"}</strong> {formatRelativeTime(evt.updatedAt, "en")}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setAuditModal({
-                                    isOpen: true,
-                                    entityType: "event",
-                                    entityId: evt.id,
-                                    entityTitle: evt.name,
-                                  });
-                                }}
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-[#ececf0] text-[#007aff] transition cursor-pointer text-[10px] font-medium"
-                                title="Ver histórico de alterações"
-                              >
-                                <History className="w-3 h-3" />
-                                <span>Histórico</span>
-                              </button>
                             </div>
                           </div>
                         </div>
@@ -1721,42 +1693,12 @@ export default function EventFlowApp({
                                 title="Ver ficha do artigo"
                               >
                                 {item.name}
-                              </Link>
-                              <Link
-                                href={`/inventario/${item.id}`}
-                                prefetch={false}
-                                className="font-mono text-[10px] text-[#8e8e93] hover:text-[#007aff] bg-[#fafafc] hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] flex-shrink-0 transition"
-                                title="ID do Artigo"
-                              >
-                                #{item.id}
-                              </Link>
+                               </Link>
                             </div>
                             <div className="text-[12px] text-[#8e8e93] mt-0.5 truncate">
                               {item.totalQuantity - (item.damagedQuantity || 0)} disponíveis de{" "}
                               {item.totalQuantity}
                               {hasDamage && ` (${item.damagedQuantity} danificados)`}
-                            </div>
-                            <div className="flex items-center gap-1.5 text-[11px] text-[#8e8e93] mt-1">
-                              <span>
-                                Last updated by <strong className="text-[#3a3a3c] font-semibold">{item.lastUpdatedByName || "Administrador CFM"}</strong> {formatRelativeTime(item.updatedAt, "en")}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setAuditModal({
-                                    isOpen: true,
-                                    entityType: "inventory",
-                                    entityId: item.id,
-                                    entityTitle: item.name,
-                                  });
-                                }}
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-[#ececf0] text-[#007aff] transition cursor-pointer text-[10px] font-medium"
-                                title="Ver histórico de alterações"
-                              >
-                                <History className="w-3 h-3" />
-                                <span>Histórico</span>
-                              </button>
                             </div>
                           </div>
                         </div>
@@ -2401,9 +2343,6 @@ export default function EventFlowApp({
                               <span className="font-bold text-sm text-[#111] group-hover:text-[#007aff] transition truncate">
                                 {e.name}
                               </span>
-                              <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0] flex-shrink-0">
-                                #{e.id}
-                              </span>
                             </div>
                             <div className="text-xs text-[#8e8e93] mt-0.5 truncate flex items-center gap-1.5">
                               {isMeeting && e.startDate && (
@@ -2509,14 +2448,6 @@ export default function EventFlowApp({
                             className="font-bold text-[16px] text-[#111] hover:text-[#007aff] transition"
                           >
                             {e.name}
-                          </Link>
-                          <Link
-                            href={`/eventos/${e.id}`}
-                            prefetch={false}
-                            className="font-mono text-[10px] text-[#8e8e93] hover:text-[#007aff] bg-[#f2f2f5] hover:bg-[#e5e5ea] px-1.5 py-0.5 rounded border border-[#e5e5ea] transition"
-                            title="ID do Evento"
-                          >
-                            #{e.id}
                           </Link>
                           {e.category && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f2f2f5] text-[#48484a]">
@@ -3031,14 +2962,6 @@ export default function EventFlowApp({
                             >
                               {item.sku}
                             </Link>
-                            <Link
-                              href={`/inventario/${item.id}`}
-                              prefetch={false}
-                              className="font-mono text-[9px] text-[#8e8e93] hover:text-[#007aff] bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] transition"
-                              title="ID único do artigo"
-                            >
-                              #{item.id}
-                            </Link>
                           </div>
 
                           <div className="font-bold text-sm text-[#111] mt-0.5">
@@ -3349,13 +3272,6 @@ export default function EventFlowApp({
                           >
                             {u.name}
                           </Link>
-                          <Link
-                            href={`/utilizadores/${u.id}`}
-                            className="font-mono text-[10px] text-[#8e8e93] hover:text-[#007aff] bg-[#fafafc] hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] transition"
-                            title="ID do Utilizador"
-                          >
-                            #{u.id}
-                          </Link>
                         </div>
                         <div className="text-[11px] text-[#8e8e93]">{u.email}</div>
                       </div>
@@ -3416,9 +3332,6 @@ export default function EventFlowApp({
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-sm text-[#111]">{client.name}</span>
-                        <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0]">
-                          #{client.id}
-                        </span>
                       </div>
                       <div className="text-[11px] text-[#8e8e93]">
                         {client.contactName ? `${client.contactName} · ` : ""}
@@ -3473,9 +3386,6 @@ export default function EventFlowApp({
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-sm text-[#111]">
                             {q.quoteNumber}
-                          </span>
-                          <span className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] px-1.5 py-0.5 rounded border border-[#ececf0]">
-                            #{q.id}
                           </span>
                           <span
                             className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -5481,7 +5391,6 @@ function EditUserModal({
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-[17px] font-bold text-[#111111]">Editar Conta de Equipa</h2>
-            <p className="text-[11px] text-[#8e8e93] font-mono mt-0.5">#{user.id}</p>
           </div>
           <button
             onClick={onClose}
@@ -6454,9 +6363,6 @@ function CalendarDayPopupModal({
                               <MapPin className="w-3 h-3 flex-shrink-0" />
                               <span className="truncate">{evt.venue || "Google Meet (Online)"}</span>
                             </div>
-                            <div className="text-[11px] text-[#8e8e93] mt-0.5 font-mono">
-                              ID: #{evt.id}
-                            </div>
                           </div>
                         </div>
 
@@ -6524,9 +6430,6 @@ function CalendarDayPopupModal({
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-bold text-[15px] text-[#111] truncate">
                               {evt.name}
-                            </span>
-                            <span className="font-mono text-[10px] text-[#8e8e93] bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#e5e5ea]">
-                              #{evt.id}
                             </span>
                             <span
                               className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusObj.bg} ${statusObj.text}`}
