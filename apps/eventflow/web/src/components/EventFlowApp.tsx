@@ -591,8 +591,7 @@ export default function EventFlowApp({
   const [inventorySearch, setInventorySearch] = useState<string>("");
   const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState<string>("all");
   const [inventoryLocationFilter, setInventoryLocationFilter] = useState<string>("all");
-  const [inventoryAlertFilter, setInventoryAlertFilter] = useState<"all" | "alerts" | "low" | "damaged" | "available">("all");
-  const [inventoryPurchaseFilter, setInventoryPurchaseFilter] = useState<"all" | "bought" | "not_bought">("all");
+  const [inventoryAlertFilter, setInventoryAlertFilter] = useState<"all" | "alerts">("all");
 
   // Distinct categories and warehouse locations
   const inventoryCategories = useMemo(() => {
@@ -673,18 +672,10 @@ export default function EventFlowApp({
       const isLow = available < item.minStock;
       const hasAlert = damaged > 0 || isLow;
 
-      // 1. Text search (Name, SKU, ID, Category, Location, Manager)
+      // 1. Text search strictly by name
       if (inventorySearch.trim()) {
         const query = inventorySearch.toLowerCase().trim();
-        const locDetails = getLocationDetails(item.warehouseLocation, item.locationId);
-        const matches =
-          item.name?.toLowerCase().includes(query) ||
-          item.sku?.toLowerCase().includes(query) ||
-          item.id?.toLowerCase().includes(query) ||
-          item.category?.toLowerCase().includes(query) ||
-          item.warehouseLocation?.toLowerCase().includes(query) ||
-          locDetails?.managerName?.toLowerCase().includes(query);
-        if (!matches) return false;
+        if (!item.name?.toLowerCase().includes(query)) return false;
       }
 
       // 2. Category filter
@@ -702,19 +693,12 @@ export default function EventFlowApp({
         if (!matchesLoc) return false;
       }
 
-      // 4. Alert filter
+      // 4. Alert filter ("all" or "alerts")
       if (inventoryAlertFilter === "alerts" && !hasAlert) return false;
-      if (inventoryAlertFilter === "low" && !isLow) return false;
-      if (inventoryAlertFilter === "damaged" && damaged <= 0) return false;
-      if (inventoryAlertFilter === "available" && hasAlert) return false;
-
-      // 5. Purchase status filter (Bought vs Not Yet Bought)
-      if (inventoryPurchaseFilter === "bought" && item.purchaseStatus === "not_bought") return false;
-      if (inventoryPurchaseFilter === "not_bought" && item.purchaseStatus !== "not_bought") return false;
 
       return true;
     });
-  }, [itemsList, locationsList, inventorySearch, inventoryCategoryFilter, inventoryLocationFilter, inventoryAlertFilter, inventoryPurchaseFilter]);
+  }, [itemsList, locationsList, inventorySearch, inventoryCategoryFilter, inventoryLocationFilter, inventoryAlertFilter]);
 
   // Financial aggregates (Realized Cash Flow - only bought items are in movementsList)
   const totalEntradas = movementsList
@@ -2577,27 +2561,14 @@ export default function EventFlowApp({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-[20px] sm:text-[22px] font-bold text-[#111111]">
-                  Catálogo de Stock & Armazém
+                  Inventário
                 </h2>
                 <p className="text-xs text-[#8e8e93]">
-                  Controlo de stock físico, inventário e triagem de materiais
+                  Controlo de stock físico e triagem de itens
                 </p>
               </div>
 
               <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLocationsModalInitialMode("create");
-                    setShowLocationsModal(true);
-                  }}
-                  className="px-3.5 py-2.5 rounded-[12px] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[#111] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
-                  title="Especificar um novo local para armazenar inventário e quem é a pessoa que o gere"
-                >
-                  <MapPin className="w-3.5 h-3.5 text-[#007aff]" />
-                  <span>+ Novo Local</span>
-                </button>
-
                 <button
                   type="button"
                   onClick={() => {
@@ -2630,7 +2601,7 @@ export default function EventFlowApp({
                   className="px-4 py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
                 >
                   <span>＋</span>
-                  <span>Novo artigo</span>
+                  <span>Novo Artigo</span>
                 </button>
               </div>
             </div>
@@ -2646,7 +2617,7 @@ export default function EventFlowApp({
                     type="text"
                     value={inventorySearch}
                     onChange={(e) => setInventorySearch(e.target.value)}
-                    placeholder="Pesquisar por nome, SKU, ID, categoria..."
+                    placeholder="Pesquisar por nome do artigo..."
                     className="w-full pl-9 pr-8 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff] transition"
                   />
                   {inventorySearch && (
@@ -2756,106 +2727,13 @@ export default function EventFlowApp({
                     <AlertTriangle className="w-3 h-3" />
                     <span>Com Alertas ({inventoryAlertCounters.totalAlerts})</span>
                   </button>
-
-                  {/* Low Stock */}
-                  <button
-                    type="button"
-                    onClick={() => setInventoryAlertFilter("low")}
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
-                      inventoryAlertFilter === "low"
-                        ? "bg-amber-600 text-white shadow-2xs"
-                        : inventoryAlertCounters.lowCount > 0
-                        ? "bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100"
-                        : "bg-white border border-[#ececf0] text-[#8e8e93] hover:bg-[#f2f2f5]"
-                    }`}
-                  >
-                    Stock Baixo ({inventoryAlertCounters.lowCount})
-                  </button>
-
-                  {/* Damaged */}
-                  <button
-                    type="button"
-                    onClick={() => setInventoryAlertFilter("damaged")}
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
-                      inventoryAlertFilter === "damaged"
-                        ? "bg-rose-700 text-white shadow-2xs"
-                        : inventoryAlertCounters.damagedCount > 0
-                        ? "bg-rose-50 border border-rose-200 text-rose-800 hover:bg-rose-100"
-                        : "bg-white border border-[#ececf0] text-[#8e8e93] hover:bg-[#f2f2f5]"
-                    }`}
-                  >
-                    Danificados ({inventoryAlertCounters.damagedCount})
-                  </button>
-
-                  {/* Available */}
-                  <button
-                    type="button"
-                    onClick={() => setInventoryAlertFilter("available")}
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
-                      inventoryAlertFilter === "available"
-                        ? "bg-emerald-600 text-white shadow-2xs"
-                        : "bg-white border border-[#ececf0] text-[#3a3a3c] hover:bg-[#f2f2f5]"
-                    }`}
-                  >
-                    Disponíveis ({itemsList.length - inventoryAlertCounters.totalAlerts})
-                  </button>
-                </div>
-
-                {/* Purchase Status (Bought vs Not Yet Bought) */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-1 sm:pt-0">
-                  <span className="text-[11px] font-semibold text-[#8e8e93] mr-1 hidden sm:inline">
-                    Aquisição:
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setInventoryPurchaseFilter("all")}
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
-                      inventoryPurchaseFilter === "all"
-                        ? "bg-[#111] text-white shadow-2xs"
-                        : "bg-white border border-[#ececf0] text-[#3a3a3c] hover:bg-[#f2f2f5]"
-                    }`}
-                  >
-                    Todas ({itemsList.length})
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setInventoryPurchaseFilter("bought")}
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition flex items-center gap-1 cursor-pointer ${
-                      inventoryPurchaseFilter === "bought"
-                        ? "bg-emerald-700 text-white shadow-2xs"
-                        : "bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100"
-                    }`}
-                  >
-                    <CheckCircle2 className="w-3 h-3" />
-                    <span>Comprados ({inventoryPurchaseStats.boughtCount})</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setInventoryPurchaseFilter("not_bought")}
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold transition flex items-center gap-1 cursor-pointer ${
-                      inventoryPurchaseFilter === "not_bought"
-                        ? "bg-amber-700 text-white shadow-2xs"
-                        : "bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100"
-                    }`}
-                  >
-                    <AlertCircle className="w-3 h-3" />
-                    <span>A Comprar ({inventoryPurchaseStats.notBoughtCount})</span>
-                    {inventoryPurchaseStats.notBoughtCost > 0 && (
-                      <span className="text-[10px] opacity-80">
-                        (€{inventoryPurchaseStats.notBoughtCost.toLocaleString("pt-PT", { maximumFractionDigits: 0 })})
-                      </span>
-                    )}
-                  </button>
                 </div>
 
                 {/* Reset button if filters active */}
                 {(inventorySearch ||
                   inventoryCategoryFilter !== "all" ||
                   inventoryLocationFilter !== "all" ||
-                  inventoryAlertFilter !== "all" ||
-                  inventoryPurchaseFilter !== "all") && (
+                  inventoryAlertFilter !== "all") && (
                   <button
                     type="button"
                     onClick={() => {
@@ -2863,7 +2741,6 @@ export default function EventFlowApp({
                       setInventoryCategoryFilter("all");
                       setInventoryLocationFilter("all");
                       setInventoryAlertFilter("all");
-                      setInventoryPurchaseFilter("all");
                     }}
                     className="text-xs font-semibold text-[#007aff] hover:underline cursor-pointer flex items-center gap-1"
                   >
@@ -2879,9 +2756,6 @@ export default function EventFlowApp({
               <span>
                 A mostrar <strong className="text-[#111]">{processedInventoryItems.length}</strong> de{" "}
                 <strong className="text-[#111]">{itemsList.length}</strong> artigos
-              </span>
-              <span className="text-[11px]">
-                Vista em lista estruturada
               </span>
             </div>
 
@@ -2914,11 +2788,11 @@ export default function EventFlowApp({
               <div className="bg-white rounded-[20px] border border-[#ececf0] overflow-hidden shadow-2xs divide-y divide-[#ececf0]">
                 {/* Desktop Table Header */}
                 <div className="hidden lg:grid grid-cols-12 gap-3 px-5 py-3 bg-[#f8f8fa] text-[11px] font-bold text-[#8e8e93] uppercase tracking-wider">
-                  <div className="col-span-4">Artigo & Identificadores</div>
+                  <div className="col-span-4">Artigo</div>
                   <div className="col-span-2">Categoria</div>
-                  <div className="col-span-2">Localização no Armazém</div>
-                  <div className="col-span-2">Stock & Estado</div>
-                  <div className="col-span-2 text-right">Preço / evento & Ações</div>
+                  <div className="col-span-2">Localização</div>
+                  <div className="col-span-2">Stock</div>
+                  <div className="col-span-2 text-right">Preço</div>
                 </div>
 
                 {/* List Item Rows */}
@@ -2932,7 +2806,7 @@ export default function EventFlowApp({
                       key={item.id}
                       className="p-4 lg:px-5 lg:py-3.5 hover:bg-[#fafafa] transition flex flex-col lg:grid lg:grid-cols-12 lg:items-center gap-3"
                     >
-                      {/* Column 1: Item Thumbnail & Name & SKU */}
+                      {/* Column 1: Item Thumbnail & Name */}
                       <div className="lg:col-span-4 flex items-center gap-3">
                         <Link
                           href={`/inventario/${item.id}`}
@@ -2953,18 +2827,7 @@ export default function EventFlowApp({
                         </Link>
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <Link
-                              href={`/inventario/${item.id}`}
-                              prefetch={false}
-                              className="text-[10px] font-bold text-[#8e8e93] hover:text-[#111] uppercase tracking-wider transition"
-                              title="SKU do Artigo"
-                            >
-                              {item.sku}
-                            </Link>
-                          </div>
-
-                          <div className="font-bold text-sm text-[#111] mt-0.5">
+                          <div className="font-bold text-sm text-[#111]">
                             <Link
                               href={`/inventario/${item.id}`}
                               prefetch={false}
@@ -2974,12 +2837,6 @@ export default function EventFlowApp({
                               {item.name}
                             </Link>
                           </div>
-
-                          {item.dimensions && (
-                            <div className="text-[11px] text-[#8e8e93] truncate">
-                              {item.dimensions}
-                            </div>
-                          )}
                         </div>
                       </div>
 
@@ -2991,89 +2848,38 @@ export default function EventFlowApp({
                         </span>
                       </div>
 
-                      {/* Column 3: Warehouse Location & Manager */}
+                      {/* Column 3: Warehouse Location */}
                       <div className="lg:col-span-2 flex lg:block items-center justify-between text-xs">
                         <span className="lg:hidden text-[#8e8e93] font-medium">Localização:</span>
-                        {(() => {
-                          const locDetails = getLocationDetails(item.warehouseLocation, item.locationId);
-                          return (
-                            <div className="space-y-0.5">
-                              <div className="inline-flex items-center gap-1 text-xs text-[#3a3a3c]">
-                                <MapPin className="w-3.5 h-3.5 text-[#007aff] shrink-0" />
-                                <span className="truncate max-w-[150px] font-medium">
-                                  {item.warehouseLocation || "Armazém Principal"}
-                                </span>
-                              </div>
-                              {locDetails?.managerName && (
-                                <div className="flex items-center gap-1 text-[11px] text-[#636366]">
-                                  <User className="w-3 h-3 text-[#8e8e93] shrink-0" />
-                                  <span className="truncate max-w-[150px]">
-                                    Gestor: <strong className="font-semibold text-[#111]">{locDetails.managerName}</strong>
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
-
-                      {/* Column 4: Stock & Alert Badges & Purchase Status */}
-                      <div className="lg:col-span-2 space-y-1.5">
-                        <div className="flex items-center justify-between lg:justify-start gap-1.5 flex-wrap">
-                          {item.purchaseStatus === "not_bought" ? (
-                            <span
-                              className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1"
-                              title="Artigo ainda não comprado. O custo previsto está deduzido do lucro projetado."
-                            >
-                              <AlertCircle className="w-3 h-3 text-amber-700" />
-                              <span>A Comprar</span>
-                            </span>
-                          ) : (
-                            <span
-                              className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1"
-                              title="Artigo comprado e contabilizado em finanças"
-                            >
-                              <Check className="w-3 h-3 text-emerald-600" />
-                              <span>Comprado</span>
-                            </span>
-                          )}
-
-                          {damaged > 0 ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3" />
-                              <span>{damaged} Danificado(s)</span>
-                            </span>
-                          ) : isLow ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3" />
-                              <span>Stock Baixo</span>
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-[#3a3a3c] flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-gray-500" />
-                              <span>Disponível</span>
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center justify-between lg:justify-start gap-2 text-xs">
-                          <div>
-                            <span className="text-[#8e8e93]">Disp:</span>{" "}
-                            <strong className="text-[#111]">{available} un.</strong>
-                          </div>
-                          <span className="text-[#ececf0]">·</span>
-                          <div>
-                            <span className="text-[#8e8e93]">Total:</span>{" "}
-                            <strong className="text-[#111]">{item.totalQuantity} un.</strong>
-                          </div>
+                        <div className="inline-flex items-center gap-1.5 text-xs text-[#3a3a3c]">
+                          <MapPin className="w-3.5 h-3.5 text-[#007aff] shrink-0" />
+                          <span className="truncate max-w-[170px] font-medium">
+                            {item.warehouseLocation || "Armazém Principal"}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Column 5: Price & Actions */}
+                      {/* Column 4: Stock */}
+                      <div className="lg:col-span-2 flex lg:block items-center justify-between text-xs">
+                        <span className="lg:hidden text-[#8e8e93] font-medium">Stock:</span>
+                        <div
+                          className={`font-bold text-sm ${
+                            damaged > 0
+                              ? "text-rose-600"
+                              : isLow
+                              ? "text-amber-600"
+                              : "text-emerald-600"
+                          }`}
+                        >
+                          {available} un.
+                        </div>
+                      </div>
+
+                      {/* Column 5: Price */}
                       <div className="lg:col-span-2 flex items-center justify-between lg:justify-end gap-3 pt-2 lg:pt-0 border-t lg:border-t-0 border-[#ececf0]/70">
                         <div className="text-left lg:text-right">
                           <div className="text-xs font-bold text-[#111]">
-                            €{(item.unitPrice || 0).toFixed(2)}/evento
+                            €{(item.replacementCost || item.unitPrice || 0).toFixed(2)}
                           </div>
                           <button
                             type="button"
@@ -3093,42 +2899,35 @@ export default function EventFlowApp({
                           </button>
                         </div>
 
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {item.purchaseStatus === "not_bought" && (
-                            <button
-                              type="button"
-                              onClick={() => handleMarkAsBought(item)}
-                              className="px-2.5 py-1.5 rounded-[10px] bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                              title="Marcar como Comprado e lançar despesa em Finanças"
-                            >
-                              <Check className="w-3 h-3" />
-                              <span>Comprar</span>
-                            </button>
-                          )}
+                        {(item.purchaseStatus === "not_bought" || damaged > 0) && (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {item.purchaseStatus === "not_bought" && (
+                              <button
+                                type="button"
+                                onClick={() => handleMarkAsBought(item)}
+                                className="px-2.5 py-1.5 rounded-[10px] bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                                title="Marcar como Comprado e lançar despesa em Finanças"
+                              >
+                                <Check className="w-3 h-3" />
+                                <span>Comprar</span>
+                              </button>
+                            )}
 
-                          {damaged > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setTriageItem(item);
-                                setShowTriageModal(true);
-                              }}
-                              className="px-2.5 py-1.5 rounded-[10px] bg-[#111] hover:bg-black text-white text-[11px] font-semibold transition cursor-pointer"
-                              title="Fazer triagem do material danificado"
-                            >
-                              Triagem
-                            </button>
-                          )}
-
-                          <Link
-                            href={`/inventario/${item.id}`}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[10px] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[#111] text-[11px] font-semibold transition cursor-pointer"
-                            title="Ver ficha completa do artigo"
-                          >
-                            <span>Ficha</span>
-                            <ChevronRight className="w-3 h-3 text-[#8e8e93]" />
-                          </Link>
-                        </div>
+                            {damaged > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTriageItem(item);
+                                  setShowTriageModal(true);
+                                }}
+                                className="px-2.5 py-1.5 rounded-[10px] bg-[#111] hover:bg-black text-white text-[11px] font-semibold transition cursor-pointer"
+                                title="Fazer triagem do material danificado"
+                              >
+                                Triagem
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -4363,145 +4162,68 @@ function ItemWizardModal({
   locations?: any[];
   users?: any[];
 }) {
-  const [sku, setSku] = useState("");
-  const [customId, setCustomId] = useState("");
   const [name, setName] = useState("");
   const [category, setCategory] = useState("Mobiliário");
   const [totalQuantity, setTotalQuantity] = useState("50");
   const [minStock, setMinStock] = useState("10");
-  const [unitPrice, setUnitPrice] = useState("6.00");
   const [purchasePrice, setPurchasePrice] = useState("45.00");
-  const [totalPurchasePrice, setTotalPurchasePrice] = useState("2250.00");
-  const [purchaseStatus, setPurchaseStatus] = useState<"bought" | "not_bought">("bought");
-  const [isConsumable, setIsConsumable] = useState(false);
-  const [packageUnits, setPackageUnits] = useState("1");
 
-  // Location State
+  // Location State (Only existing locations)
   const defaultLoc = locations[0];
   const [selectedLocationId, setSelectedLocationId] = useState<string>(
-    defaultLoc?.id || "custom"
-  );
-  const [subLocationDetails, setSubLocationDetails] = useState("");
-  const [isSpecifyingNewLoc, setIsSpecifyingNewLoc] = useState(
-    locations.length === 0
-  );
-
-  // New Location Fields
-  const [newLocName, setNewLocName] = useState("");
-  const [newLocCode, setNewLocCode] = useState("");
-  const [newLocManagerUserId, setNewLocManagerUserId] = useState(
-    users[0]?.id || "custom"
-  );
-  const [newLocManagerName, setNewLocManagerName] = useState(
-    users[0]?.name || "Administrador CFM"
-  );
-  const [newLocManagerContact, setNewLocManagerContact] = useState(
-    users[0]?.email || ""
+    defaultLoc?.id || ""
   );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleManagerUserChange = (uId: string) => {
-    setNewLocManagerUserId(uId);
-    if (uId && uId !== "custom") {
-      const u = users.find((usr) => usr.id === uId);
-      if (u) {
-        setNewLocManagerName(u.name);
-        setNewLocManagerContact(u.email);
-      }
-    } else if (uId === "custom") {
-      setNewLocManagerName("");
-      setNewLocManagerContact("");
-    }
-  };
-
-  const handleLocationDropdownChange = (val: string) => {
-    if (val === "new") {
-      setIsSpecifyingNewLoc(true);
-      setSelectedLocationId("");
-    } else {
-      setIsSpecifyingNewLoc(false);
-      setSelectedLocationId(val);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name.trim()) {
+      setError("Indique o nome do artigo.");
+      return;
+    }
     setIsSubmitting(true);
     setError(null);
 
     try {
+      const slug = name
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
       const formData = new FormData();
-      formData.set("sku", sku);
-      if (customId.trim()) formData.set("customId", customId.trim());
-      formData.set("name", name);
+      formData.set("sku", slug || `artigo-${Date.now()}`);
+      formData.set("name", name.trim());
       formData.set("category", category);
       formData.set("totalQuantity", totalQuantity);
       formData.set("minStock", minStock);
-      formData.set("unitPrice", unitPrice);
+      formData.set("unitPrice", purchasePrice);
       formData.set("purchasePrice", purchasePrice);
-      formData.set("totalPurchasePrice", totalPurchasePrice);
       formData.set("replacementCost", purchasePrice);
-      formData.set("purchaseStatus", purchaseStatus);
-      formData.set("isConsumable", isConsumable ? "true" : "false");
-      formData.set("packageUnits", packageUnits);
+      const totalCost = (
+        (parseFloat(purchasePrice) || 0) * (parseInt(totalQuantity, 10) || 1)
+      ).toFixed(2);
+      formData.set("totalPurchasePrice", totalCost);
+      formData.set("purchaseStatus", "bought");
+      formData.set("isConsumable", "false");
+      formData.set("packageUnits", "1");
 
-      let chosenWarehouseLocation = "Armazém Principal";
-      let chosenLocationId: string | null = null;
+      const matched = locations.find((l) => l.id === selectedLocationId);
+      const chosenLocationId = matched ? matched.id : defaultLoc?.id || null;
+      const chosenWarehouseLocation = matched ? matched.name : defaultLoc?.name || "Armazém Principal";
 
-      if (isSpecifyingNewLoc) {
-        if (!newLocName.trim()) {
-          setError("Indique o nome do novo local de armazenamento.");
-          setIsSubmitting(false);
-          return;
-        }
-        if (!newLocManagerName.trim()) {
-          setError("Indique a pessoa responsável pelo novo local.");
-          setIsSubmitting(false);
-          return;
-        }
-
-        formData.set("newLocationName", newLocName.trim());
-        formData.set("newLocationManagerName", newLocManagerName.trim());
-        formData.set("newLocationManagerContact", newLocManagerContact.trim());
-        formData.set(
-          "newLocationManagerUserId",
-          newLocManagerUserId === "custom" ? "" : newLocManagerUserId
-        );
-
-        chosenWarehouseLocation = subLocationDetails.trim()
-          ? `${newLocName.trim()} · ${subLocationDetails.trim()}`
-          : newLocName.trim();
-        formData.set("warehouseLocation", chosenWarehouseLocation);
-      } else {
-        const matched = locations.find((l) => l.id === selectedLocationId);
-        chosenLocationId = matched ? matched.id : null;
-        const baseName = matched ? matched.name : "Armazém Principal";
-        chosenWarehouseLocation = subLocationDetails.trim()
-          ? `${baseName} · ${subLocationDetails.trim()}`
-          : baseName;
-
-        if (chosenLocationId) {
-          formData.set("locationId", chosenLocationId);
-        }
-        formData.set("warehouseLocation", chosenWarehouseLocation);
+      if (chosenLocationId) {
+        formData.set("locationId", chosenLocationId);
       }
+      formData.set("warehouseLocation", chosenWarehouseLocation);
 
       const res = await createItemAction(formData);
       if (res.success && res.item) {
-        let newLocationObj = null;
-        if (isSpecifyingNewLoc) {
-          newLocationObj = {
-            id: res.item.locationId,
-            name: newLocName.trim(),
-            code: newLocCode.trim() || newLocName.trim().slice(0, 8).toUpperCase(),
-            managerUserId: newLocManagerUserId === "custom" ? null : newLocManagerUserId,
-            managerName: newLocManagerName.trim(),
-            managerContact: newLocManagerContact.trim() || null,
-          };
-        }
-        onCreated(res.item, newLocationObj, res.movement);
+        onCreated(res.item, null, res.movement);
       } else {
         setError(res.error || "Erro ao criar artigo.");
       }
@@ -4512,7 +4234,7 @@ function ItemWizardModal({
     }
   };
 
-  const selectedLocObj = locations.find((l) => l.id === selectedLocationId);
+  const selectedLocObj = locations.find((l) => l.id === selectedLocationId) || defaultLoc;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
@@ -4520,10 +4242,10 @@ function ItemWizardModal({
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-[17px] font-bold text-[#111111]">
-              Novo Artigo de Stock
+              Novo Artigo
             </h2>
             <p className="text-[11px] text-[#8e8e93] mt-0.5">
-              Adicionar material ao inventário com local e gestor atribuído
+              Adicionar artigo ao inventário
             </p>
           </div>
           <button
@@ -4541,18 +4263,19 @@ function ItemWizardModal({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
+          <div>
+            <label className="block font-bold text-[#3a3a3c] mb-1">Nome do Artigo *</label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex: Cadeira Chiavari Dourada"
+              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-bold text-[#3a3a3c] mb-1">SKU / Código *</label>
-              <input
-                type="text"
-                required
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
-                placeholder="Ex: CAD-CHIA-DOU"
-                className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-              />
-            </div>
             <div>
               <label className="block font-bold text-[#3a3a3c] mb-1">Categoria</label>
               <select
@@ -4567,34 +4290,21 @@ function ItemWizardModal({
                 <option value="Som e Luz">Som e Luz</option>
               </select>
             </div>
+            <div>
+              <label className="block font-bold text-[#3a3a3c] mb-1">Preço (€)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={purchasePrice}
+                onChange={(e) => setPurchasePrice(e.target.value)}
+                placeholder="0.00"
+                className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block font-bold text-[#3a3a3c] mb-1">Nome do Artigo *</label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex: Cadeira Chiavari Dourada"
-              className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-            />
-          </div>
-
-          <div>
-            <label className="block font-bold text-[#3a3a3c] mb-1">
-              ID Único Personalizado (Opcional)
-            </label>
-            <input
-              type="text"
-              value={customId}
-              onChange={(e) => setCustomId(e.target.value)}
-              placeholder="Ex: itm-cadeira-chiavari (vazio = automático)"
-              className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-            />
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-bold text-[#3a3a3c] mb-1">Qtd. Total</label>
               <input
@@ -4602,13 +4312,7 @@ function ItemWizardModal({
                 min="1"
                 required
                 value={totalQuantity}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setTotalQuantity(val);
-                  const q = parseFloat(val) || 0;
-                  const u = parseFloat(purchasePrice) || 0;
-                  setTotalPurchasePrice((q * u).toFixed(2));
-                }}
+                onChange={(e) => setTotalQuantity(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
               />
             </div>
@@ -4622,296 +4326,48 @@ function ItemWizardModal({
                 className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
               />
             </div>
-            <div>
-              <label className="block font-bold text-[#3a3a3c] mb-1">Preço/evento (€)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={unitPrice}
-                onChange={(e) => setUnitPrice(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-              />
-            </div>
           </div>
 
-          {/* Nature of Item: Reusable vs Consumable */}
-          <div className="p-4 rounded-[16px] border border-[#ececf0] bg-[#fafafc] space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="block font-bold text-xs text-[#111]">
-                Classificação de Material / Consumo
-              </label>
-              <span className="text-[10px] text-[#8e8e93]">
-                {isConsumable ? "Gasto único em eventos" : "Equipamento reutilizável permanente"}
-              </span>
-            </div>
+          {/* STORAGE LOCATION SELECTION (Existing locations only) */}
+          <div className="pt-2 border-t border-[#ececf0] space-y-2">
+            <label className="block font-bold text-[#3a3a3c] flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-[#007aff]" />
+              <span>Local de Armazenamento</span>
+            </label>
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setIsConsumable(false)}
-                className={`py-2 px-3 rounded-[12px] text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                  !isConsumable
-                    ? "bg-[#111] text-white shadow-2xs"
-                    : "bg-white border border-[#ececf0] text-[#3a3a3c] hover:bg-[#f2f2f5]"
-                }`}
+            {locations.length > 0 ? (
+              <select
+                value={selectedLocationId || defaultLoc?.id}
+                onChange={(e) => setSelectedLocationId(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
               >
-                <span>📦 Reutilizável</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsConsumable(true)}
-                className={`py-2 px-3 rounded-[12px] text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                  isConsumable
-                    ? "bg-orange-600 text-white shadow-2xs"
-                    : "bg-white border border-[#ececf0] text-[#3a3a3c] hover:bg-[#f2f2f5]"
-                }`}
-              >
-                <span>🔥 Consumível</span>
-              </button>
-            </div>
-
-            {isConsumable && (
-              <div className="pt-2 border-t border-[#ececf0] flex items-center justify-between gap-3 text-xs">
-                <span className="text-[11px] text-[#636366]">
-                  Unidades por Embalagem / Pack:
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="number"
-                    min="1"
-                    value={packageUnits}
-                    onChange={(e) => setPackageUnits(e.target.value)}
-                    className="w-20 px-2 py-1 text-xs bg-white border border-[#ececf0] rounded-[8px] text-center font-bold"
-                  />
-                  <span className="text-[11px] text-[#8e8e93]">un/pack</span>
-                </div>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name} {loc.managerName ? `— Gestor: ${loc.managerName}` : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="px-3 py-2 text-xs bg-[#f2f2f5] border border-[#ececf0] rounded-[12px] text-[#3a3a3c]">
+                Armazém Principal
               </div>
             )}
-          </div>
 
-          {/* Purchase Status & Financial Accounting */}
-          <div className={`p-4 rounded-[16px] border space-y-3 transition ${
-            purchaseStatus === "bought"
-              ? "bg-[#fffbf0] border-[#f5dfa8]"
-              : "bg-amber-50/70 border-amber-200"
-          }`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-bold text-xs text-[#8c6417]">
-                <AlertCircle className="w-4 h-4 text-[#8c6417] shrink-0" />
-                <span>Estado de Aquisição & Contabilidade Financeira</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setPurchaseStatus("bought")}
-                className={`py-2 px-3 rounded-[12px] text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                  purchaseStatus === "bought"
-                    ? "bg-[#111] text-white shadow-2xs"
-                    : "bg-white border border-[#ececf0] text-[#3a3a3c] hover:bg-[#f2f2f5]"
-                }`}
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Comprado (Caixa)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPurchaseStatus("not_bought")}
-                className={`py-2 px-3 rounded-[12px] text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                  purchaseStatus === "not_bought"
-                    ? "bg-amber-700 text-white shadow-2xs"
-                    : "bg-white border border-[#ececf0] text-[#3a3a3c] hover:bg-[#f2f2f5]"
-                }`}
-              >
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span>Ainda Não Comprado</span>
-              </button>
-            </div>
-
-            <p className="text-[11px] text-[#5c430e] leading-relaxed">
-              {purchaseStatus === "bought" ? (
-                <>
-                  ✅ <strong>Contabilizado em Finanças:</strong> Será gerada automaticamente uma saída de caixa de €{Number(totalPurchasePrice || 0).toFixed(2)} no módulo de Finanças.
-                </>
-              ) : (
-                <>
-                  ⏳ <strong>Deduzido do Lucro Projetado:</strong> Não é gerada saída de caixa imediata. O valor de aquisição de €{Number(totalPurchasePrice || 0).toFixed(2)} fica deduzido no Lucro Projetado até que o artigo seja marcado como comprado.
-                </>
-              )}
-            </p>
-
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <div>
-                <label className="block font-bold text-[#3a3a3c] mb-1">
-                  Custo Unit. Compra (€)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={purchasePrice}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setPurchasePrice(val);
-                    const q = parseFloat(totalQuantity) || 0;
-                    const u = parseFloat(val) || 0;
-                    setTotalPurchasePrice((q * u).toFixed(2));
-                  }}
-                  placeholder="0.00"
-                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                />
-              </div>
-              <div>
-                <label className="block font-bold text-[#3a3a3c] mb-1">
-                  {purchaseStatus === "bought" ? "Despesa de Caixa (€)" : "Custo Previsto (€)"}
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={totalPurchasePrice}
-                  onChange={(e) => setTotalPurchasePrice(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* STORAGE LOCATION SPECIFICATION */}
-          <div className="pt-2 border-t border-[#ececf0] space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="block font-bold text-[#3a3a3c] flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-[#007aff]" />
-                <span>Local de Armazenamento do Artigo</span>
-              </label>
-
-              <button
-                type="button"
-                onClick={() => setIsSpecifyingNewLoc(!isSpecifyingNewLoc)}
-                className="text-[11px] font-semibold text-[#007aff] hover:underline"
-              >
-                {isSpecifyingNewLoc ? "← Escolher local existente" : "+ Novo local"}
-              </button>
-            </div>
-
-            {!isSpecifyingNewLoc ? (
-              <div className="space-y-2">
-                <select
-                  value={selectedLocationId}
-                  onChange={(e) => handleLocationDropdownChange(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                >
-                  {locations.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.name} — Gestor: {loc.managerName}
-                    </option>
-                  ))}
-                  <option value="new">+ Especificar um novo local de armazenamento...</option>
-                </select>
-
-                {selectedLocObj && (
-                  <div className="p-2.5 rounded-[12px] bg-[#fafafc] border border-[#ececf0] flex items-center justify-between text-[11px] text-[#636366]">
-                    <div className="flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-[#007aff]" />
-                      <span>
-                        Gestor do Local: <strong className="text-[#111]">{selectedLocObj.managerName}</strong>
-                      </span>
-                    </div>
-                    {selectedLocObj.managerContact && (
-                      <span className="font-mono text-[10px] text-[#8e8e93]">
-                        {selectedLocObj.managerContact}
-                      </span>
-                    )}
-                  </div>
+            {selectedLocObj && (
+              <div className="p-2.5 rounded-[12px] bg-[#fafafc] border border-[#ececf0] flex items-center justify-between text-[11px] text-[#636366]">
+                <div className="flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-[#007aff]" />
+                  <span>
+                    Gestor do Local: <strong className="font-semibold text-[#111]">{selectedLocObj.managerName || "Administrador CFM"}</strong>
+                  </span>
+                </div>
+                {selectedLocObj.managerContact && (
+                  <span className="font-mono text-[10px] text-[#8e8e93]">
+                    {selectedLocObj.managerContact}
+                  </span>
                 )}
               </div>
-            ) : (
-              <div className="p-3.5 rounded-[16px] bg-[#f0f7ff]/50 border border-[#007aff]/30 space-y-3">
-                <div className="text-[11px] font-bold text-[#0066cc]">
-                  Especificar Novo Local & Pessoa Responsável:
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-[10px] font-bold text-[#3a3a3c] mb-1">
-                      Nome do Local *
-                    </label>
-                    <input
-                      type="text"
-                      required={isSpecifyingNewLoc}
-                      value={newLocName}
-                      onChange={(e) => setNewLocName(e.target.value)}
-                      placeholder="Ex: Armazém C, Pavilhão Sintra"
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-[#ececf0] rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-[#3a3a3c] mb-1">
-                      Atribuir da Equipa CFM
-                    </label>
-                    <select
-                      value={newLocManagerUserId}
-                      onChange={(e) => handleManagerUserChange(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-[#ececf0] rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                    >
-                      {users.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.name} ({u.role})
-                        </option>
-                      ))}
-                      <option value="custom">Outro Gestor Externo</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-[10px] font-bold text-[#3a3a3c] mb-1">
-                      Nome da Pessoa que Gere o Local *
-                    </label>
-                    <input
-                      type="text"
-                      required={isSpecifyingNewLoc}
-                      value={newLocManagerName}
-                      onChange={(e) => setNewLocManagerName(e.target.value)}
-                      placeholder="Nome completo do gestor"
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-[#ececf0] rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-[#3a3a3c] mb-1">
-                      Contacto do Gestor (Email/Tel)
-                    </label>
-                    <input
-                      type="text"
-                      value={newLocManagerContact}
-                      onChange={(e) => setNewLocManagerContact(e.target.value)}
-                      placeholder="gestor@cfmeventos.pt"
-                      className="w-full px-2.5 py-1.5 text-xs bg-white border border-[#ececf0] rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                    />
-                  </div>
-                </div>
-              </div>
             )}
-
-            <div>
-              <label className="block text-[11px] font-medium text-[#8e8e93] mb-1">
-                Detalhe / Prateleira / Fila (Opcional)
-              </label>
-              <input
-                type="text"
-                value={subLocationDetails}
-                onChange={(e) => setSubLocationDetails(e.target.value)}
-                placeholder="Ex: Corredor A, Prateleira 2, Palete 4"
-                className="w-full px-3 py-1.5 text-xs bg-white border border-[#ececf0] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-              />
-            </div>
           </div>
 
           <button
@@ -4919,7 +4375,7 @@ function ItemWizardModal({
             disabled={isSubmitting}
             className="w-full py-2.5 rounded-[12px] bg-[#111111] hover:bg-black text-white text-xs font-bold transition shadow-xs mt-2 cursor-pointer"
           >
-            {isSubmitting ? "A guardar artigo..." : "Adicionar ao Catálogo"}
+            {isSubmitting ? "A guardar artigo..." : "Novo Artigo"}
           </button>
         </form>
       </div>
