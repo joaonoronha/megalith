@@ -38,6 +38,10 @@ import {
   RefreshCw,
   Video,
   ScanLine,
+  Camera,
+  Upload,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import AuditLogModal from "@/components/AuditLogModal";
 import AlertsDrawerModal from "@/components/AlertsDrawerModal";
@@ -65,6 +69,8 @@ import {
   acknowledgeAlertAction,
   dismissAlertAction,
   syncCalendlyMeetingsAction,
+  deleteInventoryItemAction,
+  uploadItemPhotoAction,
 } from "@/app/actions";
 
 interface Props {
@@ -570,6 +576,65 @@ export default function EventFlowApp({
   const [showClientWizard, setShowClientWizard] = useState(false);
   const [showTriageModal, setShowTriageModal] = useState(false);
   const [triageItem, setTriageItem] = useState<any>(null);
+  const [deleteItemModal, setDeleteItemModal] = useState<{
+    isOpen: boolean;
+    item: any | null;
+    upcomingAllocations: any[];
+  }>({
+    isOpen: false,
+    item: null,
+    upcomingAllocations: [],
+  });
+  const [isDeletingItem, setIsDeletingItem] = useState(false);
+
+  const getItemUpcomingAllocations = (itemId: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const itemAllocs = allocationsList.filter((a) => a.itemId === itemId);
+    return itemAllocs
+      .map((a) => {
+        const ev = eventsList.find((e) => e.id === a.eventId);
+        return {
+          allocation: a,
+          event: ev,
+        };
+      })
+      .filter((entry) => {
+        if (!entry.event) return false;
+        if (entry.event.status === "cancelado" || entry.event.status === "concluido") return false;
+        const end = entry.event.endDate ? new Date(entry.event.endDate) : new Date(entry.event.startDate);
+        return end >= today;
+      });
+  };
+
+  const handleDeleteItemClick = (item: any) => {
+    const upcoming = getItemUpcomingAllocations(item.id);
+    setDeleteItemModal({
+      isOpen: true,
+      item,
+      upcomingAllocations: upcoming,
+    });
+  };
+
+  const handleConfirmDeleteItem = async () => {
+    if (!deleteItemModal.item) return;
+    setIsDeletingItem(true);
+    try {
+      const res = await deleteInventoryItemAction(deleteItemModal.item.id);
+      if (res.success) {
+        setItemsList((prev) => prev.filter((i) => i.id !== deleteItemModal.item.id));
+        setDeleteItemModal({ isOpen: false, item: null, upcomingAllocations: [] });
+      } else {
+        alert(res.error || "Erro ao eliminar artigo.");
+      }
+    } catch (err: any) {
+      alert(err?.message || "Erro ao eliminar artigo.");
+    } finally {
+      setIsDeletingItem(false);
+    }
+  };
+
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showNewUserModal, setShowNewUserModal] = useState(false);
   const [editingTeamUser, setEditingTeamUser] = useState<any | null>(null);
@@ -2822,15 +2887,12 @@ export default function EventFlowApp({
                   return (
                     <div
                       key={item.id}
-                      className="p-4 lg:px-5 lg:py-3.5 hover:bg-[#fafafa] transition flex flex-col lg:grid lg:grid-cols-12 lg:items-center gap-3"
+                      onClick={() => router.push(`/inventario/${item.id}`)}
+                      className="p-4 lg:px-5 lg:py-3.5 hover:bg-[#fafafa] transition flex flex-col lg:grid lg:grid-cols-12 lg:items-center gap-3 cursor-pointer group"
                     >
                       {/* Column 1: Item Thumbnail & Name */}
                       <div className="lg:col-span-4 flex items-center gap-3">
-                        <Link
-                          href={`/inventario/${item.id}`}
-                          prefetch={false}
-                          className="shrink-0 relative group"
-                        >
+                        <div className="shrink-0 relative">
                           {item.imageUrl ? (
                             <img
                               src={item.imageUrl}
@@ -2842,18 +2904,11 @@ export default function EventFlowApp({
                               <Package className="w-5 h-5" />
                             </div>
                           )}
-                        </Link>
+                        </div>
 
                         <div className="min-w-0 flex-1">
-                          <div className="font-bold text-sm text-[#111]">
-                            <Link
-                              href={`/inventario/${item.id}`}
-                              prefetch={false}
-                              className="hover:text-[#007aff] transition line-clamp-1"
-                              title={item.name}
-                            >
-                              {item.name}
-                            </Link>
+                          <div className="font-bold text-sm text-[#111] group-hover:text-[#007aff] transition line-clamp-1" title={item.name}>
+                            {item.name}
                           </div>
                         </div>
                       </div>
@@ -2901,7 +2956,8 @@ export default function EventFlowApp({
                           </div>
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setAuditModal({
                                 isOpen: true,
                                 entityType: "inventory",
@@ -2915,10 +2971,19 @@ export default function EventFlowApp({
                             <History className="w-3 h-3" />
                             <span>Histórico</span>
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteItemClick(item)}
+                            className="inline-flex items-center gap-1 text-[10px] text-rose-600 hover:text-rose-800 hover:underline cursor-pointer ml-2"
+                            title="Eliminar este artigo do inventário"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Eliminar</span>
+                          </button>
                         </div>
 
                         {(item.purchaseStatus === "not_bought" || damaged > 0) && (
-                          <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                             {item.purchaseStatus === "not_bought" && (
                               <button
                                 type="button"
@@ -3616,6 +3681,109 @@ export default function EventFlowApp({
             setShowItemWizard(false);
           }}
         />
+      )}
+
+      {/* 5.0.1 DELETE INVENTORY ITEM MODAL (SOFT DELETE WITH UPCOMING EVENTS CAUTION) */}
+      {deleteItemModal.isOpen && deleteItemModal.item && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-[24px] w-full max-w-lg border border-[#ececf0] shadow-2xl overflow-hidden p-6 text-xs space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-[#ececf0] pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#111]">Eliminar Artigo do Inventário</h3>
+                  <p className="text-[11px] text-[#8e8e93]">
+                    {deleteItemModal.item.name} ({deleteItemModal.item.sku})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteItemModal({ isOpen: false, item: null, upcomingAllocations: [] })}
+                className="w-8 h-8 rounded-full hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Caution if item is being used in upcoming events */}
+            {deleteItemModal.upcomingAllocations.length > 0 ? (
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-bold text-xs text-amber-900">
+                      Atenção: Este artigo está atualmente alocado a {deleteItemModal.upcomingAllocations.length} evento(s) futuro(s)!
+                    </h4>
+                    <p className="text-[11px] text-amber-800 mt-1">
+                      O artigo continua programado para a produção dos seguintes eventos:
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-white/80 rounded-xl p-2.5 divide-y divide-amber-200/50 max-h-40 overflow-y-auto">
+                  {deleteItemModal.upcomingAllocations.map((entry, idx) => (
+                    <div key={idx} className="py-2 first:pt-0 last:pb-0 flex items-center justify-between text-[11px]">
+                      <div>
+                        <strong className="text-[#111]">{entry.event.name}</strong>
+                        <div className="text-[10px] text-[#636366]">
+                          {new Date(entry.event.startDate).toLocaleDateString("pt-PT")} {entry.event.venue ? `· ${entry.event.venue}` : ""}
+                        </div>
+                      </div>
+                      <span className="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full text-[10px]">
+                        {entry.allocation.quantity} un.
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[11px] text-amber-800">
+                  Ao confirmar a eliminação, é aplicado um <strong>soft delete</strong>: o artigo deixará de constar no inventário ativo e catálogo, mas todo o histórico e registos em eventos anteriores e futuros serão devidamente preservados.
+                </p>
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-[#fafafa] border border-[#ececf0] text-[#3a3a3c] space-y-2">
+                <p className="text-xs">
+                  Tem a certeza que deseja remover <strong>"{deleteItemModal.item.name}"</strong> do inventário ativo?
+                </p>
+                <p className="text-[11px] text-[#8e8e93]">
+                  Será aplicado um <strong>soft delete</strong> que preserva o histórico de eventos anteriores onde o artigo foi utilizado.
+                </p>
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-[#ececf0] flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteItemModal({ isOpen: false, item: null, upcomingAllocations: [] })}
+                disabled={isDeletingItem}
+                className="px-4 py-2 rounded-[12px] bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#3a3a3c] font-semibold transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteItem}
+                disabled={isDeletingItem}
+                className="px-4 py-2 rounded-[12px] bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {isDeletingItem ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>A eliminar...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Eliminar Artigo</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 5.1 RECEIPT SCANNER MODAL (Gemini Receipt Reader) */}

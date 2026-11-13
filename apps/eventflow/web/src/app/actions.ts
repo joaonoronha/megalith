@@ -20,7 +20,7 @@ import {
   alerts,
   appUploads,
 } from "@/db/schema";
-import { eq, or, sql } from "drizzle-orm";
+import { eq, or, sql, isNull, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import crypto from "crypto";
@@ -813,6 +813,137 @@ export async function markItemAsBoughtAction(
     item: { ...item, purchaseStatus: "bought" as const, purchaseCost: cost },
     movement: createdMovement,
   };
+}
+
+// 6.4 Check if item is used in upcoming events before deletion
+export async function checkItemUpcomingEventsAction(itemId: string) {
+  if (!itemId) return { success: false, upcomingAllocations: [], hasUpcomingEvents: false };
+
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const allocations = await db
+      .select({
+        allocationId: eventAllocations.id,
+        quantity: eventAllocations.quantity,
+        status: eventAllocations.status,
+        eventId: events.id,
+        eventName: events.name,
+        eventVenue: events.venue,
+        eventStartDate: events.startDate,
+        eventEndDate: events.endDate,
+        eventStatus: events.status,
+      })
+      .from(eventAllocations)
+      .innerJoin(events, eq(eventAllocations.eventId, events.id))
+      .where(eq(eventAllocations.itemId, itemId));
+
+    const upcomingAllocations = allocations.filter((a) => {
+      if (a.eventStatus === "cancelado" || a.eventStatus === "concluido") return false;
+      const end = a.eventEndDate ? new Date(a.eventEndDate) : new Date(a.eventStartDate);
+      return end >= today;
+    });
+
+    return {
+      success: true,
+      totalAllocations: allocations.length,
+      upcomingAllocations,
+      hasUpcomingEvents: upcomingAllocations.length > 0,
+    };
+  } catch (err: any) {
+    console.error("checkItemUpcomingEventsAction error:", err);
+    return { success: false, upcomingAllocations: [], hasUpcomingEvents: false, error: err?.message };
+  }
+}
+
+// 6.5 Soft-delete item from inventory (preserves event history and past allocations)
+export async function deleteInventoryItemAction(itemId: string) {
+  if (!itemId) return { success: false, error: "ID do artigo é obrigatório." };
+
+  try {
+    const item = await db.query.inventoryItems.findFirst({
+      where: eq(inventoryItems.id, itemId),
+    });
+
+    if (!item) {
+      return { success: false, error: "Artigo não encontrado." };
+    }
+
+    // Soft delete: sets deletedAt timestamp so active inventory ignores it
+    // but all past events, historical allocations, and quotes preserve the item record!
+    await db
+      .update(inventoryItems)
+      .set({
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(inventoryItems.id, itemId));
+
+    // Record audit log
+    await recordAuditLog({
+      entityType: "inventory",
+      entityId: itemId,
+      action: "eliminado",
+      title: "Artigo removido (Soft Delete)",
+      details: `Artigo "${item.name}" (${item.sku}) foi removido do inventário ativo. O histórico em eventos anteriores foi preservado.`,
+    });
+
+    invalidateAllCaches();
+    revalidatePath("/inventario");
+    revalidatePath("/inventory");
+    revalidatePath(`/inventario/${itemId}`);
+    revalidatePath(`/inventory/${itemId}`);
+    revalidatePath("/");
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("deleteInventoryItemAction error:", err);
+    return { success: false, error: err?.message || "Erro ao eliminar artigo." };
+  }
+}
+
+// 6.6 Upload item photo from camera capture or file picker
+export async function uploadItemPhotoAction(formData: FormData) {
+  try {
+    const file = formData.get("file") as File;
+    if (!file || typeof file.arrayBuffer !== "function" || file.size === 0) {
+      return { success: false, error: "Ficheiro inválido ou vazio." };
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const rawExt = path.extname(file.name || "").toLowerCase() || ".jpg";
+    const sanitizedBase = path.basename(file.name || "artigo", rawExt).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
+    const uniqueName = `item-${Date.now()}-${generateId("f")}-${sanitizedBase}${rawExt}`;
+    const mime = file.type || (rawExt === ".png" ? "image/png" : rawExt === ".webp" ? "image/webp" : "image/jpeg");
+
+    try {
+      await db.insert(appUploads).values({
+        id: generateId("upl"),
+        filename: uniqueName,
+        mimeType: mime,
+        dataBase64: buffer.toString("base64"),
+        size: buffer.length,
+        createdAt: new Date(),
+      }).onConflictDoNothing();
+    } catch (dbErr) {
+      console.error("Erro ao gravar foto do artigo na DB:", dbErr);
+    }
+
+    try {
+      const uploadsDir = path.join(process.cwd(), "public", "uploads");
+      await fs.mkdir(uploadsDir, { recursive: true });
+      await fs.writeFile(path.join(uploadsDir, uniqueName), buffer);
+    } catch {
+      // Best effort disk cache
+    }
+
+    const url = `/api/uploads/${uniqueName}`;
+    return { success: true, url };
+  } catch (err: any) {
+    console.error("uploadItemPhotoAction error:", err);
+    return { success: false, error: err?.message || "Erro ao processar fotografia." };
+  }
 }
 
 // 7. Create Client CRM
@@ -3333,10 +3464,13 @@ export async function searchBarcodeAction(rawBarcode: string): Promise<BarcodeSe
       .select()
       .from(inventoryItems)
       .where(
-        or(
-          eq(inventoryItems.barcode, barcode),
-          eq(inventoryItems.sku, barcode),
-          eq(inventoryItems.id, barcode)
+        and(
+          isNull(inventoryItems.deletedAt),
+          or(
+            eq(inventoryItems.barcode, barcode),
+            eq(inventoryItems.sku, barcode),
+            eq(inventoryItems.id, barcode)
+          )
         )
       )
       .limit(1);

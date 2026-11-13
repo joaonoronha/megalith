@@ -27,11 +27,19 @@ import {
   Boxes,
   ShieldAlert,
   Share2,
+  Trash2,
+  Upload,
 } from "lucide-react";
 import AuditLogModal from "@/components/AuditLogModal";
 import StorageLocationsModal, { StorageLocation, TeamUser } from "@/components/StorageLocationsModal";
 import { formatRelativeTime } from "@/lib/date-format";
-import { updateItemPatchAction, updateItemTriageAction, markItemAsBoughtAction } from "@/app/actions";
+import {
+  updateItemPatchAction,
+  updateItemTriageAction,
+  markItemAsBoughtAction,
+  deleteInventoryItemAction,
+  uploadItemPhotoAction,
+} from "@/app/actions";
 
 interface InventoryItem {
   id: string;
@@ -150,9 +158,65 @@ export default function InventoryDetailView({
   const [showTriageModal, setShowTriageModal] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [showImagePicker, setShowImagePicker] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const photoCameraInputRef = useRef<HTMLInputElement | null>(null);
+  const photoFileInputRef = useRef<HTMLInputElement | null>(null);
   const [customImageUrl, setCustomImageUrl] = useState(item.imageUrl || "");
   const [damageQuantity, setDamageQuantity] = useState(1);
   const [isPending, startTransition] = useTransition();
+
+  // Filter upcoming allocations where this item is currently booked
+  const upcomingAllocations = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return allocations.filter((a) => {
+      if (a.eventStatus === "cancelado" || a.eventStatus === "concluido") return false;
+      const end = a.eventEndDate ? new Date(a.eventEndDate) : new Date(a.eventStartDate);
+      return end >= today;
+    });
+  }, [allocations]);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await uploadItemPhotoAction(fd);
+      if (res.success && res.url) {
+        setCustomImageUrl(res.url);
+        handleFieldChange("imageUrl", res.url, true);
+        setShowImagePicker(false);
+      } else {
+        alert(res.error || "Não foi possível carregar a imagem.");
+      }
+    } catch (err: any) {
+      alert(err?.message || "Erro ao processar fotografia.");
+    } finally {
+      setIsUploadingPhoto(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const res = await deleteInventoryItemAction(item.id);
+      if (res.success) {
+        window.location.href = "/inventario";
+      } else {
+        alert(res.error || "Erro ao eliminar artigo.");
+        setIsDeleting(false);
+      }
+    } catch (err: any) {
+      alert(err?.message || "Erro ao eliminar artigo.");
+      setIsDeleting(false);
+    }
+  };
 
   // Find designated location and manager
   const currentLocation = useMemo(() => {
@@ -308,6 +372,15 @@ export default function InventoryDetailView({
               <History className="w-3.5 h-3.5" />
               <span>Histórico</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setShowDeleteModal(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 px-3 py-1.5 rounded-[12px] transition cursor-pointer"
+              title="Eliminar este artigo do inventário"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Eliminar</span>
+            </button>
 
             {currentUserState && (
               <div
@@ -353,6 +426,15 @@ export default function InventoryDetailView({
                 >
                   <Camera className="w-5 h-5 mb-0.5" />
                   <span className="text-[10px] font-bold">Alterar foto</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowImagePicker(true)}
+                  className="sm:hidden absolute -bottom-1 -right-1 p-1.5 rounded-full bg-[#111] text-white shadow-md border-2 border-white flex items-center justify-center cursor-pointer"
+                  title="Alterar foto"
+                  aria-label="Alterar foto"
+                >
+                  <Camera className="w-3.5 h-3.5" />
                 </button>
               </div>
 
@@ -905,10 +987,26 @@ export default function InventoryDetailView({
       {showImagePicker && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-[22px] w-full max-w-md border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs space-y-4">
+            <input
+              ref={photoCameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handlePhotoUpload}
+            />
+            <input
+              ref={photoFileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoUpload}
+            />
+
             <div className="flex items-center justify-between border-b border-[#ececf0] pb-3">
               <div>
                 <h3 className="text-base font-bold text-[#111]">Imagem do Artigo</h3>
-                <p className="text-[11px] text-[#8e8e93]">Insira um link ou escolha uma imagem de exemplo</p>
+                <p className="text-[11px] text-[#8e8e93]">Tire uma foto com a câmara ou escolha um ficheiro</p>
               </div>
               <button
                 type="button"
@@ -919,20 +1017,51 @@ export default function InventoryDetailView({
               </button>
             </div>
 
-            <div>
-              <label className="block font-bold text-[#3a3a3c] mb-1.5">URL da Foto</label>
+            {/* Quick Photo Capture / Upload buttons */}
+            <div className="space-y-2">
+              <label className="block font-bold text-[#3a3a3c]">Fotografia do Dispositivo</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => photoCameraInputRef.current?.click()}
+                  disabled={isUploadingPhoto}
+                  className="p-3 rounded-xl border border-dashed border-[#c6c6c8] hover:border-[#007aff] bg-[#f9f9fb] hover:bg-white text-[#111] hover:text-[#007aff] flex flex-col items-center justify-center gap-1 text-xs font-semibold transition cursor-pointer"
+                >
+                  <Camera className="w-5 h-5 text-[#007aff]" />
+                  <span>Tirar Foto (Câmara)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => photoFileInputRef.current?.click()}
+                  disabled={isUploadingPhoto}
+                  className="p-3 rounded-xl border border-dashed border-[#c6c6c8] hover:border-[#007aff] bg-[#f9f9fb] hover:bg-white text-[#111] hover:text-[#007aff] flex flex-col items-center justify-center gap-1 text-xs font-semibold transition cursor-pointer"
+                >
+                  <Upload className="w-5 h-5 text-[#636366]" />
+                  <span>Carregar da Galeria</span>
+                </button>
+              </div>
+              {isUploadingPhoto && (
+                <div className="flex items-center justify-center gap-2 py-1 text-xs text-[#007aff] font-semibold">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>A processar fotografia...</span>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-[#ececf0]">
+              <label className="block font-bold text-[#3a3a3c] mb-1.5">Ou introduza URL da Foto</label>
               <input
                 type="url"
                 value={customImageUrl}
                 onChange={(e) => setCustomImageUrl(e.target.value)}
                 placeholder="https://images.unsplash.com/..."
-                className="w-full px-3.5 py-2.5 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                className="w-full px-3.5 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
               />
             </div>
 
             <div>
               <label className="block font-bold text-[#3a3a3c] mb-2">Exemplos Rápidos:</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto">
                 {PRESET_IMAGE_TEMPLATES.map((tmpl) => (
                   <button
                     key={tmpl.label}
@@ -972,6 +1101,111 @@ export default function InventoryDetailView({
                 className="px-4 py-2 rounded-[10px] bg-[#111] hover:bg-black text-white font-bold cursor-pointer"
               >
                 Aplicar Imagem
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* DELETE CONFIRMATION MODAL WITH UPCOMING EVENTS CAUTION (SOFT DELETE) */}
+      {/* ================================================================= */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-[24px] w-full max-w-lg border border-[#ececf0] shadow-2xl overflow-hidden p-6 text-xs space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-[#ececf0] pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#111]">Eliminar Artigo do Inventário</h3>
+                  <p className="text-[11px] text-[#8e8e93]">
+                    {item.name} ({item.sku})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="w-8 h-8 rounded-full hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Caution if item is being used in upcoming events */}
+            {upcomingAllocations.length > 0 ? (
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-bold text-xs text-amber-900">
+                      Atenção: Este artigo está atualmente alocado a {upcomingAllocations.length} evento(s) futuro(s)!
+                    </h4>
+                    <p className="text-[11px] text-amber-800 mt-1">
+                      O artigo continua programado para a produção dos seguintes eventos:
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-white/80 rounded-xl p-2.5 divide-y divide-amber-200/50 max-h-40 overflow-y-auto">
+                  {upcomingAllocations.map((alloc) => (
+                    <div key={alloc.id} className="py-2 first:pt-0 last:pb-0 flex items-center justify-between text-[11px]">
+                      <div>
+                        <strong className="text-[#111]">{alloc.eventName}</strong>
+                        <div className="text-[10px] text-[#636366]">
+                          {new Date(alloc.eventStartDate).toLocaleDateString("pt-PT")} {alloc.eventVenue ? `· ${alloc.eventVenue}` : ""}
+                        </div>
+                      </div>
+                      <span className="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full text-[10px]">
+                        {alloc.quantity} un.
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[11px] text-amber-800">
+                  Ao confirmar a eliminação, é aplicado um <strong>soft delete</strong>: o artigo deixará de constar no inventário ativo e catálogo, mas todo o histórico e registos em eventos anteriores e futuros serão devidamente preservados.
+                </p>
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-[#fafafa] border border-[#ececf0] text-[#3a3a3c] space-y-2">
+                <p className="text-xs">
+                  Tem a certeza que deseja remover <strong>"{item.name}"</strong> do inventário ativo?
+                </p>
+                <p className="text-[11px] text-[#8e8e93]">
+                  Será aplicado um <strong>soft delete</strong> que preserva o histórico de eventos anteriores onde o artigo foi utilizado.
+                </p>
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-[#ececf0] flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-[12px] bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#3a3a3c] font-semibold transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-[12px] bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>A eliminar...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Eliminar Artigo</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
