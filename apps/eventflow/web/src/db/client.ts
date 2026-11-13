@@ -125,6 +125,20 @@ export async function ensureDbMigrated(): Promise<void> {
       "ALTER TABLE event_custom_items ADD COLUMN is_consumable INTEGER DEFAULT 0",
       "ALTER TABLE event_custom_items ADD COLUMN bought_status TEXT DEFAULT 'pending'",
       "ALTER TABLE event_custom_items ADD COLUMN converted_item_id TEXT",
+
+      // 9. User profile picture & Realtime team presence
+      "ALTER TABLE users ADD COLUMN avatar_url TEXT",
+      `CREATE TABLE IF NOT EXISTS user_presence (
+        user_id TEXT PRIMARY KEY,
+        user_name TEXT NOT NULL,
+        user_email TEXT,
+        user_role TEXT DEFAULT 'admin',
+        avatar_url TEXT,
+        editing_entity_type TEXT,
+        editing_entity_id TEXT,
+        editing_entity_title TEXT,
+        last_seen_at INTEGER NOT NULL
+      )`,
     ];
 
     for (const sql of migrationStatements) {

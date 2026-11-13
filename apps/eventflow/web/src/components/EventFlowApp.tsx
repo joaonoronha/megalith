@@ -50,8 +50,10 @@ import StorageLocationsModal, { StorageLocation } from "@/components/StorageLoca
 import ReceiptScannerModal from "@/components/ReceiptScannerModal";
 import BarcodeScannerModal from "@/components/BarcodeScannerModal";
 import FinanceView from "@/components/FinanceView";
+import CompletedEventsProfitChart from "@/components/CompletedEventsProfitChart";
 import { formatRelativeTime } from "@/lib/date-format";
 import { isMeetingEvent, canEventReceiveQuote, countsForFinance, isCancelledEvent } from "@/lib/events";
+import { computeCompletedEventsProfit } from "@/lib/profit-trajectory";
 import {
   createEventAction,
   updateEventStatusAction,
@@ -836,6 +838,11 @@ export default function EventFlowApp({
     };
   }, [eventsList, totalEntradas, pendingStockPurchases, pendingStockItemsCount]);
 
+  // Completed events financial profit & monthly trajectory
+  const completedEventsProfitData = useMemo(() => {
+    return computeCompletedEventsProfit(eventsList, activeMovements);
+  }, [eventsList, activeMovements]);
+
   // Mark Item as Bought Handler
   const handleMarkAsBought = async (itemToBuy: any) => {
     const cost = Number(itemToBuy.purchaseCost) > 0
@@ -919,6 +926,29 @@ export default function EventFlowApp({
       e.status?.toLowerCase().includes(term)
     );
   });
+
+  // Upcoming Events for Overview (from today onwards, excluding cancelled and completed)
+  const upcomingEvents = useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+    return eventsList
+      .filter((e) => {
+        // Exclude cancelled events
+        if (isCancelledEvent(e)) return false;
+        const status = (e.status || "").toLowerCase().trim();
+        if (status === "cancelado" || status === "cancelada" || status === "cancelled") return false;
+        // Completed events belong in past completed events / finance, not upcoming
+        if (status === "concluido" || status === "concluído") return false;
+
+        const endMs = e.endDate ? new Date(e.endDate).getTime() : new Date(e.startDate).getTime();
+        const startMs = new Date(e.startDate).getTime();
+        const eventTime = !isNaN(endMs) ? endMs : startMs;
+
+        return !isNaN(eventTime) && eventTime >= startOfToday;
+      })
+      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+  }, [eventsList]);
 
   // Filtered Inventory
   const filteredItems = itemsList.filter((item) => {
@@ -1138,292 +1168,25 @@ export default function EventFlowApp({
         {activeTab === "home" && (
           <section className="space-y-4">
             {/* Header Greeting */}
-            <div className="mb-4">
-              <h1 className="text-[28px] sm:text-[39px] font-extrabold tracking-[-1px] sm:tracking-[-1.5px] text-[#111111] leading-tight mb-3">
+            <div className="mb-2">
+              <h1 className="text-[28px] sm:text-[39px] font-extrabold tracking-[-1px] sm:tracking-[-1.5px] text-[#111111] leading-tight">
                 Olá {userFirstName}.
               </h1>
-
-              {/* Search bar matching prototype */}
-              <div className="w-full max-w-[720px] h-[48px] sm:h-[50px] bg-white border border-[#ececf0] rounded-[15px] px-3.5 sm:px-4 flex items-center gap-3 shadow-[0_1px_0_rgba(0,0,0,0.015)]">
-                <Search className="w-4 h-4 text-[#8e8e93] flex-shrink-0" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Pesquisar artigos, eventos, clientes..."
-                  className="w-full text-[14px] text-[#111111] placeholder-[#8e8e93] bg-transparent outline-none"
-                />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm("")}
-                    className="p-1 rounded-full text-[#8e8e93] hover:text-[#111] hover:bg-[#f2f2f5] cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* 2 Buttons under Search / Greeting */}
-              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 mt-3">
-                <button
-                  onClick={() => setShowEventWizard(true)}
-                  className="flex-1 sm:flex-initial min-h-[44px] px-4 py-2.5 rounded-[12px] bg-[#111111] hover:bg-black text-white text-[13px] font-semibold flex items-center justify-center gap-1.5 transition shadow-xs cursor-pointer"
-                >
-                  <span className="text-base font-normal leading-none">＋</span>
-                  <span>Novo evento</span>
-                </button>
-              </div>
             </div>
 
-            {/* Resumo Financeiro Card (Realizado vs Projetado) */}
-            <div className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)] space-y-4">
-              {/* Head */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[18px] font-bold tracking-[-0.35px] text-[#111111]">
-                      Resumo financeiro
-                    </span>
-                    {projectedMetrics.lucroProjetado > 0 && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#eaf8ee] text-[#217a3b] border border-[#217a3b]/20">
-                        +€{projectedMetrics.lucroProjetado.toLocaleString("pt-PT")} lucro projetado
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-[12px] text-[#8e8e93]">
-                    {currentMonthSubtitle}
-                  </div>
-                </div>
+            {/* Resumo Financeiro Card (Lucro de Eventos Concluídos & Trajetória Mensal) */}
+            <CompletedEventsProfitChart
+              totalProfit={completedEventsProfitData.totalProfit}
+              totalRevenue={completedEventsProfitData.totalRevenue}
+              totalCosts={completedEventsProfitData.totalCosts}
+              avgMargin={completedEventsProfitData.avgMargin}
+              events={completedEventsProfitData.events}
+              monthlyTrajectory={completedEventsProfitData.monthlyTrajectory}
+              onSelectEvent={(eventId) => router.push(`/eventos/${eventId}`)}
+              onNavigateFinance={(e) => handleTabSwitch("finance", "/financas", e)}
+            />
 
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* View Mode Toggle */}
-                  <div className="flex items-center p-1 bg-[#f4f4f6] rounded-[12px] text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setDashboardFinanceMode("comparative")}
-                      className={`px-2.5 py-1 rounded-[8px] font-semibold transition cursor-pointer ${
-                        dashboardFinanceMode === "comparative"
-                          ? "bg-white text-[#111] shadow-xs"
-                          : "text-[#8e8e93] hover:text-[#111]"
-                      }`}
-                    >
-                      Comparativo
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDashboardFinanceMode("projected")}
-                      className={`px-2.5 py-1 rounded-[8px] font-semibold transition cursor-pointer flex items-center gap-1 ${
-                        dashboardFinanceMode === "projected"
-                          ? "bg-white text-[#111] shadow-xs"
-                          : "text-[#8e8e93] hover:text-[#111]"
-                      }`}
-                    >
-                      <span>Projetado</span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#6366f1]"></span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDashboardFinanceMode("realized")}
-                      className={`px-2.5 py-1 rounded-[8px] font-semibold transition cursor-pointer flex items-center gap-1 ${
-                        dashboardFinanceMode === "realized"
-                          ? "bg-white text-[#111] shadow-xs"
-                          : "text-[#8e8e93] hover:text-[#111]"
-                      }`}
-                    >
-                      <span>Caixa Real</span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#217a3b]"></span>
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={(e) => handleTabSwitch("finance", "/financas", e)}
-                    className="text-[13px] font-semibold text-[#007aff] hover:underline cursor-pointer px-1"
-                  >
-                    Ver detalhe →
-                  </button>
-                  <button
-                    onClick={() => setShowMovementModal(true)}
-                    className="w-[32px] h-[32px] rounded-full bg-[#1c1c1e] text-white flex items-center justify-center font-bold text-base hover:bg-black transition shadow-xs cursor-pointer"
-                    aria-label="Novo movimento"
-                    title="Adicionar entrada, saída ou investimento"
-                  >
-                    ＋
-                  </button>
-                </div>
-              </div>
-
-              {/* 4 Metrics Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                {/* 1. Entradas / Faturação */}
-                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5 flex flex-col justify-between">
-                  <div>
-                    <div className="text-[12px] text-[#8e8e93] mb-1">
-                      {dashboardFinanceMode === "projected" ? "Faturação Prevista" : "Entradas"}
-                    </div>
-                    <div className="text-[24px] font-bold tracking-[-0.7px] text-[#217a3b]">
-                      €{dashboardFinanceMode === "projected"
-                        ? projectedMetrics.faturacao.toLocaleString("pt-PT")
-                        : totalEntradas.toLocaleString("pt-PT")}
-                    </div>
-                  </div>
-                  <div className="text-[11px] text-[#8e8e93] mt-2 pt-2 border-t border-black/[0.04]">
-                    {dashboardFinanceMode === "comparative" ? (
-                      <div>
-                        <span>Previsto: </span>
-                        <strong className="text-[#111]">€{projectedMetrics.faturacao.toLocaleString("pt-PT")}</strong>
-                        <span className="text-[#6366f1] ml-1 font-semibold">
-                          (€{projectedMetrics.aReceber.toLocaleString("pt-PT")} a receber)
-                        </span>
-                      </div>
-                    ) : dashboardFinanceMode === "projected" ? (
-                      <div>
-                        <span>A receber: </span>
-                        <strong className="text-[#6366f1]">€{projectedMetrics.aReceber.toLocaleString("pt-PT")}</strong>
-                      </div>
-                    ) : (
-                      "Recebido em caixa"
-                    )}
-                  </div>
-                </div>
-
-                {/* 2. Saídas / Custos */}
-                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5 flex flex-col justify-between">
-                  <div>
-                    <div className="text-[12px] text-[#8e8e93] mb-1">
-                      {dashboardFinanceMode === "projected" ? "Custos Previstos" : "Saídas"}
-                    </div>
-                    <div className="text-[24px] font-bold tracking-[-0.7px] text-[#b04a3f]">
-                      €{dashboardFinanceMode === "projected"
-                        ? projectedMetrics.totalCustosProjetados.toLocaleString("pt-PT")
-                        : totalSaidas.toLocaleString("pt-PT")}
-                    </div>
-                  </div>
-                  <div className="text-[11px] text-[#8e8e93] mt-2 pt-2 border-t border-black/[0.04]">
-                    {dashboardFinanceMode === "comparative" ? (
-                      <div>
-                        <span>Orçado: </span>
-                        <strong className="text-[#111]">€{projectedMetrics.totalCustosProjetados.toLocaleString("pt-PT")}</strong>
-                        {projectedMetrics.pendingStockPurchases > 0 && (
-                          <div className="text-[10px] text-amber-700 mt-0.5 font-medium">
-                            (inclui €{projectedMetrics.pendingStockPurchases.toLocaleString("pt-PT")} stock a comprar)
-                          </div>
-                        )}
-                      </div>
-                    ) : dashboardFinanceMode === "projected" ? (
-                      <div>
-                        <span>Orçamento eventos: €{projectedMetrics.orcamentoCustos.toLocaleString("pt-PT")}</span>
-                        {projectedMetrics.pendingStockPurchases > 0 && (
-                          <div className="text-[10px] text-amber-700 font-medium mt-0.5">
-                            + €{projectedMetrics.pendingStockPurchases.toLocaleString("pt-PT")} compras pendentes stock
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      "Despesas operacionais pagas"
-                    )}
-                  </div>
-                </div>
-
-                {/* 3. Investido / A Receber */}
-                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5 flex flex-col justify-between">
-                  <div>
-                    <div className="text-[12px] text-[#8e8e93] mb-1">
-                      {dashboardFinanceMode === "projected" ? "Pendente a Receber" : "Investido"}
-                    </div>
-                    <div className={`text-[24px] font-bold tracking-[-0.7px] ${
-                      dashboardFinanceMode === "projected" ? "text-[#6366f1]" : "text-[#8c6417]"
-                    }`}>
-                      €{dashboardFinanceMode === "projected"
-                        ? projectedMetrics.aReceber.toLocaleString("pt-PT")
-                        : totalInvestido.toLocaleString("pt-PT")}
-                    </div>
-                  </div>
-                  <div className="text-[11px] text-[#8e8e93] mt-2 pt-2 border-t border-black/[0.04]">
-                    {dashboardFinanceMode === "projected"
-                      ? "Valor por cobrar aos clientes"
-                      : "Material e equipamento em stock"}
-                  </div>
-                </div>
-
-                {/* 4. Resultado Líquido / Lucro Projetado */}
-                <div className="bg-[#f7f7f9] border border-black/[0.035] rounded-[16px] p-3.5 flex flex-col justify-between">
-                  <div>
-                    <div className="text-[12px] text-[#8e8e93] mb-1">
-                      {dashboardFinanceMode === "projected" ? "Lucro Projetado" : "Resultado líquido"}
-                    </div>
-                    <div className={`text-[24px] font-bold tracking-[-0.7px] ${
-                      (dashboardFinanceMode === "projected" ? projectedMetrics.lucroProjetado : resultadoLiquido) >= 0
-                        ? "text-[#217a3b]"
-                        : "text-[#b04a3f]"
-                    }`}>
-                      €{dashboardFinanceMode === "projected"
-                        ? projectedMetrics.lucroProjetado.toLocaleString("pt-PT")
-                        : resultadoLiquido.toLocaleString("pt-PT")}
-                    </div>
-                  </div>
-                  <div className="text-[11px] text-[#8e8e93] mt-2 pt-2 border-t border-black/[0.04]">
-                    {dashboardFinanceMode === "comparative" ? (
-                      <div>
-                        <span>Lucro Projetado: </span>
-                        <strong className="text-[#217a3b]">€{projectedMetrics.lucroProjetado.toLocaleString("pt-PT")}</strong>
-                        <span className="text-[#8e8e93] ml-1">({projectedMetrics.margemProjetada}%)</span>
-                        {projectedMetrics.pendingStockPurchases > 0 && (
-                          <div className="text-[10px] text-[#8e8e93] mt-0.5">
-                            (deduzido €{projectedMetrics.pendingStockPurchases.toLocaleString("pt-PT")} stock a comprar)
-                          </div>
-                        )}
-                      </div>
-                    ) : dashboardFinanceMode === "projected" ? (
-                      <div>
-                        <span>Margem prevista: {projectedMetrics.margemProjetada}%</span>
-                        {projectedMetrics.pendingStockPurchases > 0 && (
-                          <div className="text-[10px] text-[#8e8e93] mt-0.5">
-                            Deduzido €{projectedMetrics.pendingStockPurchases.toLocaleString("pt-PT")} stock a comprar
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      "Entradas − saídas − investimento"
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-[#ececf0] pt-3 text-[12px] text-[#8e8e93]">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span>
-                    Faturado previsto:{" "}
-                    <strong className="text-[#111111] font-semibold">
-                      €{totalFaturado.toLocaleString("pt-PT")}
-                    </strong>
-                  </span>
-                  <span>·</span>
-                  <span>
-                    A receber:{" "}
-                    <strong className="text-[#6366f1] font-semibold">
-                      €{totalAReceber.toLocaleString("pt-PT")}
-                    </strong>
-                  </span>
-                  <span>·</span>
-                  <span>
-                    Lucro projetado:{" "}
-                    <strong className="text-[#217a3b] font-semibold">
-                      €{projectedMetrics.lucroProjetado.toLocaleString("pt-PT")}
-                    </strong>
-                  </span>
-                </div>
-                <div>
-                  Margem prevista:{" "}
-                  <strong className="text-[#111111] font-semibold">
-                    {projectedMetrics.margemProjetada}%
-                  </strong>
-                  <span className="text-[#8e8e93] ml-1.5">(atual em caixa: {margemOperacional}%)</span>
-                </div>
-              </div>
-            </div>
-
-            {/* ROW 1: 2/3 Próximos Eventos + 1/3 Calendário */}
+            {/* ROW: 2/3 Próximos Eventos + 1/3 Alertas Importantes */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
               {/* 2/3 COLUMN: Próximos Eventos */}
               <div className="lg:col-span-8 bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
@@ -1436,12 +1199,12 @@ export default function EventFlowApp({
                     onClick={(e) => handleTabSwitch("events", "/eventos", e)}
                     className="text-[12px] text-[#8e8e93] hover:text-[#007aff] cursor-pointer"
                   >
-                    Ver todos ({filteredEvents.length}) →
+                    Ver todos ({upcomingEvents.length}) →
                   </Link>
                 </div>
 
                 <div className="divide-y divide-[#f0f0f3]">
-                  {filteredEvents.slice(0, 4).map((evt) => {
+                  {upcomingEvents.slice(0, 5).map((evt) => {
                     const dayBadge = String(
                       new Date(evt.startDate).getDate()
                     ).padStart(2, "0");
@@ -1536,274 +1299,16 @@ export default function EventFlowApp({
                     );
                   })}
 
-                  {filteredEvents.length === 0 && (
+                  {upcomingEvents.length === 0 && (
                     <div className="py-8 text-center text-xs text-[#8e8e93]">
-                      {searchTerm ? `Nenhum evento encontrado para "${searchTerm}".` : "Ainda não existem eventos registados."}
+                      Sem eventos futuros agendados.
                     </div>
                   )}
-                </div>
-              </div>
-
-              {/* 1/3 COLUMN: Calendar Picker */}
-              <div className="lg:col-span-4 bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <div className="text-[18px] font-bold tracking-[-0.35px] text-[#111111]">
-                      {currentMonthName}
-                    </div>
-                    <div className="text-[12px] text-[#8e8e93]">{currentCalendarYear}</div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={handlePrevMonth}
-                      className="p-1 rounded-lg hover:bg-[#f2f2f5] text-[#8e8e93] hover:text-[#111] transition cursor-pointer"
-                      title="Mês anterior"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={handleTodayMonth}
-                      className="px-1.5 py-0.5 rounded-lg hover:bg-[#f2f2f5] text-[10px] font-bold text-[#8e8e93] hover:text-[#111] transition cursor-pointer"
-                      title="Ir para hoje"
-                    >
-                      Hoje
-                    </button>
-                    <button
-                      onClick={handleNextMonth}
-                      className="p-1 rounded-lg hover:bg-[#f2f2f5] text-[#8e8e93] hover:text-[#111] transition cursor-pointer"
-                      title="Mês seguinte"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                    <Link
-                      href="/calendario"
-                      onClick={(e) => handleTabSwitch("calendar", "/calendario", e)}
-                      className="text-[12px] text-[#8e8e93] hover:text-[#007aff] cursor-pointer ml-1"
-                    >
-                      Abrir →
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Day of Week Labels */}
-                <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-[#8e8e93] font-medium mb-1">
-                  <div>S</div>
-                  <div>T</div>
-                  <div>Q</div>
-                  <div>Q</div>
-                  <div>S</div>
-                  <div>S</div>
-                  <div>D</div>
-                </div>
-
-                {/* Calendar Days */}
-                <div className="grid grid-cols-7 gap-1 text-center text-[12px]">
-                  {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-                    <div key={`blank-${i}`} />
-                  ))}
-                  {Array.from({ length: daysInMonth }).map((_, i) => {
-                    const day = i + 1;
-                    const isSelected =
-                      selectedDate.year === currentCalendarYear &&
-                      selectedDate.month === currentCalendarMonth &&
-                      selectedDate.day === day;
-                    const isToday =
-                      today.getFullYear() === currentCalendarYear &&
-                      today.getMonth() === currentCalendarMonth &&
-                      today.getDate() === day;
-                    const hasEvent = eventDays.has(day);
-                    const dayEvents = getEventsForCalendarDay(day);
-
-                    return (
-                      <button
-                        key={day}
-                        onClick={() => handleCalendarDayClick(day)}
-                        className={`h-8 flex flex-col items-center justify-center rounded-[9px] transition cursor-pointer relative ${
-                          isSelected
-                            ? "bg-[#111] text-white font-bold shadow-xs"
-                            : isToday
-                            ? "border border-[#007aff] text-[#007aff] font-bold hover:bg-[#007aff]/10"
-                            : hasEvent
-                            ? "bg-[#f0f0f2] text-[#3a3a3c] font-semibold hover:bg-[#e4e4e7]"
-                            : "text-[#454549] hover:bg-[#f7f7f9]"
-                        }`}
-                        title={
-                          hasEvent
-                            ? `${dayEvents.length} evento(s) no dia ${day} de ${currentMonthName}`
-                            : `Dia ${day} de ${currentMonthName}`
-                        }
-                      >
-                        <span>{day}</span>
-                        {hasEvent && (
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full absolute bottom-0.5 ${
-                              isSelected
-                                ? "bg-white"
-                                : calendlyEventDays.has(day)
-                                ? "bg-[#6366f1] ring-1 ring-purple-300"
-                                : "bg-[#007aff]"
-                            }`}
-                          />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Selected Date Peek */}
-                <div className="mt-3.5 pt-3 border-t border-[#ececf0]">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="text-[11px] font-bold text-[#8e8e93] uppercase tracking-wider">
-                      {selectedDate.day} de {monthNames[selectedDate.month]}
-                      {selectedDate.year === today.getFullYear() &&
-                        selectedDate.month === today.getMonth() &&
-                        selectedDate.day === today.getDate() && (
-                          <span className="ml-1.5 text-[#007aff] font-bold">· Hoje</span>
-                        )}
-                    </div>
-                    <button
-                      onClick={() =>
-                        handleCalendarDayClick(
-                          selectedDate.day,
-                          selectedDate.month,
-                          selectedDate.year
-                        )
-                      }
-                      className="text-[11px] text-[#007aff] hover:underline font-semibold cursor-pointer"
-                    >
-                      Ver detalhes →
-                    </button>
-                  </div>
-                  {eventsForSelectedDay.length > 0 ? (
-                    <div className="space-y-1.5">
-                      {eventsForSelectedDay.map((e) => (
-                        <Link
-                          key={e.id}
-                          href={`/eventos/${e.id}`}
-                          prefetch={false}
-                          className="p-2 rounded-xl bg-[#f8f8fa] hover:bg-[#f0f0f5] cursor-pointer transition flex items-center justify-between text-xs group"
-                        >
-                          <div className="font-semibold truncate text-[#111] group-hover:text-[#007aff]">
-                            {e.name}
-                          </div>
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              getStatusStyle(e.status).bg
-                            } ${getStatusStyle(e.status).text}`}
-                          >
-                            {e.status}
-                          </span>
-                        </Link>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between text-[12px] text-[#8e8e93]">
-                      <span>Sem eventos marcados.</span>
-                      <button
-                        onClick={() => {
-                          const formattedIsoDate = `${selectedDate.year}-${String(selectedDate.month + 1).padStart(2, "0")}-${String(selectedDate.day).padStart(2, "0")}T10:00`;
-                          setEventWizardInitialDate(formattedIsoDate);
-                          setShowEventWizard(true);
-                        }}
-                        className="text-[11px] text-[#007aff] font-bold hover:underline cursor-pointer"
-                      >
-                        ＋ Criar
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* ROW 2: 2/3 Inventário + 1/3 Alertas Importantes */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
-              {/* 2/3 COLUMN: Inventário */}
-              <div className="lg:col-span-8 bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-[18px] font-bold tracking-[-0.35px] text-[#111111]">
-                    Inventário
-                  </h3>
-                  <Link
-                    href="/inventario"
-                    onClick={(e) => handleTabSwitch("inventory", "/inventario", e)}
-                    className="text-[12px] text-[#8e8e93] hover:text-[#007aff] cursor-pointer"
-                  >
-                    Abrir inventário ({filteredItems.length}) →
-                  </Link>
-                </div>
-
-                <div className="divide-y divide-[#f0f0f3]">
-                  {filteredItems.slice(0, 3).map((item) => {
-                    const isLow =
-                      item.totalQuantity - (item.damagedQuantity || 0) <
-                      item.minStock;
-                    const hasDamage = (item.damagedQuantity || 0) > 0;
-
-                    let icon = "🪑";
-                    if (item.category?.toLowerCase().includes("vel") || item.category?.toLowerCase().includes("ilumin")) {
-                      icon = "🕯️";
-                    } else if (item.category?.toLowerCase().includes("mes")) {
-                      icon = "◉";
-                    } else if (item.category?.toLowerCase().includes("têxtil")) {
-                      icon = "🧺";
-                    }
-
-                    return (
-                      <div
-                        key={item.id}
-                        className="py-3 flex items-center justify-between gap-3"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-[42px] h-[42px] rounded-[10px] bg-[#f2f2f4] flex items-center justify-center text-[21px] flex-shrink-0">
-                            {icon}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <Link
-                                href={`/inventario/${item.id}`}
-                                prefetch={false}
-                                className="text-[14px] font-bold text-[#111111] hover:text-[#007aff] transition truncate"
-                                title="Ver ficha do artigo"
-                              >
-                                {item.name}
-                               </Link>
-                            </div>
-                            <div className="text-[12px] text-[#8e8e93] mt-0.5 truncate">
-                              {item.totalQuantity - (item.damagedQuantity || 0)} disponíveis de{" "}
-                              {item.totalQuantity}
-                              {hasDamage && ` (${item.damagedQuantity} danificados)`}
-                            </div>
-                          </div>
-                        </div>
-
-                        {hasDamage ? (
-                          <span
-                            onClick={() => {
-                              setTriageItem(item);
-                              setShowTriageModal(true);
-                            }}
-                            className="px-3 py-1 rounded-full text-[12px] font-semibold bg-[#ff3b30]/10 text-[#a62a24] hover:bg-[#ff3b30]/20 cursor-pointer transition"
-                            title="Clique para fazer triagem"
-                          >
-                            Dano
-                          </span>
-                        ) : isLow ? (
-                          <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-[#fff4df] text-[#9a5b00]">
-                            Baixo
-                          </span>
-                        ) : (
-                          <span className="px-3 py-1 rounded-full text-[12px] font-semibold bg-[#eaf8ee] text-[#24793a]">
-                            Disponível
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
                 </div>
               </div>
 
               {/* 1/3 COLUMN: Alertas Importantes */}
-              <div className="lg:col-span-4 pt-1">
+              <div className="lg:col-span-4 bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
                 <div className="flex items-center justify-between mb-2.5 px-1">
                   <div className="flex items-center gap-2.5">
                     <div className="w-[34px] h-[34px] rounded-[11px] bg-white text-[#ff3b30] border border-[#ff3b30]/15 flex items-center justify-center font-bold text-[16px] shadow-xs">

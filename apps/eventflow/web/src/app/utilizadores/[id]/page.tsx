@@ -56,12 +56,13 @@ export default async function UserPage({ params }: PageProps) {
         name: user.name,
         email: user.email,
         role: user.role,
+        avatarUrl: user.avatarUrl,
         createdAt: user.createdAt,
       }}
       currentUser={currentUser}
       assignedTasks={tasks}
       managedLocations={managedLocs}
-      canEdit={currentUser?.role === "admin"}
+      canEdit={currentUser?.role === "admin" || currentUser?.id === user.id}
     />
   );
 }
