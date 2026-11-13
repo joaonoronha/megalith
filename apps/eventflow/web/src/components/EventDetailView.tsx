@@ -60,6 +60,7 @@ import {
 import { useRouter } from "next/navigation";
 import AuditLogModal from "@/components/AuditLogModal";
 import EventQuoteModal from "@/components/EventQuoteModal";
+import TimeWindowSlider from "@/components/TimeWindowSlider";
 import { formatRelativeTime, formatUpcomingTime, formatMeetingRange } from "@/lib/date-format";
 import { isMeetingEvent } from "@/lib/events";
 import {
@@ -3499,110 +3500,19 @@ export default function EventDetailView({
         </section>
 
                 {/* ================================================================= */}
-        {/* OPERATIONAL HOUR RANGE WIDGET (Single-Day Event Operational Ranges) */}
+        {/* OPERATIONAL TIME WINDOW SLIDER (3 Colored Ranges: Setting up, Event, Tearing down) */}
         {/* ================================================================= */}
-        <section className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            {/* Event Date Picker */}
-            <div className="flex items-center gap-3 pr-4 lg:border-r border-[#ececf0] shrink-0">
-              <div className="w-10 h-10 rounded-2xl bg-[#f2f2f5] flex items-center justify-center text-[#111] shrink-0">
-                <Calendar className="w-5 h-5 text-[#007aff]" />
-              </div>
-              <div>
-                <span className="text-[10px] font-bold text-[#8e8e93] uppercase tracking-wider block">
-                  Data do Evento
-                </span>
-                <input
-                  type="date"
-                  value={operationalSchedule.date}
-                  onChange={(e) => handleScheduleChange({ date: e.target.value })}
-                  className="text-sm font-black text-[#111] bg-transparent outline-none cursor-pointer hover:text-[#007aff] transition"
-                />
-              </div>
-            </div>
-
-            {/* 3 Hour Ranges */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1">
-              {/* 1. Montagem */}
-              <div className="p-3 rounded-[16px] bg-[#fafafc] border border-[#ececf0] flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-[#48484a]">
-                    <Wrench className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Montagem</span>
-                  </div>
-                  <span className="text-[10px] font-semibold text-[#8e8e93]">Preparação</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    value={operationalSchedule.prepStart}
-                    onChange={(e) => handleScheduleChange({ prepStart: e.target.value })}
-                    className="w-full bg-white border border-[#ececf0] rounded-lg px-2 py-1 text-xs font-semibold text-[#111] outline-none cursor-pointer focus:border-[#007aff]"
-                  />
-                  <span className="text-[#8e8e93] text-xs font-medium shrink-0">às</span>
-                  <input
-                    type="time"
-                    value={operationalSchedule.prepEnd}
-                    onChange={(e) => handleScheduleChange({ prepEnd: e.target.value, eventStart: e.target.value })}
-                    className="w-full bg-white border border-[#ececf0] rounded-lg px-2 py-1 text-xs font-semibold text-[#111] outline-none cursor-pointer focus:border-[#007aff]"
-                  />
-                </div>
-              </div>
-
-              {/* 2. Festa / Evento */}
-              <div className="p-3 rounded-[16px] bg-emerald-50/70 border border-emerald-200/80 flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
-                    <PartyPopper className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Festa / Evento</span>
-                  </div>
-                  <span className="text-[10px] font-bold text-emerald-700">Duração</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    value={operationalSchedule.eventStart}
-                    onChange={(e) => handleScheduleChange({ eventStart: e.target.value, prepEnd: e.target.value })}
-                    className="w-full bg-white border border-emerald-200 rounded-lg px-2 py-1 text-xs font-bold text-emerald-950 outline-none cursor-pointer focus:border-emerald-500"
-                  />
-                  <span className="text-emerald-700 text-xs font-bold shrink-0">às</span>
-                  <input
-                    type="time"
-                    value={operationalSchedule.eventEnd}
-                    onChange={(e) => handleScheduleChange({ eventEnd: e.target.value, teardownStart: e.target.value })}
-                    className="w-full bg-white border border-emerald-200 rounded-lg px-2 py-1 text-xs font-bold text-emerald-950 outline-none cursor-pointer focus:border-emerald-500"
-                  />
-                </div>
-              </div>
-
-              {/* 3. Desmontagem */}
-              <div className="p-3 rounded-[16px] bg-[#fafafc] border border-[#ececf0] flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-[#48484a]">
-                    <Truck className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Desmontagem</span>
-                  </div>
-                  <span className="text-[10px] font-semibold text-[#8e8e93]">Recolha</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="time"
-                    value={operationalSchedule.teardownStart}
-                    onChange={(e) => handleScheduleChange({ teardownStart: e.target.value })}
-                    className="w-full bg-white border border-[#ececf0] rounded-lg px-2 py-1 text-xs font-semibold text-[#111] outline-none cursor-pointer focus:border-[#007aff]"
-                  />
-                  <span className="text-[#8e8e93] text-xs font-medium shrink-0">às</span>
-                  <input
-                    type="time"
-                    value={operationalSchedule.teardownEnd}
-                    onChange={(e) => handleScheduleChange({ teardownEnd: e.target.value })}
-                    className="w-full bg-white border border-[#ececf0] rounded-lg px-2 py-1 text-xs font-semibold text-[#111] outline-none cursor-pointer focus:border-[#007aff]"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+        <TimeWindowSlider
+          date={operationalSchedule.date}
+          onDateChange={(newDate) => handleScheduleChange({ date: newDate })}
+          prepStart={operationalSchedule.prepStart}
+          prepEnd={operationalSchedule.prepEnd}
+          eventStart={operationalSchedule.eventStart}
+          eventEnd={operationalSchedule.eventEnd}
+          teardownStart={operationalSchedule.teardownStart}
+          teardownEnd={operationalSchedule.teardownEnd}
+          onChange={(ranges) => handleScheduleChange(ranges)}
+        />
 
         {/* ================================================================= */}
         {/* 3-TAB MAIN NAVIGATION BAR */}
