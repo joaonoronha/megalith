@@ -2973,7 +2973,10 @@ export default function EventFlowApp({
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDeleteItemClick(item)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteItemClick(item);
+                            }}
                             className="inline-flex items-center gap-1 text-[10px] text-rose-600 hover:text-rose-800 hover:underline cursor-pointer ml-2"
                             title="Eliminar este artigo do inventário"
                           >
