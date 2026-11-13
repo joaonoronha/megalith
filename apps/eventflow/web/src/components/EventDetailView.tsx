@@ -28,6 +28,10 @@ import {
   Check,
   Copy,
   ShieldAlert,
+  LayoutGrid,
+  Wrench,
+  PartyPopper,
+  Truck,
   Loader2,
   Camera,
   Minus,
@@ -325,7 +329,7 @@ function MoodboardCard({
   const images = useMemo(() => parseMediaImages(board), [board]);
   const comments = useMemo(() => parseMediaComments(board), [board]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [zoomModalUrl, setZoomModalUrl] = useState<{ url: string; alt?: string } | null>(null);
+  const [zoomModalUrl, setZoomModalUrl] = useState<{ url: string; alt?: string; caption?: string } | null>(null);
 
   // Comments state
   const [showComments, setShowComments] = useState(false);
@@ -819,7 +823,13 @@ function MoodboardCard({
                             src={comment.imageUrl}
                             alt="Anexo da nota"
                             className="w-full max-h-32 object-cover cursor-pointer hover:opacity-90 transition"
-                            onClick={() => setZoomModalUrl({ url: comment.imageUrl!, alt: "Anexo da nota" })}
+                            onClick={() =>
+                              setZoomModalUrl({
+                                url: comment.imageUrl!,
+                                alt: comment.photoLabel ? `Anexo: ${comment.photoLabel}` : "Anexo da nota",
+                                caption: (comment.content || comment.photoLabel) ?? undefined,
+                              })
+                            }
                           />
                         </div>
                       )}
@@ -1002,36 +1012,33 @@ function MoodboardCard({
               <span className="text-xs font-semibold text-white/90">
                 {zoomModalUrl.alt || "Anexo da nota"}
               </span>
-              <div className="flex items-center gap-2">
-                <a
-                  href={zoomModalUrl.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-                  title="Abrir imagem original"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setZoomModalUrl(null)}
-                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-                  title="Fechar"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setZoomModalUrl(null)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+                title="Fechar"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
             {/* Modal Body / Image Stage */}
-            <div className="p-3 sm:p-5 flex items-center justify-center bg-black/60 max-h-[calc(90vh-60px)] overflow-auto">
+            <div className="p-3 sm:p-5 flex items-center justify-center bg-black/60 max-h-[calc(85vh-90px)] overflow-auto">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={zoomModalUrl.url}
                 alt={zoomModalUrl.alt || "Anexo"}
-                className="max-h-[75vh] w-auto max-w-full object-contain rounded-[12px] shadow-lg"
+                className="max-h-[70vh] w-auto max-w-full object-contain rounded-[12px] shadow-lg"
               />
             </div>
+
+            {/* Bottom Caption */}
+            {zoomModalUrl.caption && (
+              <div className="px-4 py-3 border-t border-white/10 bg-[#1c1c1e] text-white text-xs">
+                <span className="text-[10px] uppercase font-bold text-white/50 block mb-0.5">Nota / Ideia</span>
+                <p className="leading-relaxed text-white/95 whitespace-pre-line">{zoomModalUrl.caption}</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1077,7 +1084,7 @@ function LightboxCommentsDrawer({
   const [urlInput, setUrlInput] = useState("");
   const [showUrlField, setShowUrlField] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [drawerZoomUrl, setDrawerZoomUrl] = useState<{ url: string; alt?: string } | null>(null);
+  const [drawerZoomUrl, setDrawerZoomUrl] = useState<{ url: string; alt?: string; caption?: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const targetInfo = useMemo(() => {
@@ -1253,7 +1260,13 @@ function LightboxCommentsDrawer({
                       src={c.imageUrl}
                       alt="Anexo"
                       className="w-full max-h-32 object-cover cursor-pointer hover:opacity-90 transition"
-                      onClick={() => setDrawerZoomUrl({ url: c.imageUrl!, alt: "Anexo" })}
+                      onClick={() =>
+                        setDrawerZoomUrl({
+                          url: c.imageUrl!,
+                          alt: c.photoLabel ? `Anexo: ${c.photoLabel}` : "Anexo",
+                          caption: (c.content || c.photoLabel) ?? undefined,
+                        })
+                      }
                     />
                   </div>
                 )}
@@ -1383,36 +1396,33 @@ function LightboxCommentsDrawer({
               <span className="text-xs font-semibold text-white/90">
                 {drawerZoomUrl.alt || "Anexo da nota"}
               </span>
-              <div className="flex items-center gap-2">
-                <a
-                  href={drawerZoomUrl.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-                  title="Abrir imagem original"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setDrawerZoomUrl(null)}
-                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
-                  title="Fechar"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setDrawerZoomUrl(null)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+                title="Fechar"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
             {/* Modal Body / Image Stage */}
-            <div className="p-3 sm:p-5 flex items-center justify-center bg-black/60 max-h-[calc(90vh-60px)] overflow-auto">
+            <div className="p-3 sm:p-5 flex items-center justify-center bg-black/60 max-h-[calc(85vh-90px)] overflow-auto">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={drawerZoomUrl.url}
                 alt={drawerZoomUrl.alt || "Anexo"}
-                className="max-h-[75vh] w-auto max-w-full object-contain rounded-[12px] shadow-lg"
+                className="max-h-[70vh] w-auto max-w-full object-contain rounded-[12px] shadow-lg"
               />
             </div>
+
+            {/* Bottom Caption */}
+            {drawerZoomUrl.caption && (
+              <div className="px-4 py-3 border-t border-white/10 bg-[#1c1c1e] text-white text-xs">
+                <span className="text-[10px] uppercase font-bold text-white/50 block mb-0.5">Nota / Ideia</span>
+                <p className="leading-relaxed text-white/95 whitespace-pre-line">{drawerZoomUrl.caption}</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1899,6 +1909,13 @@ export default function EventDetailView({
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Main Tab Navigation state: "planning" | "materials" | "client"
+  const [activeMainTab, setActiveMainTab] = useState<"planning" | "materials" | "client">("planning");
+
+  // Unified Add Item Modal state
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [addItemType, setAddItemType] = useState<"inventory" | "custom">("inventory");
+
   // Modals for adding items
   const [showAddAllocationModal, setShowAddAllocationModal] = useState(false);
   const [showCoverPicker, setShowCoverPicker] = useState(false);
@@ -1971,6 +1988,81 @@ export default function EventDetailView({
     if (isNaN(date.getTime())) return "";
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  // Operational Hour Ranges state & helper for single-day event
+  const extractDateAndTimes = (evt: EventData) => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const toDatePart = (d: Date | null | undefined) => {
+      if (!d) return "";
+      const date = new Date(d);
+      if (isNaN(date.getTime())) return "";
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    };
+    const toTimePart = (d: Date | null | undefined, defaultTime = "00:00") => {
+      if (!d) return defaultTime;
+      const date = new Date(d);
+      if (isNaN(date.getTime())) return defaultTime;
+      return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
+    const baseDate = toDatePart(evt.startDate) || toDatePart(evt.prepDate) || toDatePart(new Date());
+
+    const prepStart = toTimePart(evt.prepDate, "09:00");
+    const eventStart = toTimePart(evt.startDate, "14:00");
+    const eventEnd = toTimePart(evt.endDate, "20:00");
+    const prepEnd = eventStart;
+    const teardownStart = eventEnd;
+    const teardownEnd = toTimePart(evt.returnDate, "23:00");
+
+    return {
+      date: baseDate,
+      prepStart,
+      prepEnd,
+      eventStart,
+      eventEnd,
+      teardownStart,
+      teardownEnd,
+    };
+  };
+
+  const [operationalSchedule, setOperationalSchedule] = useState(() => extractDateAndTimes(event));
+
+  const handleScheduleChange = (patchSched: Partial<ReturnType<typeof extractDateAndTimes>>) => {
+    const updated = { ...operationalSchedule, ...patchSched };
+    setOperationalSchedule(updated);
+
+    const { date, prepStart, eventStart, eventEnd, teardownEnd } = updated;
+    if (!date) return;
+
+    const makeDate = (dStr: string, tStr: string) => {
+      const dt = new Date(`${dStr}T${tStr}:00`);
+      return isNaN(dt.getTime()) ? null : dt;
+    };
+
+    const newPrepDate = makeDate(date, prepStart);
+    const newStartDate = makeDate(date, eventStart) || new Date();
+    const newEndDate = makeDate(date, eventEnd);
+    const newReturnDate = makeDate(date, teardownEnd);
+
+    setEvent((prev) => ({
+      ...prev,
+      prepDate: newPrepDate,
+      startDate: newStartDate,
+      endDate: newEndDate,
+      returnDate: newReturnDate,
+    }));
+
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    setSaveStatus("saving");
+    saveTimeoutRef.current = setTimeout(() => {
+      savePatch({
+        prepDate: newPrepDate,
+        startDate: newStartDate,
+        endDate: newEndDate,
+        returnDate: newReturnDate,
+      });
+    }, 500);
   };
 
   // -------------------------------------------------------------
@@ -2180,6 +2272,7 @@ export default function EventDetailView({
 
     setAllocations((prev) => [...prev, newAllocation]);
     setShowAddAllocationModal(false);
+    setShowAddItemModal(false);
 
     const formData = new FormData();
     formData.append("eventId", event.id);
@@ -2201,7 +2294,13 @@ export default function EventDetailView({
     });
   };
 
-  // Custom Item Handlers
+  // Materials / Add Item Handlers
+  const handleOpenAddItem = () => {
+    setEditingCustomItem(null);
+    setAddItemType("inventory");
+    setShowAddItemModal(true);
+  };
+
   const handleOpenAddCustomItem = () => {
     setEditingCustomItem(null);
     setCustomItemName("");
@@ -2213,6 +2312,8 @@ export default function EventDetailView({
     setCustomItemNotes("");
     setCustomItemIsConsumable(false);
     setCustomItemAddToQuota(true);
+    setAddItemType("custom");
+    setShowAddItemModal(true);
     setShowAddCustomItemModal(true);
   };
 
@@ -2227,6 +2328,8 @@ export default function EventDetailView({
     setCustomItemNotes(item.notes || "");
     setCustomItemIsConsumable(Boolean(item.isConsumable));
     setCustomItemAddToQuota(true);
+    setAddItemType("custom");
+    setShowAddItemModal(true);
     setShowAddCustomItemModal(true);
   };
 
@@ -2311,6 +2414,7 @@ export default function EventDetailView({
         }
       }
       setShowAddCustomItemModal(false);
+      setShowAddItemModal(false);
     } catch (err) {
       console.error("Erro ao guardar artigo personalizado:", err);
     } finally {
@@ -2956,8 +3060,7 @@ export default function EventDetailView({
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-600" />
                   <span className="text-emerald-700 font-semibold text-[11px] sm:text-xs">
-                    <span className="hidden sm:inline">Guardado instantaneamente</span>
-                    <span className="sm:hidden">Guardado</span>
+                    Guardado
                   </span>
                 </>
               ) : (
@@ -3209,7 +3312,7 @@ export default function EventDetailView({
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-1.5 text-xs font-bold text-[#111]">
                 <Palette className="w-4 h-4 text-[#8e8e93]" />
-                <span>Paleta & Cores (Clique para mudar):</span>
+                <span>Cores</span>
               </div>
 
               {/* Direct Color Pickers */}
@@ -3267,28 +3370,13 @@ export default function EventDetailView({
                 </button>
               </div>
             </div>
-
-            {/* Quick Palettes Presets Bar */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-              <span className="text-[11px] text-[#8e8e93] font-medium flex-shrink-0">Temas rápidos:</span>
-              {PRESET_PALETTES.map((preset, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => handlePresetPalette(preset)}
-                  className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white hover:bg-[#111] hover:text-white border border-[#ececf0] transition shadow-2xs flex-shrink-0 cursor-pointer"
-                >
-                  {preset.name}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* TOP METRICS & FINANCIALS (Directly Editable Inline) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#ececf0] p-4 bg-white">
             {/* 1. Customer Price (Directly Editable) */}
             <div className="p-3 space-y-1">
-              <div className="text-[#8e8e93] text-xs font-medium">Valor Cobrado ao Cliente (€)</div>
+              <div className="text-[#8e8e93] text-xs font-medium">Valor Festa</div>
               <div className="flex items-center gap-1">
                 <span className="text-xl font-black text-[#111]">€</span>
                 <input
@@ -3321,7 +3409,7 @@ export default function EventDetailView({
 
             {/* 2. Internal Production Budget (Directly Editable) */}
             <div className="p-3 space-y-1">
-              <div className="text-[#8e8e93] text-xs font-medium">Custo Interno Orçado (€)</div>
+              <div className="text-[#8e8e93] text-xs font-medium">Custo</div>
               <div className="flex items-center gap-1">
                 <span className="text-xl font-black text-[#111]">€</span>
                 <input
@@ -3348,7 +3436,7 @@ export default function EventDetailView({
 
             {/* 3. Action Items Checklist Progress */}
             <div className="p-3">
-              <div className="text-[#8e8e93] text-xs font-medium mb-1">Ações de Conclusão</div>
+              <div className="text-[#8e8e93] text-xs font-medium mb-1">Tarefas</div>
               <div className="flex items-baseline gap-2">
                 <span className="text-xl md:text-2xl font-black text-[#111]">
                   {pendingTasksCount}
@@ -3410,464 +3498,173 @@ export default function EventDetailView({
           </div>
         </section>
 
+                {/* ================================================================= */}
+        {/* OPERATIONAL HOUR RANGE WIDGET (Single-Day Event Operational Ranges) */}
         {/* ================================================================= */}
-        {/* TWO-COLUMN DETAILS GRID */}
-        {/* ================================================================= */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* LEFT 2 COLUMNS: INVENTORY ALLOCATION & ACTION ITEMS */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* ----------------------------------------------------------------- */}
-            {/* INVENTORY MANAGEMENT */}
-            {/* ----------------------------------------------------------------- */}
-            {/* ----------------------------------------------------------------- */}
-            {/* INVENTORY & CUSTOM BESPOKE ITEMS MANAGEMENT */}
-            {/* ----------------------------------------------------------------- */}
-            <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Package className="w-5 h-5 text-[#111]" />
-                    <h2 className="text-lg font-bold text-[#111]">
-                      Artigos & Materiais do Evento
-                    </h2>
-                  </div>
-                  <p className="text-xs text-[#8e8e93] mt-0.5">
-                    Artigos de stock de armazém e artigos personalizados exclusivos deste evento
-                  </p>
-                </div>
+        <section className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            {/* Event Date Picker */}
+            <div className="flex items-center gap-3 pr-4 lg:border-r border-[#ececf0] shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-[#f2f2f5] flex items-center justify-center text-[#111] shrink-0">
+                <Calendar className="w-5 h-5 text-[#007aff]" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-[#8e8e93] uppercase tracking-wider block">
+                  Data do Evento
+                </span>
+                <input
+                  type="date"
+                  value={operationalSchedule.date}
+                  onChange={(e) => handleScheduleChange({ date: e.target.value })}
+                  className="text-sm font-black text-[#111] bg-transparent outline-none cursor-pointer hover:text-[#007aff] transition"
+                />
+              </div>
+            </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => setShowAddAllocationModal(true)}
-                    className="px-3.5 py-2 rounded-[12px] bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#111] text-xs font-bold flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
-                  >
-                    <Package className="w-3.5 h-3.5 text-[#007aff]" />
-                    <span>+ Alocar Stock CFM</span>
-                  </button>
-                  <button
-                    onClick={handleOpenAddCustomItem}
-                    className="px-3.5 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                    <span>+ Artigo Personalizado</span>
-                  </button>
+            {/* 3 Hour Ranges */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1">
+              {/* 1. Montagem */}
+              <div className="p-3 rounded-[16px] bg-[#fafafc] border border-[#ececf0] flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-[#48484a]">
+                    <Wrench className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Montagem</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-[#8e8e93]">Preparação</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="time"
+                    value={operationalSchedule.prepStart}
+                    onChange={(e) => handleScheduleChange({ prepStart: e.target.value })}
+                    className="w-full bg-white border border-[#ececf0] rounded-lg px-2 py-1 text-xs font-semibold text-[#111] outline-none cursor-pointer focus:border-[#007aff]"
+                  />
+                  <span className="text-[#8e8e93] text-xs font-medium shrink-0">às</span>
+                  <input
+                    type="time"
+                    value={operationalSchedule.prepEnd}
+                    onChange={(e) => handleScheduleChange({ prepEnd: e.target.value, eventStart: e.target.value })}
+                    className="w-full bg-white border border-[#ececf0] rounded-lg px-2 py-1 text-xs font-semibold text-[#111] outline-none cursor-pointer focus:border-[#007aff]"
+                  />
                 </div>
               </div>
 
-              {/* Sub-tabs: Armazém Stock vs Artigos Personalizados */}
-              <div className="flex items-center gap-2 pb-4 mb-5 border-b border-[#ececf0]">
-                <button
-                  type="button"
-                  onClick={() => setInventoryTab("stock")}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-2 ${
-                    inventoryTab === "stock"
-                      ? "bg-[#111] text-white shadow-xs"
-                      : "bg-[#f2f2f5] text-[#636366] hover:bg-[#e5e5ea]"
-                  }`}
-                >
-                  <Package className="w-3.5 h-3.5" />
-                  <span>Stock de Armazém CFM</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                      inventoryTab === "stock" ? "bg-white/20 text-white" : "bg-black/5 text-[#8e8e93]"
-                    }`}
-                  >
-                    {allocations.length}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setInventoryTab("custom")}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-2 ${
-                    inventoryTab === "custom"
-                      ? "bg-[#111] text-white shadow-xs"
-                      : "bg-[#f2f2f5] text-[#636366] hover:bg-[#e5e5ea]"
-                  }`}
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Artigos Personalizados</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                      inventoryTab === "custom" ? "bg-white/20 text-white" : "bg-black/5 text-[#8e8e93]"
-                    }`}
-                  >
-                    {customItems.length}
-                  </span>
-                  {customItems.length > 0 && (
-                    <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-bold">
-                      Exclusivo
-                    </span>
-                  )}
-                </button>
+              {/* 2. Festa / Evento */}
+              <div className="p-3 rounded-[16px] bg-emerald-50/70 border border-emerald-200/80 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
+                    <PartyPopper className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Festa / Evento</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-700">Duração</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="time"
+                    value={operationalSchedule.eventStart}
+                    onChange={(e) => handleScheduleChange({ eventStart: e.target.value, prepEnd: e.target.value })}
+                    className="w-full bg-white border border-emerald-200 rounded-lg px-2 py-1 text-xs font-bold text-emerald-950 outline-none cursor-pointer focus:border-emerald-500"
+                  />
+                  <span className="text-emerald-700 text-xs font-bold shrink-0">às</span>
+                  <input
+                    type="time"
+                    value={operationalSchedule.eventEnd}
+                    onChange={(e) => handleScheduleChange({ eventEnd: e.target.value, teardownStart: e.target.value })}
+                    className="w-full bg-white border border-emerald-200 rounded-lg px-2 py-1 text-xs font-bold text-emerald-950 outline-none cursor-pointer focus:border-emerald-500"
+                  />
+                </div>
               </div>
 
-              {/* TAB 1: STOCK DE ARMAZÉM CFM */}
-              {inventoryTab === "stock" && (
-                <>
-                  {allocations.length === 0 ? (
-                    <div className="text-center py-10 px-4 border border-dashed border-[#ececf0] rounded-[16px] bg-[#fafafc]">
-                      <Package className="w-9 h-9 text-[#8e8e93] mx-auto mb-2 opacity-50" />
-                      <div className="text-sm font-bold text-[#111]">Nenhum artigo de armazém alocado</div>
-                      <p className="text-xs text-[#8e8e93] max-w-sm mx-auto mt-1 mb-4">
-                        Adicione cadeiras, mesas, velas, copos ou mobiliário para gerir a preparação e montagem deste evento.
-                      </p>
-                      <button
-                        onClick={() => setShowAddAllocationModal(true)}
-                        className="px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Adicionar primeiro artigo de stock</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {allocations.map((a) => (
-                        <div
-                          key={a.id}
-                          className="p-4 rounded-[16px] border border-[#ececf0] bg-[#fafafc] hover:bg-white transition flex flex-col md:flex-row md:items-center justify-between gap-4"
-                        >
-                          <div className="flex items-center gap-3.5 min-w-0">
-                            {a.itemImageUrl ? (
-                              <Link href={`/inventario/${a.itemId}`} prefetch={false} className="flex-shrink-0" title="Ver ficha do artigo">
-                                <img
-                                  src={a.itemImageUrl}
-                                  alt={a.itemName}
-                                  className="w-12 h-12 rounded-[10px] object-cover border border-black/5 hover:opacity-85 transition"
-                                />
-                              </Link>
-                            ) : (
-                              <Link
-                                href={`/inventario/${a.itemId}`}
-                                prefetch={false}
-                                className="w-12 h-12 rounded-[10px] bg-[#ececf0] hover:bg-[#e5e5ea] flex items-center justify-center text-[#8e8e93] font-bold text-xs flex-shrink-0 transition"
-                                title="Ver ficha do artigo"
-                              >
-                                {a.itemSku?.substring(0, 3)}
-                              </Link>
-                            )}
-
-                            <div className="min-w-0">
-                              <div className="font-bold text-sm text-[#111] truncate">
-                                <Link
-                                  href={`/inventario/${a.itemId}`}
-                                  prefetch={false}
-                                  className="hover:text-[#007aff] transition"
-                                  title="Ver ficha do artigo no inventário"
-                                >
-                                  {a.itemName}
-                                </Link>
-                              </div>
-                              <div className="text-xs text-[#8e8e93] flex flex-wrap items-center gap-2 mt-0.5">
-                                <Link
-                                  href={`/inventario/${a.itemId}`}
-                                  prefetch={false}
-                                  className="font-mono bg-white hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] text-[10px] text-[#48484a] font-semibold transition"
-                                  title="SKU do Artigo"
-                                >
-                                  {a.itemSku}
-                                </Link>
-                                <span>•</span>
-                                <span>{a.itemCategory}</span>
-                                {a.itemWarehouseLocation && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="text-[#007aff]">{a.itemWarehouseLocation}</span>
-                                  </>
-                                )}
-                              </div>
-                              {a.notes && (
-                                <div className="text-[11px] text-[#48484a] italic mt-1 bg-white/70 px-2 py-0.5 rounded border border-[#ececf0]/60 inline-block">
-                                  Nota: {a.notes}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Right side controls: Instant Quantity & Status */}
-                          <div className="flex items-center justify-between md:justify-end gap-3 flex-shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-[#ececf0]">
-                            {/* Instant Qty Adjustment Buttons */}
-                            <div className="flex items-center gap-1.5 bg-white border border-[#ececf0] rounded-[10px] p-1">
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateAllocationQty(a.id, a.quantity - 1)}
-                                disabled={a.quantity <= 1}
-                                className="w-6 h-6 rounded-md hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] hover:text-[#111] disabled:opacity-30"
-                                title="Diminuir quantidade"
-                              >
-                                <Minus className="w-3 h-3" />
-                              </button>
-                              <span className="w-8 text-center text-xs font-extrabold text-[#111]">
-                                {a.quantity}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateAllocationQty(a.id, a.quantity + 1)}
-                                className="w-6 h-6 rounded-md hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] hover:text-[#111]"
-                                title="Aumentar quantidade"
-                              >
-                                <Plus className="w-3 h-3" />
-                              </button>
-                            </div>
-
-                            <div className="text-right min-w-[65px]">
-                              <div className="text-[11px] font-semibold text-[#111]">
-                                €{(a.quantity * (a.itemUnitPrice || 0)).toFixed(2)}
-                              </div>
-                              <div className="text-[9px] text-[#8e8e93]">
-                                €{a.itemUnitPrice?.toFixed(2)}/un
-                              </div>
-                            </div>
-
-                            {/* Status selector */}
-                            <select
-                              value={a.status}
-                              onChange={(e) =>
-                                handleUpdateAllocationStatus(
-                                  a.id,
-                                  e.target.value as "reservado" | "despachado" | "devolvido" | "danificado"
-                                )
-                              }
-                              className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border outline-none cursor-pointer ${
-                                a.status === "despachado"
-                                  ? "bg-blue-50 text-blue-700 border-blue-200"
-                                  : a.status === "devolvido"
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                  : a.status === "danificado"
-                                  ? "bg-rose-50 text-rose-700 border-rose-200"
-                                  : "bg-amber-50 text-amber-700 border-amber-200"
-                              }`}
-                            >
-                              <option value="reservado">Reservado</option>
-                              <option value="despachado">Despachado</option>
-                              <option value="devolvido">Devolvido</option>
-                              <option value="danificado">Danificado</option>
-                            </select>
-
-                            {/* Delete action */}
-                            <button
-                              onClick={() => handleDeleteAllocation(a.id)}
-                              className="p-1.5 text-[#8e8e93] hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
-                              title="Remover alocação"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* TAB 2: ARTIGOS PERSONALIZADOS (EXCLUSIVOS DESTE EVENTO) */}
-              {inventoryTab === "custom" && (
-                <div className="space-y-4">
-                  {/* Informative description banner */}
-                  <div className="p-3.5 rounded-[16px] bg-gradient-to-r from-amber-50/80 via-white to-amber-50/40 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-start gap-2.5">
-                      <div className="w-7 h-7 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
-                        <Sparkles className="w-4 h-4" />
-                      </div>
-                      <div className="text-xs">
-                        <div className="font-bold text-[#111]">Artigos Exclusivos do Evento</div>
-                        <p className="text-[#636366] text-[11px] mt-0.5 leading-relaxed">
-                          Itens desenhados ou contratados especificamente para este evento (ex: néons personalizados, arranjos de flores dedicados, bolo artístico, sinalética ou estruturas). Não poluem o catálogo do armazém e o seu custo/venda é imputado diretamente na Quota deste evento.
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleOpenAddCustomItem}
-                      className="px-3 py-1.5 rounded-lg bg-[#111] hover:bg-black text-white text-[11px] font-bold flex items-center gap-1.5 transition self-start sm:self-auto shrink-0 cursor-pointer shadow-2xs"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Novo Artigo Exclusivo</span>
-                    </button>
+              {/* 3. Desmontagem */}
+              <div className="p-3 rounded-[16px] bg-[#fafafc] border border-[#ececf0] flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-[#48484a]">
+                    <Truck className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Desmontagem</span>
                   </div>
-
-                  {/* Financial Summary for Custom Items */}
-                  {customItems.length > 0 && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-[16px] bg-[#fafafc] border border-[#ececf0]">
-                      <div className="p-2">
-                        <div className="text-[10px] text-[#8e8e93] font-medium uppercase tracking-wider">Total Itens</div>
-                        <div className="text-base font-black text-[#111] mt-0.5">{totalCustomItemsCount} un</div>
-                      </div>
-                      <div className="p-2">
-                        <div className="text-[10px] text-[#8e8e93] font-medium uppercase tracking-wider">Custo Fornecedores</div>
-                        <div className="text-base font-black text-amber-700 mt-0.5">€{totalCustomCost.toFixed(2)}</div>
-                      </div>
-                      <div className="p-2">
-                        <div className="text-[10px] text-[#8e8e93] font-medium uppercase tracking-wider">Adicionado à Quota</div>
-                        <div className="text-base font-black text-[#007aff] mt-0.5">€{totalCustomPrice.toFixed(2)}</div>
-                      </div>
-                      <div className="p-2">
-                        <div className="text-[10px] text-[#8e8e93] font-medium uppercase tracking-wider">Margem Bruta</div>
-                        <div className="text-base font-black text-emerald-700 mt-0.5">
-                          +€{totalCustomMargin.toFixed(2)}
-                          {totalCustomPrice > 0 && (
-                            <span className="text-[10px] text-emerald-600 font-semibold ml-1">
-                              ({Math.round((totalCustomMargin / totalCustomPrice) * 100)}%)
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Custom Items List */}
-                  {customItems.length === 0 ? (
-                    <div className="text-center py-10 px-4 border border-dashed border-[#ececf0] rounded-[16px] bg-[#fafafc]">
-                      <Sparkles className="w-9 h-9 text-amber-500 mx-auto mb-2 opacity-60" />
-                      <div className="text-sm font-bold text-[#111]">Nenhum artigo exclusivo registado</div>
-                      <p className="text-xs text-[#8e8e93] max-w-md mx-auto mt-1 mb-4 leading-relaxed">
-                        Adicione peças feitas por medida para este evento (letreiros néon com nomes, arranjos de flores específicos, bolo artístico, sinalética ou artigos alugados externamente). O custo e valor são imputados diretamente na quota.
-                      </p>
-                      <button
-                        onClick={handleOpenAddCustomItem}
-                        className="px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-xs hover:bg-black transition"
-                      >
-                        <Plus className="w-3.5 h-3.5 text-amber-300" />
-                        <span>Adicionar primeiro artigo exclusivo</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {customItems.map((item) => {
-                        const lineCost = (item.quantity || 1) * (item.unitCost || 0);
-                        const linePrice = (item.quantity || 1) * (item.unitPrice || 0);
-                        const lineMargin = linePrice - lineCost;
-
-                        return (
-                          <div
-                            key={item.id}
-                            className="p-4 rounded-[16px] border border-[#ececf0] bg-[#fafafc] hover:bg-white hover:border-[#d2d2d7] transition flex flex-col md:flex-row md:items-center justify-between gap-4"
-                          >
-                            <div className="flex items-start gap-3.5 min-w-0">
-                              <div className="w-11 h-11 rounded-[12px] bg-gradient-to-br from-amber-100 to-amber-200 border border-amber-300/60 flex items-center justify-center text-amber-700 shrink-0 font-bold text-xs shadow-2xs">
-                                <Sparkles className="w-5 h-5" />
-                              </div>
-
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-bold text-sm text-[#111]">{item.name}</span>
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#e5e5ea] text-[#1c1c1e]">
-                                    {item.category || "Personalizado"}
-                                  </span>
-                                  {item.isConsumable ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800">
-                                      🔥 Consumível
-                                    </span>
-                                  ) : (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
-                                      📦 Reutilizável
-                                    </span>
-                                  )}
-                                  {item.boughtStatus === "bought" ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 inline-flex items-center gap-1">
-                                      <CheckCircle className="w-3 h-3 text-emerald-600" />
-                                      <span>Adquirido & no Inventário</span>
-                                      {item.convertedItemId && (
-                                        <Link href={`/inventario/${item.convertedItemId}`} prefetch={false} className="underline hover:text-emerald-950 font-bold text-[10px] ml-1">
-                                          Ver no Armazém →
-                                        </Link>
-                                      )}
-                                    </span>
-                                  ) : (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                                      Exclusivo deste evento
-                                    </span>
-                                  )}
-                                </div>
-
-                                <div className="text-xs text-[#8e8e93] flex flex-wrap items-center gap-2 mt-1">
-                                  <span className="font-semibold text-[#111] bg-white px-1.5 py-0.5 rounded border border-[#ececf0] text-[10px]">
-                                    Qtd: {item.quantity} un
-                                  </span>
-                                  {item.supplier && (
-                                    <>
-                                      <span>•</span>
-                                      <span className="text-[#48484a] text-[11px]">
-                                        Fornecedor: <strong className="text-[#111]">{item.supplier}</strong>
-                                      </span>
-                                    </>
-                                  )}
-                                  {item.notes && (
-                                    <>
-                                      <span>•</span>
-                                      <span className="text-[#636366] text-[11px] italic truncate max-w-xs" title={item.notes}>
-                                        {item.notes}
-                                      </span>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Right side values & actions */}
-                            <div className="flex items-center justify-between md:justify-end gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-[#ececf0]">
-                              {/* Price breakdown */}
-                              <div className="text-right">
-                                <div className="text-xs font-bold text-[#007aff] flex items-center justify-end gap-1">
-                                  <span>Quota: €{linePrice.toFixed(2)}</span>
-                                </div>
-                                <div className="text-[10px] text-[#8e8e93] flex items-center justify-end gap-1 mt-0.5">
-                                  <span>Custo: €{lineCost.toFixed(2)}</span>
-                                  <span>•</span>
-                                  <span className={lineMargin >= 0 ? "text-emerald-700 font-semibold" : "text-rose-600 font-semibold"}>
-                                    Margem: €{lineMargin.toFixed(2)}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Button: Comprado — Adicionar ao Inventário & Despesa */}
-                              {item.boughtStatus !== "bought" && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleConvertCustomItemToInventory(item)}
-                                  disabled={convertingCustomItemId === item.id}
-                                  className="px-3 py-1.5 rounded-[10px] bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50"
-                                  title="Marcar como comprado, registar despesa de saída e adicionar ao inventário permanente"
-                                >
-                                  {convertingCustomItemId === item.id ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  ) : (
-                                    <ShoppingCart className="w-3.5 h-3.5" />
-                                  )}
-                                  <span>Comprado (Lançar no Inventário & Despesa)</span>
-                                </button>
-                              )}
-
-                              {/* Edit & Delete */}
-                              <div className="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditCustomItem(item)}
-                                  className="p-1.5 text-[#8e8e93] hover:text-[#007aff] rounded-lg hover:bg-[#f2f2f5] transition cursor-pointer"
-                                  title="Editar artigo exclusivo"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteCustomItem(item)}
-                                  className="p-1.5 text-[#8e8e93] hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
-                                  title="Remover e deduzir da quota"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <span className="text-[10px] font-semibold text-[#8e8e93]">Recolha</span>
                 </div>
-              )}
-            </section>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="time"
+                    value={operationalSchedule.teardownStart}
+                    onChange={(e) => handleScheduleChange({ teardownStart: e.target.value })}
+                    className="w-full bg-white border border-[#ececf0] rounded-lg px-2 py-1 text-xs font-semibold text-[#111] outline-none cursor-pointer focus:border-[#007aff]"
+                  />
+                  <span className="text-[#8e8e93] text-xs font-medium shrink-0">às</span>
+                  <input
+                    type="time"
+                    value={operationalSchedule.teardownEnd}
+                    onChange={(e) => handleScheduleChange({ teardownEnd: e.target.value })}
+                    className="w-full bg-white border border-[#ececf0] rounded-lg px-2 py-1 text-xs font-semibold text-[#111] outline-none cursor-pointer focus:border-[#007aff]"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
+        {/* ================================================================= */}
+        {/* 3-TAB MAIN NAVIGATION BAR */}
+        {/* ================================================================= */}
+        <div className="flex items-center gap-2 p-1.5 bg-[#f2f2f5] rounded-2xl w-full sm:w-auto self-start border border-[#e5e5ea] overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setActiveMainTab("planning")}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shrink-0 ${
+              activeMainTab === "planning"
+                ? "bg-white text-[#111] shadow-xs"
+                : "text-[#636366] hover:text-[#111]"
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4 text-[#007aff]" />
+            <span>Moodboards & Tarefas</span>
+            {pendingTasksCount > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
+                {pendingTasksCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveMainTab("materials")}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shrink-0 ${
+              activeMainTab === "materials"
+                ? "bg-white text-[#111] shadow-xs"
+                : "text-[#636366] hover:text-[#111]"
+            }`}
+          >
+            <Package className="w-4 h-4 text-amber-500" />
+            <span>Materiais do Evento</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-[#111]/5 text-[#48484a] font-bold">
+              {allocations.length + customItems.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveMainTab("client")}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shrink-0 ${
+              activeMainTab === "client"
+                ? "bg-white text-[#111] shadow-xs"
+                : "text-[#636366] hover:text-[#111]"
+            }`}
+          >
+            <User className="w-4 h-4 text-indigo-500" />
+            <span>Cliente & Gestão</span>
+            {quotesList.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-blue-100 text-blue-800 font-bold">
+                {quotesList.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {activeMainTab === "planning" && (
+          <div className="space-y-6">
             {/* ----------------------------------------------------------------- */}
-            {/* PAINÉIS DE IDEIAS (MOODBOARDS) & RESULTADOS FINAIS (FOTOS REAIS) */}
+            {/* MOODBOARDS (Ideias & Conceito da Festa)                           */}
             {/* ----------------------------------------------------------------- */}
             <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
@@ -3878,15 +3675,13 @@ export default function EventDetailView({
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h2 className="text-lg font-bold text-[#111]">
-                          Painéis de Ideias & Resultados Finais
-                        </h2>
+                        <h2 className="text-lg font-bold text-[#111]">Moodboards</h2>
                         <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#f2f2f5] text-[#111]">
                           {mediaList.length}
                         </span>
                       </div>
                       <p className="text-xs text-[#8e8e93] mt-0.5">
-                        Moodboards de inspiração conceptual e fotografias reais do resultado do evento (upload de múltiplos ficheiros e URLs)
+                        Moodboards de inspiração conceptual e referências visuais com carrossel e notas da equipa
                       </p>
                     </div>
                   </div>
@@ -3898,75 +3693,19 @@ export default function EventDetailView({
                   className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 transition self-start sm:self-auto shadow-xs cursor-pointer flex-shrink-0"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Novo Moodboard / Painel</span>
+                  <span>Novo Moodboard</span>
                 </button>
               </div>
 
-              {/* Filter Tabs */}
-              <div className="flex flex-wrap items-center gap-2 pb-4 mb-5 border-b border-[#ececf0]">
-                <button
-                  type="button"
-                  onClick={() => setMediaFilter("all")}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                    mediaFilter === "all"
-                      ? "bg-[#111] text-white shadow-xs"
-                      : "bg-[#f2f2f5] text-[#636366] hover:bg-[#e5e5ea]"
-                  }`}
-                >
-                  <span>Todos</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${mediaFilter === "all" ? "bg-white/20 text-white" : "bg-black/5 text-[#8e8e93]"}`}>
-                    {mediaList.length}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setMediaFilter("idea_board")}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                    mediaFilter === "idea_board"
-                      ? "bg-amber-500 text-white shadow-xs"
-                      : "bg-amber-50 text-amber-800 hover:bg-amber-100"
-                  }`}
-                >
-                  <Lightbulb className="w-3.5 h-3.5" />
-                  <span>Ideias & Conceito</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${mediaFilter === "idea_board" ? "bg-white/20 text-white" : "bg-amber-200/60 text-amber-900"}`}>
-                    {ideaBoardsCount}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setMediaFilter("final_outcome")}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                    mediaFilter === "final_outcome"
-                      ? "bg-emerald-600 text-white shadow-xs"
-                      : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                  }`}
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  <span>Resultados Reais</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${mediaFilter === "final_outcome" ? "bg-white/20 text-white" : "bg-emerald-200/60 text-emerald-900"}`}>
-                    {finalOutcomesCount}
-                  </span>
-                </button>
-              </div>
-
-              {/* Gallery Grid */}
-              {filteredMedia.length === 0 ? (
+              {/* Gallery Grid (Ideas only, no outcome tabs) */}
+              {mediaList.length === 0 ? (
                 <div className="text-center py-10 px-4 rounded-[16px] bg-[#fafafc] border border-dashed border-[#d2d2d7]">
                   <div className="w-12 h-12 rounded-full bg-white shadow-xs flex items-center justify-center mx-auto mb-3 text-[#8e8e93]">
                     <ImageIcon className="w-6 h-6" />
                   </div>
-                  <h4 className="text-sm font-bold text-[#111]">
-                    {mediaFilter === "idea_board"
-                      ? "Nenhum painel de ideias adicionado"
-                      : mediaFilter === "final_outcome"
-                      ? "Nenhuma fotografia de resultado final adicionada"
-                      : "Galeria de imagens vazia"}
-                  </h4>
+                  <h4 className="text-sm font-bold text-[#111]">Nenhum moodboard adicionado</h4>
                   <p className="text-xs text-[#8e8e93] max-w-md mx-auto mt-1 mb-4">
-                    Adicione referências visuais de inspiração num moodboard com fotos em carrossel, ou registe as fotografias reais do evento concluído.
+                    Adicione referências visuais de inspiração num moodboard com fotos em carrossel e notas da equipa.
                   </p>
                   <button
                     type="button"
@@ -3974,12 +3713,12 @@ export default function EventDetailView({
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold hover:bg-black transition shadow-xs cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Criar primeiro painel</span>
+                    <span>Criar primeiro moodboard</span>
                   </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  {filteredMedia.map((item) => (
+                  {mediaList.map((item) => (
                     <MoodboardCard
                       key={item.id}
                       board={item}
@@ -3997,19 +3736,17 @@ export default function EventDetailView({
             </section>
 
             {/* ----------------------------------------------------------------- */}
-            {/* ACTION ITEMS CHECKLIST */}
+            {/* TAREFAS (Checklist sem prioridades técnicas)                      */}
             {/* ----------------------------------------------------------------- */}
             <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
                 <div>
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-[#137333]" />
-                    <h2 className="text-lg font-bold text-[#111]">
-                      Ações Pendentes para Conclusão do Evento
-                    </h2>
+                    <h2 className="text-lg font-bold text-[#111]">Tarefas</h2>
                   </div>
                   <p className="text-xs text-[#8e8e93] mt-0.5">
-                    Checklist operacional de preparação, montagem, cliente e desmontagem
+                    Checklist de todas as tarefas necessárias para esta festa
                   </p>
                 </div>
 
@@ -4020,7 +3757,7 @@ export default function EventDetailView({
                 </div>
               </div>
 
-              {/* Add task inline form */}
+              {/* Add task inline form (Sem seletor de prioridade) */}
               <form onSubmit={handleAddTask} className="flex items-center gap-2 mb-4">
                 <input
                   type="text"
@@ -4029,30 +3766,20 @@ export default function EventDetailView({
                   onChange={(e) => setNewTaskTitle(e.target.value)}
                   className="flex-1 px-3.5 py-2 text-xs bg-[#fafafc] border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff] transition"
                 />
-                <select
-                  value={newTaskPriority}
-                  onChange={(e) => setNewTaskPriority(e.target.value as any)}
-                  className="px-2.5 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] text-[#48484a]"
-                >
-                  <option value="baixa">Baixa</option>
-                  <option value="media">Média</option>
-                  <option value="alta">Alta</option>
-                  <option value="urgente">Urgente</option>
-                </select>
                 <button
                   type="submit"
                   disabled={!newTaskTitle.trim()}
-                  className="px-4 py-2 bg-[#111] hover:bg-black disabled:opacity-50 text-white rounded-[12px] text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                  className="px-4 py-2 bg-[#111] hover:bg-black disabled:opacity-50 text-white rounded-[12px] text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Adicionar</span>
                 </button>
               </form>
 
-              {/* Task list */}
+              {/* Task list (Sem tags de prioridade) */}
               {tasks.length === 0 ? (
                 <div className="text-center py-6 text-xs text-[#8e8e93]">
-                  Nenhuma ação adicionada ainda. Escreva acima para criar o checklist deste evento.
+                  Nenhuma tarefa adicionada ainda. Escreva acima para criar o checklist deste evento.
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -4089,132 +3816,289 @@ export default function EventDetailView({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {/* Priority tag */}
-                        {t.priority && (
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                              t.priority === "urgente"
-                                ? "bg-red-100 text-red-700"
-                                : t.priority === "alta"
-                                ? "bg-amber-100 text-amber-800"
-                                : t.priority === "media"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-neutral-100 text-neutral-600"
-                            }`}
-                          >
-                            {t.priority}
-                          </span>
-                        )}
-
-                        <button
-                          onClick={() => handleDeleteTask(t.id)}
-                          className="p-1 text-[#8e8e93] hover:text-rose-600 rounded-md transition cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTask(t.id)}
+                        className="p-1 text-[#8e8e93] hover:text-rose-600 rounded-md transition cursor-pointer shrink-0"
+                        title="Eliminar tarefa"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   ))}
                 </div>
               )}
             </section>
           </div>
+        )}
 
-          {/* RIGHT COLUMN: CRONOGRAMA, PEDIDOS ESPECIAIS, NOTAS & CLIENT CONTACT */}
-          <div className="space-y-6">
-            {/* ----------------------------------------------------------------- */}
-            {/* SCHEDULE & CRONOGRAMA (Directly Editable Datetime Inputs) */}
-            {/* ----------------------------------------------------------------- */}
-            <section className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
+        {activeMainTab === "materials" && (
+          <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
                 <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-[#111]" />
-                  <h3 className="text-sm font-bold text-[#111]">Cronograma Operacional</h3>
+                  <Package className="w-5 h-5 text-[#111]" />
+                  <h2 className="text-lg font-bold text-[#111]">Materiais do Evento</h2>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#f2f2f5] text-[#111]">
+                    {allocations.length + customItems.length}
+                  </span>
                 </div>
-                <span className="text-[10px] text-[#8e8e93]">Edição imediata</span>
+                <p className="text-xs text-[#8e8e93] mt-0.5">
+                  Artigos do inventário e artigos personalizados exclusivos para este evento
+                </p>
               </div>
 
-              <div className="space-y-3 text-xs">
-                {/* 1. Prep Date */}
-                <div className="p-2.5 rounded-[12px] bg-[#fafafc] border border-[#ececf0] space-y-1">
-                  <span className="text-[#8e8e93] font-medium block text-[11px]">Montagem / Carga:</span>
-                  <input
-                    type="datetime-local"
-                    value={toInputDate(event.prepDate)}
-                    onChange={(e) => handleFieldChange("prepDate", e.target.value, true)}
-                    className="w-full bg-white border border-[#ececf0] rounded-md px-2 py-1 text-xs font-semibold text-[#111] outline-none cursor-pointer"
-                  />
-                </div>
+              <button
+                type="button"
+                onClick={handleOpenAddItem}
+                className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer self-start sm:self-auto shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Adicionar artigo</span>
+              </button>
+            </div>
 
-                {/* 2. Start Date */}
-                <div className="p-2.5 rounded-[12px] bg-emerald-50/70 border border-emerald-200/80 space-y-1">
-                  <span className="text-emerald-800 font-bold block text-[11px]">Início do Evento:</span>
-                  <input
-                    type="datetime-local"
-                    value={toInputDate(event.startDate)}
-                    onChange={(e) => handleFieldChange("startDate", e.target.value, true)}
-                    className="w-full bg-white border border-emerald-200 rounded-md px-2 py-1 text-xs font-bold text-emerald-950 outline-none cursor-pointer"
-                  />
+            {/* Unified List of Items (Stock Allocations + Custom Items) */}
+            {allocations.length === 0 && customItems.length === 0 ? (
+              <div className="text-center py-10 px-4 rounded-[16px] bg-[#fafafc] border border-dashed border-[#d2d2d7]">
+                <div className="w-12 h-12 rounded-full bg-white shadow-xs flex items-center justify-center mx-auto mb-3 text-[#8e8e93]">
+                  <Package className="w-6 h-6" />
                 </div>
-
-                {/* 3. End Date */}
-                <div className="p-2.5 rounded-[12px] bg-emerald-50/70 border border-emerald-200/80 space-y-1">
-                  <span className="text-emerald-800 font-bold block text-[11px]">Fim do Evento:</span>
-                  <input
-                    type="datetime-local"
-                    value={toInputDate(event.endDate)}
-                    onChange={(e) => handleFieldChange("endDate", e.target.value, true)}
-                    className="w-full bg-white border border-emerald-200 rounded-md px-2 py-1 text-xs font-bold text-emerald-950 outline-none cursor-pointer"
-                  />
-                </div>
-
-                {/* 4. Return Date */}
-                <div className="p-2.5 rounded-[12px] bg-[#fafafc] border border-[#ececf0] space-y-1">
-                  <span className="text-[#8e8e93] font-medium block text-[11px]">Desmontagem & Recolha:</span>
-                  <input
-                    type="datetime-local"
-                    value={toInputDate(event.returnDate)}
-                    onChange={(e) => handleFieldChange("returnDate", e.target.value, true)}
-                    className="w-full bg-white border border-[#ececf0] rounded-md px-2 py-1 text-xs font-semibold text-[#111] outline-none cursor-pointer"
-                  />
-                </div>
+                <h4 className="text-sm font-bold text-[#111]">Nenhum material adicionado ainda</h4>
+                <p className="text-xs text-[#8e8e93] max-w-md mx-auto mt-1 mb-4">
+                  Adicione artigos do inventário de armazém ou crie artigos personalizados feitos por medida para este evento.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleOpenAddItem}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold hover:bg-black transition shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Adicionar artigo</span>
+                </button>
               </div>
-            </section>
+            ) : (
+              <div className="space-y-3">
+                {/* 1. Warehouse Stock Allocations */}
+                {allocations.map((a) => {
+                  const item = allItems.find((i) => i.id === a.itemId);
+                  const isItemConsumable = item?.isConsumable;
+                  const packageUnits = item?.packageUnits || 1;
+                  const packsCount = Math.ceil(a.quantity / packageUnits);
+                  const totalLineVal = a.quantity * (a.itemUnitPrice || item?.unitPrice || 0);
 
-            {/* ----------------------------------------------------------------- */}
-            {/* SPECIAL NEEDS & RESTRICTIONS (Directly Editable Inline) */}
-            {/* ----------------------------------------------------------------- */}
-            <section className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-4 h-4 text-[#D32F2F]" />
-                  <h3 className="text-sm font-bold text-[#111]">Pedidos Especiais & Alergias</h3>
-                </div>
-                <span className="text-[10px] text-[#8e8e93]">Guarda ao escrever</span>
+                  return (
+                    <div
+                      key={a.id}
+                      className="p-4 rounded-[16px] border border-[#ececf0] bg-[#fafafc] hover:border-[#c7c7cc] transition flex flex-col md:flex-row md:items-center justify-between gap-4"
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-white border border-[#ececf0] flex items-center justify-center text-[#111] shrink-0 overflow-hidden">
+                          {a.itemImageUrl || item?.imageUrl ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={(a.itemImageUrl || item?.imageUrl) ?? undefined}
+                              alt={a.itemName || "Item"}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Package className="w-5 h-5 text-[#007aff]" />
+                          )}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-sm text-[#111] truncate">
+                              {a.itemName || item?.name || "Artigo"}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200/60">
+                              Inventário CFM
+                            </span>
+                            {isItemConsumable && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800">
+                                Consumível
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3 text-xs text-[#8e8e93] mt-1 flex-wrap">
+                            {a.itemSku && <span>SKU: {a.itemSku}</span>}
+                            {a.itemCategory && <span>{a.itemCategory}</span>}
+                            <span className="font-semibold text-[#111]">
+                              €{(a.itemUnitPrice || item?.unitPrice || 0).toFixed(2)} / un
+                            </span>
+                            {isItemConsumable && packageUnits > 1 && (
+                              <span className="text-orange-900 font-medium">
+                                ({packsCount} {packsCount === 1 ? "pacote" : "pacotes"})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 justify-between md:justify-end shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-[#ececf0]">
+                        {/* Quantity Controls */}
+                        <div className="flex items-center gap-1.5 bg-white border border-[#ececf0] rounded-xl px-2 py-1">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateAllocationQty(a.id, a.quantity - 1)}
+                            disabled={a.quantity <= 1}
+                            className="p-1 text-[#8e8e93] hover:text-[#111] disabled:opacity-30 cursor-pointer"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="text-xs font-bold text-[#111] px-1 min-w-[20px] text-center">
+                            {a.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateAllocationQty(a.id, a.quantity + 1)}
+                            className="p-1 text-[#8e8e93] hover:text-[#111] cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Total Line Price */}
+                        <div className="text-right min-w-[80px]">
+                          <div className="text-xs font-black text-[#111]">€{totalLineVal.toFixed(2)}</div>
+                          <div className="text-[10px] text-[#8e8e93]">subtotal</div>
+                        </div>
+
+                        {/* Status Selector */}
+                        <select
+                          value={a.status}
+                          onChange={(e) => handleUpdateAllocationStatus(a.id, e.target.value as any)}
+                          className={`text-[11px] font-bold rounded-lg px-2 py-1 border cursor-pointer outline-none ${
+                            a.status === "devolvido"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : a.status === "despachado"
+                              ? "bg-blue-50 text-blue-800 border-blue-200"
+                              : a.status === "danificado"
+                              ? "bg-rose-50 text-rose-800 border-rose-200"
+                              : "bg-white text-[#48484a] border-[#ececf0]"
+                          }`}
+                        >
+                          <option value="reservado">Reservado</option>
+                          <option value="despachado">Despachado</option>
+                          <option value="devolvido">Devolvido</option>
+                          <option value="danificado">Danificado</option>
+                        </select>
+
+                        {/* Delete button */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAllocation(a.id)}
+                          className="p-1.5 text-[#8e8e93] hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                          title="Remover alocação"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* 2. Custom Bespoke Items */}
+                {customItems.map((item) => {
+                  const lineTotal = item.quantity * item.unitPrice;
+                  const lineCost = item.quantity * item.unitCost;
+                  const lineMargin = lineTotal - lineCost;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-4 rounded-[16px] border border-amber-200/70 bg-amber-50/20 hover:border-amber-300 transition flex flex-col md:flex-row md:items-center justify-between gap-4"
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                          <Sparkles className="w-5 h-5" />
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-sm text-[#111] truncate">{item.name}</span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                              Personalizado
+                            </span>
+                            {item.boughtStatus === "bought" && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                Comprado
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3 text-xs text-[#8e8e93] mt-1 flex-wrap">
+                            <span>{item.category}</span>
+                            <span>Qtd: {item.quantity}</span>
+                            <span>Custo: €{item.unitCost.toFixed(2)}</span>
+                            <span className="font-semibold text-[#111]">PVP: €{item.unitPrice.toFixed(2)}</span>
+                            <span className={lineMargin >= 0 ? "text-emerald-700 font-semibold" : "text-rose-600 font-semibold"}>
+                              Margem: €{lineMargin.toFixed(2)}
+                            </span>
+                            {item.supplier && <span>Fornecedor: {item.supplier}</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 justify-between md:justify-end shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-[#ececf0]">
+                        {/* Total Line Price */}
+                        <div className="text-right min-w-[80px]">
+                          <div className="text-xs font-black text-[#111]">€{lineTotal.toFixed(2)}</div>
+                          <div className="text-[10px] text-[#8e8e93]">subtotal venda</div>
+                        </div>
+
+                        {/* Comprado button if not bought */}
+                        {item.boughtStatus !== "bought" && (
+                          <button
+                            type="button"
+                            onClick={() => handleConvertCustomItemToInventory(item)}
+                            disabled={convertingCustomItemId === item.id}
+                            className="px-2.5 py-1 rounded-[10px] bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer shadow-xs disabled:opacity-50"
+                            title="Lançar no inventário e despesa"
+                          >
+                            {convertingCustomItemId === item.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <ShoppingCart className="w-3 h-3" />
+                            )}
+                            <span>Comprado</span>
+                          </button>
+                        )}
+
+                        {/* Edit & Delete */}
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditCustomItem(item)}
+                            className="p-1.5 text-[#8e8e93] hover:text-[#007aff] rounded-lg hover:bg-[#f2f2f5] transition cursor-pointer"
+                            title="Editar artigo personalizado"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCustomItem(item)}
+                            className="p-1.5 text-[#8e8e93] hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                            title="Remover artigo personalizado"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+            )}
+          </section>
+        )}
 
-              <textarea
-                rows={3}
-                value={event.specialNeeds || ""}
-                onChange={(e) => handleFieldChange("specialNeeds", e.target.value)}
-                placeholder="Ex: Alergia a amendoim, restrição de ruído após as 22h, tomadas 220V no jardim..."
-                className="w-full p-3 bg-rose-50/60 border border-rose-200/80 rounded-[12px] text-xs text-rose-950 placeholder:text-rose-900/40 outline-none focus:ring-1 focus:ring-rose-400 transition"
-              />
-
-              <div className="pt-2 border-t border-[#ececf0]">
-                <div className="font-bold text-xs text-[#111] mb-1.5">Notas Operacionais Internas:</div>
-                <textarea
-                  rows={2}
-                  value={event.notes || ""}
-                  onChange={(e) => handleFieldChange("notes", e.target.value)}
-                  placeholder="Instruções de logística, montagem ou camiões..."
-                  className="w-full p-3 bg-[#fafafc] border border-[#ececf0] rounded-[12px] text-xs text-[#111] placeholder:text-[#8e8e93] outline-none focus:ring-1 focus:ring-[#007aff] transition"
-                />
-              </div>
-            </section>
-
-            {/* ----------------------------------------------------------------- */}
+        {activeMainTab === "client" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* LEFT COLUMN: FICHA DO CLIENTE & PEDIDOS ESPECIAIS */}
+            <div className="space-y-6">
+              {/* ----------------------------------------------------------------- */}
             {/* CLIENT CONTACT CARD */}
             {/* ----------------------------------------------------------------- */}
             <section className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs space-y-3">
@@ -4357,8 +4241,138 @@ export default function EventDetailView({
                 </div>
               )}
             </section>
-
+              {/* ----------------------------------------------------------------- */}
+            {/* SPECIAL NEEDS & RESTRICTIONS (Directly Editable Inline) */}
             {/* ----------------------------------------------------------------- */}
+            <section className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-[#D32F2F]" />
+                  <h3 className="text-sm font-bold text-[#111]">Pedidos Especiais</h3>
+                </div>
+                
+              </div>
+
+              <textarea
+                rows={3}
+                value={event.specialNeeds || ""}
+                onChange={(e) => handleFieldChange("specialNeeds", e.target.value)}
+                placeholder="Ex: Alergia a amendoim, restrição de ruído após as 22h, tomadas 220V no jardim..."
+                className="w-full p-3 bg-rose-50/60 border border-rose-200/80 rounded-[12px] text-xs text-rose-950 placeholder:text-rose-900/40 outline-none focus:ring-1 focus:ring-rose-400 transition"
+              />
+
+              <div className="pt-2 border-t border-[#ececf0]">
+                <div className="font-bold text-xs text-[#111] mb-1.5">Notas:</div>
+                <textarea
+                  rows={2}
+                  value={event.notes || ""}
+                  onChange={(e) => handleFieldChange("notes", e.target.value)}
+                  placeholder="Instruções de logística, montagem ou camiões..."
+                  className="w-full p-3 bg-[#fafafc] border border-[#ececf0] rounded-[12px] text-xs text-[#111] placeholder:text-[#8e8e93] outline-none focus:ring-1 focus:ring-[#007aff] transition"
+                />
+              </div>
+            </section>
+            </div>
+
+            {/* RIGHT COLUMN: ORÇAMENTOS & REUNIÕES COM O CLIENTE */}
+            <div className="space-y-6">
+              {/* ----------------------------------------------------------------- */}
+            {/* DIGITAL PROPOSALS & QUOTES (Meetings do not get quotas; only events get quotas) */}
+            {/* ----------------------------------------------------------------- */}
+            <section className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-[#111]" />
+                  <h3 className="text-sm font-bold text-[#111]">Orçamentos</h3>
+                  {!isMeeting && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#f2f2f5] text-[#48484a]">
+                      {quotesList.length}
+                    </span>
+                  )}
+                </div>
+                {!isMeeting && (
+                  <button
+                    type="button"
+                    onClick={() => setShowQuoteWizard(true)}
+                    className="px-3 py-1.5 rounded-[10px] bg-[#111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Gerar Orçamento</span>
+                  </button>
+                )}
+              </div>
+
+              {isMeeting ? (
+                <div className="p-4 bg-[#f8f8fa] border border-[#ececf0] rounded-[14px] text-xs text-[#8e8e93] flex items-center gap-3">
+                  <Info className="w-4 h-4 text-[#007aff] shrink-0" />
+                  <span>
+                    Reuniões e briefings Calendly não recebem orçamentos. Apenas eventos de produção podem ter propostas comerciais associadas.
+                  </span>
+                </div>
+              ) : quotesList.length === 0 ? (
+                <div className="text-center py-6 px-4 border border-dashed border-[#e5e5ea] rounded-[16px] bg-[#fdfdfd] space-y-2">
+                  <p className="text-xs text-[#8e8e93]">
+                    Nenhum orçamento emitido especificamente para este evento.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuoteWizard(true)}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#007aff] hover:underline cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Gerar o primeiro orçamento para este evento</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {quotesList.map((q) => (
+                    <div
+                      key={q.id}
+                      className="p-3 rounded-[14px] border border-[#ececf0] bg-[#fafafc] flex items-center justify-between gap-2"
+                    >
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-xs text-[#111]">{q.quoteNumber}</span>
+                        </div>
+                        <div className="text-[11px] font-semibold text-[#137333]">
+                          €{q.total.toFixed(2)}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleCopyQuoteLink(q.accessToken, q.id)}
+                          className="px-2.5 py-1 rounded-[8px] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[11px] font-semibold text-[#111] flex items-center gap-1 transition cursor-pointer"
+                        >
+                          {copiedQuoteId === q.id ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              <span>Copiado!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Share2 className="w-3 h-3 text-[#8e8e93]" />
+                              <span>Link</span>
+                            </>
+                          )}
+                        </button>
+
+                        <a
+                          href={`/proposta/${q.accessToken}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 rounded-[8px] bg-[#111] hover:bg-black text-white text-xs"
+                          title="Abrir proposta pública"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+              {/* ----------------------------------------------------------------- */}
             {/* CLIENT MEETINGS (GOOGLE MEET & IN PERSON) */}
             {/* ----------------------------------------------------------------- */}
             <section id="event-meetings-section" className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs space-y-4">
@@ -4697,105 +4711,10 @@ export default function EventDetailView({
                 </div>
               )}
             </section>
-
-            {/* ----------------------------------------------------------------- */}
-            {/* DIGITAL PROPOSALS & QUOTES (Meetings do not get quotas; only events get quotas) */}
-            {/* ----------------------------------------------------------------- */}
-            <section className="bg-white border border-[#ececf0] rounded-[22px] p-5 shadow-xs">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-[#111]" />
-                  <h3 className="text-sm font-bold text-[#111]">Propostas & Orçamentos</h3>
-                  {!isMeeting && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#f2f2f5] text-[#48484a]">
-                      {quotesList.length}
-                    </span>
-                  )}
-                </div>
-                {!isMeeting && (
-                  <button
-                    type="button"
-                    onClick={() => setShowQuoteWizard(true)}
-                    className="px-3 py-1.5 rounded-[10px] bg-[#111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Gerar Orçamento</span>
-                  </button>
-                )}
-              </div>
-
-              {isMeeting ? (
-                <div className="p-4 bg-[#f8f8fa] border border-[#ececf0] rounded-[14px] text-xs text-[#8e8e93] flex items-center gap-3">
-                  <Info className="w-4 h-4 text-[#007aff] shrink-0" />
-                  <span>
-                    Reuniões e briefings Calendly não recebem orçamentos. Apenas eventos de produção podem ter propostas comerciais associadas.
-                  </span>
-                </div>
-              ) : quotesList.length === 0 ? (
-                <div className="text-center py-6 px-4 border border-dashed border-[#e5e5ea] rounded-[16px] bg-[#fdfdfd] space-y-2">
-                  <p className="text-xs text-[#8e8e93]">
-                    Nenhum orçamento emitido especificamente para este evento.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowQuoteWizard(true)}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#007aff] hover:underline cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Gerar o primeiro orçamento para este evento</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {quotesList.map((q) => (
-                    <div
-                      key={q.id}
-                      className="p-3 rounded-[14px] border border-[#ececf0] bg-[#fafafc] flex items-center justify-between gap-2"
-                    >
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-xs text-[#111]">{q.quoteNumber}</span>
-                        </div>
-                        <div className="text-[11px] font-semibold text-[#137333]">
-                          €{q.total.toFixed(2)}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => handleCopyQuoteLink(q.accessToken, q.id)}
-                          className="px-2.5 py-1 rounded-[8px] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[11px] font-semibold text-[#111] flex items-center gap-1 transition cursor-pointer"
-                        >
-                          {copiedQuoteId === q.id ? (
-                            <>
-                              <Check className="w-3 h-3 text-emerald-600" />
-                              <span>Copiado!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Share2 className="w-3 h-3 text-[#8e8e93]" />
-                              <span>Link</span>
-                            </>
-                          )}
-                        </button>
-
-                        <a
-                          href={`/proposta/${q.accessToken}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="p-1.5 rounded-[8px] bg-[#111] hover:bg-black text-white text-xs"
-                          title="Abrir proposta pública"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
+            </div>
           </div>
-        </div>
+        )}
+
       </main>
 
       {/* ===================================================================== */}
@@ -4815,26 +4734,81 @@ export default function EventDetailView({
         />
       )}
 
+            {/* ===================================================================== */}
+      {/* MODAL: UNIFIED ADD ITEM (Stock Inventory or Bespoke Custom Item)     */}
       {/* ===================================================================== */}
-      {/* MODAL: ADD ALLOCATION (For selecting items from warehouse catalog) */}
-      {/* ===================================================================== */}
-      {showAddAllocationModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-[24px] w-full max-w-md border border-[#ececf0] shadow-2xl overflow-hidden p-6 space-y-4">
+      {(showAddItemModal || showAddAllocationModal || showAddCustomItemModal) && (
+        <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-[24px] w-full max-w-lg border border-[#ececf0] shadow-2xl overflow-hidden p-6 space-y-4 max-h-[92vh] flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-[#ececf0]">
-              <div className="flex items-center gap-2">
-                <Package className="w-5 h-5 text-[#111]" />
-                <h3 className="text-base font-bold text-[#111]">Alocar Material do Armazém</h3>
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    addItemType === "inventory" ? "bg-sky-50 text-[#007aff]" : "bg-amber-500/10 text-amber-600"
+                  }`}
+                >
+                  {addItemType === "inventory" ? <Package className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#111]">
+                    {editingCustomItem
+                      ? "Editar Artigo Personalizado"
+                      : "Adicionar Artigo ao Evento"}
+                  </h3>
+                  <p className="text-[11px] text-[#8e8e93]">
+                    {editingCustomItem
+                      ? "Exclusivo para este evento"
+                      : "Selecione entre o inventário de armazém ou um artigo personalizado"}
+                  </p>
+                </div>
               </div>
               <button
-                onClick={() => setShowAddAllocationModal(false)}
-                className="text-[#8e8e93] hover:text-[#111] p-1 rounded-full cursor-pointer"
+                type="button"
+                onClick={() => {
+                  setShowAddItemModal(false);
+                  setShowAddAllocationModal(false);
+                  setShowAddCustomItemModal(false);
+                  setEditingCustomItem(null);
+                }}
+                className="text-[#8e8e93] hover:text-[#111] p-1 rounded-full cursor-pointer transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleAddAllocation} className="space-y-3.5 text-xs">
+            {/* Dynamic Tab Switcher (Visible only when creating new item) */}
+            {!editingCustomItem && (
+              <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#f2f2f5] rounded-xl shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setAddItemType("inventory")}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    addItemType === "inventory"
+                      ? "bg-white text-[#111] shadow-xs"
+                      : "text-[#636366] hover:text-[#111]"
+                  }`}
+                >
+                  <Package className="w-3.5 h-3.5 text-[#007aff]" />
+                  <span>Do Inventário</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddItemType("custom")}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    addItemType === "custom"
+                      ? "bg-white text-[#111] shadow-xs"
+                      : "text-[#636366] hover:text-[#111]"
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Artigo Personalizado</span>
+                </button>
+              </div>
+            )}
+
+            {/* Form Stage */}
+            {addItemType === "inventory" && !editingCustomItem && (
+              <form onSubmit={handleAddAllocation} className="space-y-3.5 text-xs">
               {/* Item Search / Selector */}
               <div>
                 <label className="block font-bold text-[#111] mb-1">Pesquisar ou Selecionar Artigo</label>
@@ -5012,40 +4986,10 @@ export default function EventDetailView({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+            )}
 
-      {/* ===================================================================== */}
-      {/* MODAL: ADD / EDIT CUSTOM BESPOKE ITEM (Single-Event Specific) */}
-      {/* ===================================================================== */}
-      {showAddCustomItemModal && (
-        <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-[24px] w-full max-w-lg border border-[#ececf0] shadow-2xl overflow-hidden p-6 space-y-4 max-h-[92vh] flex flex-col">
-            <div className="flex items-center justify-between pb-3 border-b border-[#ececf0]">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-[#111]">
-                    {editingCustomItem ? "Editar Artigo Personalizado" : "Novo Artigo Personalizado"}
-                  </h3>
-                  <p className="text-[11px] text-[#8e8e93]">
-                    Exclusivo para este evento · Adicionado diretamente à Quota
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddCustomItemModal(false)}
-                className="text-[#8e8e93] hover:text-[#111] p-1 rounded-full cursor-pointer transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveCustomItem} className="space-y-4 text-xs overflow-y-auto flex-1 pr-1">
+            {(addItemType === "custom" || editingCustomItem) && (
+              <form onSubmit={handleSaveCustomItem} className="space-y-4 text-xs overflow-y-auto flex-1 pr-1">
               {/* Name */}
               <div>
                 <label className="block font-bold text-[#111] mb-1">
@@ -5231,11 +5175,12 @@ export default function EventDetailView({
                 </button>
               </div>
             </form>
+            )}
           </div>
         </div>
       )}
 
-      {/* Lightbox Modal with Carousel Navigation */}
+{/* Lightbox Modal with Carousel Navigation */}
       {lightboxState && (() => {
         const { board, imageIndex } = lightboxState;
         const images = parseMediaImages(board);
