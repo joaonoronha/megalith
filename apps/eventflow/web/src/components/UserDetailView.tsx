@@ -148,16 +148,17 @@ export default function UserDetailView({
         <div className="max-w-[1000px] mx-auto flex items-center justify-between gap-2">
           <Link
             href="/mais"
-            className="inline-flex items-center gap-1.5 sm:gap-2 text-xs font-semibold text-[#636366] hover:text-[#111111] transition bg-[#f2f2f5] hover:bg-[#e5e5ea] px-2.5 sm:px-3 py-1.5 rounded-full flex-shrink-0"
+            className="inline-flex items-center gap-1.5 sm:gap-2 text-xs font-semibold text-[#636366] hover:text-[#111111] transition bg-[#f2f2f5] hover:bg-[#e5e5ea] p-1.5 sm:px-3 sm:py-1.5 rounded-full flex-shrink-0"
+            title="Voltar à Gestão de Equipa"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Voltar<span className="hidden sm:inline"> à Gestão de Equipa</span></span>
+            <span className="hidden sm:inline">Voltar à Gestão de Equipa</span>
           </Link>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {currentUserState && (
               <div
-                className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold shadow-2xs"
+                className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold shadow-2xs"
                 title={`${currentUserState.name} (${currentUserState.email}) · Acesso ${currentUserState.role}`}
               >
                 <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold">
@@ -170,10 +171,11 @@ export default function UserDetailView({
             {canEdit && (
               <button
                 onClick={() => setShowEditModal(true)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#111] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] px-3 sm:px-3.5 py-1.5 rounded-[12px] shadow-2xs transition cursor-pointer flex-shrink-0"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#111] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] p-1.5 sm:px-3.5 sm:py-1.5 rounded-[12px] shadow-2xs transition cursor-pointer flex-shrink-0"
+                title="Editar Conta"
               >
                 <Edit3 className="w-3.5 h-3.5" />
-                <span>Editar<span className="hidden sm:inline"> Conta</span></span>
+                <span className="hidden sm:inline">Editar Conta</span>
               </button>
             )}
           </div>
