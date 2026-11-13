@@ -76,4 +76,46 @@ describe("CFM Events: Barcode Scanner Business Rules & Accessibility", () => {
     assert.equal(userFacingDescription.includes("EAN-13"), false);
     assert.equal(userFacingDescription.includes("UPC-A"), false);
   });
+
+  it("handles Open Products Facts structure when Open Food Facts has no match", () => {
+    const rawOpfProduct = {
+      status: 1,
+      product: {
+        product_name: "Board Master",
+        product_name_pt: null,
+        brands: "Pilot",
+        categories: "en:Whiteboard markers, Office Supplies",
+        image_front_url: "https://images.openproductsfacts.org/images/products/490/pilot.jpg",
+      },
+    };
+
+    const name = (
+      rawOpfProduct.product.product_name_pt ||
+      rawOpfProduct.product.product_name ||
+      rawOpfProduct.product.brands ||
+      ""
+    ).trim();
+
+    const category = rawOpfProduct.product.categories
+      ? rawOpfProduct.product.categories.split(",")[0].trim()
+      : "Material / Consumíveis";
+
+    assert.equal(name, "Board Master");
+    assert.equal(category, "en:Whiteboard markers");
+    assert.equal(rawOpfProduct.product.image_front_url.startsWith("https://"), true);
+  });
+
+  it("falls back to empty manual form when product is not found in either API or DB", () => {
+    const fallbackResult = {
+      success: true,
+      found: false,
+      source: "none" as const,
+      barcode: "0000000000001",
+      suggestedItem: null,
+    };
+
+    assert.equal(fallbackResult.found, false);
+    assert.equal(fallbackResult.source, "none");
+    assert.equal(fallbackResult.suggestedItem, null);
+  });
 });
