@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useTransition } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   X,
   Camera,
@@ -77,7 +77,7 @@ export default function BarcodeScannerModal({
   storageLocations = [],
   onItemAddedOrUpdated,
 }: BarcodeScannerModalProps) {
-  const [isPending, startTransition] = useTransition();
+  const [isSaving, setIsSaving] = useState(false);
 
   // Estados do Scanner
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -222,7 +222,7 @@ export default function BarcodeScannerModal({
   }
 
   // Manipular deteção de código
-  function handleBarcodeFound(barcode: string) {
+  async function handleBarcodeFound(barcode: string) {
     if (isScanningLockedRef.current) return;
     isScanningLockedRef.current = true;
 
@@ -238,69 +238,82 @@ export default function BarcodeScannerModal({
     setStockSuccessMsg(null);
     setCreateError(null);
 
-    startTransition(async () => {
-      try {
-        const res = await searchBarcodeAction(barcode);
-        setSearchResult(res);
+    try {
+      const res = await searchBarcodeAction(barcode);
+      setSearchResult(res);
 
-        if (res.found && res.item) {
-          setStockToAdd(1);
-        } else {
-          // Preencher formulário simplificado com os dados obtidos (Open Facts ou padrão)
-          const suggested = res.suggestedItem;
-          setNewItemName(suggested?.name || "");
-          setNewItemCategory(suggested?.category || "Material / Consumíveis");
-          setNewItemQuantity(1);
-          setNewItemIsConsumable(suggested?.isConsumable || false);
-          setNewItemImageUrl(suggested?.imageUrl || null);
-          setNewItemPrice("0");
-          setNewItemLocationId(storageLocations[0]?.id || "");
-        }
-      } catch (e: unknown) {
-        console.error("searchBarcodeAction error:", e);
-        setSearchResult({
-          success: false,
-          found: false,
-          source: "none",
-          barcode,
-          error: "Ocorreu uma falha ao pesquisar o artigo.",
-        });
-      } finally {
-        setIsSearching(false);
+      if (res.found && res.item) {
+        setStockToAdd(1);
+      } else {
+        // Preencher formulário simplificado com os dados obtidos (Open Facts ou padrão)
+        const suggested = res.suggestedItem;
+        setNewItemName(suggested?.name || "");
+        setNewItemCategory(suggested?.category || "Material / Consumíveis");
+        setNewItemQuantity(1);
+        setNewItemIsConsumable(suggested?.isConsumable || false);
+        setNewItemImageUrl(suggested?.imageUrl || null);
+        setNewItemPrice("0");
+        setNewItemLocationId((storageLocations && storageLocations[0]?.id) || "");
       }
-    });
+    } catch (e: unknown) {
+      console.error("searchBarcodeAction error:", e);
+      setSearchResult({
+        success: false,
+        found: false,
+        source: "none",
+        barcode,
+        error: "Ocorreu uma falha ao pesquisar o artigo.",
+      });
+    } finally {
+      setIsSearching(false);
+    }
   }
 
   // Confirmar adição de stock a artigo já existente
-  function handleAddStock() {
-    if (!searchResult?.item?.id || stockToAdd <= 0) return;
+  async function handleAddStock() {
+    if (!searchResult?.item?.id || stockToAdd <= 0 || isSaving) return;
 
-    startTransition(async () => {
-      const res = await addBarcodeStockAction(searchResult.item!.id, stockToAdd);
+    setIsSaving(true);
+    try {
+      const res = await addBarcodeStockAction(searchResult.item.id, stockToAdd);
       if (res.success) {
         setStockSuccessMsg(`+${stockToAdd} unidades adicionadas com sucesso! Novo total: ${res.newTotal} un.`);
         if (onItemAddedOrUpdated) onItemAddedOrUpdated();
       } else {
         alert(res.error || "Erro ao adicionar stock.");
       }
-    });
+    } catch (e: any) {
+      alert(e?.message || "Erro ao adicionar stock.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   // Guardar novo artigo detetado (Formulário simplificado sem expor detalhes técnicos)
-  function handleCreateNewItem(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newItemName.trim()) {
+  async function handleCreateNewItem(e?: React.FormEvent) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (isSaving) return;
+
+    const trimmedName = newItemName.trim();
+    if (!trimmedName) {
       setCreateError("Por favor insere o nome do artigo.");
       return;
     }
 
-    startTransition(async () => {
-      setCreateError(null);
+    setIsSaving(true);
+    setCreateError(null);
+
+    try {
       const fd = new FormData();
-      fd.append("name", newItemName.trim());
-      fd.append("category", newItemCategory);
-      fd.append("totalQuantity", String(Math.max(1, newItemQuantity)));
-      fd.append("locationId", newItemLocationId);
+      fd.append("name", trimmedName);
+      fd.append("category", newItemCategory || "Material / Consumíveis");
+      fd.append("totalQuantity", String(Math.max(1, newItemQuantity || 1)));
+      if (newItemLocationId) {
+        fd.append("locationId", newItemLocationId);
+      }
       fd.append("isConsumable", newItemIsConsumable ? "true" : "false");
       fd.append("unitPrice", newItemPrice || "0");
       if (newItemImageUrl) {
@@ -311,13 +324,18 @@ export default function BarcodeScannerModal({
       }
 
       const res = await createItemAction(fd);
-      if (res.success) {
-        setStockSuccessMsg(`Artigo "${newItemName}" registado com sucesso no inventário!`);
+      if (res && res.success) {
+        setStockSuccessMsg(`Artigo "${trimmedName}" registado com sucesso no inventário!`);
         if (onItemAddedOrUpdated) onItemAddedOrUpdated();
       } else {
-        setCreateError(res.error || "Erro ao registar o artigo.");
+        setCreateError(res?.error || "Erro ao registar o artigo.");
       }
-    });
+    } catch (err: any) {
+      console.error("createItemAction error:", err);
+      setCreateError(err?.message || "Ocorreu um erro ao registar o artigo.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   // Reiniciar para nova leitura
@@ -632,11 +650,20 @@ export default function BarcodeScannerModal({
                 <button
                   type="button"
                   onClick={handleAddStock}
-                  disabled={isPending}
-                  className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+                  disabled={isSaving}
+                  className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>Adicionar ao Stock (+{stockToAdd})</span>
+                  {isSaving ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>A adicionar...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>Adicionar ao Stock (+{stockToAdd})</span>
+                    </>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -774,11 +801,20 @@ export default function BarcodeScannerModal({
               <div className="flex items-center gap-2 pt-2">
                 <button
                   type="submit"
-                  disabled={isPending}
-                  className="flex-1 py-3 px-4 rounded-xl bg-[#111] hover:bg-black text-white text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+                  disabled={isSaving}
+                  className="flex-1 py-3 px-4 rounded-xl bg-[#111] hover:bg-black active:scale-[0.98] text-white text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>Guardar no Inventário</span>
+                  {isSaving ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>A guardar...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>Guardar no Inventário</span>
+                    </>
+                  )}
                 </button>
                 <button
                   type="button"
