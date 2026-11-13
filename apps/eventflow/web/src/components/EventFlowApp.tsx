@@ -4463,6 +4463,8 @@ function ItemWizardModal({
   const [purchasePrice, setPurchasePrice] = useState("45.00");
   const [totalPurchasePrice, setTotalPurchasePrice] = useState("2250.00");
   const [purchaseStatus, setPurchaseStatus] = useState<"bought" | "not_bought">("bought");
+  const [isConsumable, setIsConsumable] = useState(false);
+  const [packageUnits, setPackageUnits] = useState("1");
 
   // Location State
   const defaultLoc = locations[0];
@@ -4532,6 +4534,8 @@ function ItemWizardModal({
       formData.set("totalPurchasePrice", totalPurchasePrice);
       formData.set("replacementCost", purchasePrice);
       formData.set("purchaseStatus", purchaseStatus);
+      formData.set("isConsumable", isConsumable ? "true" : "false");
+      formData.set("packageUnits", packageUnits);
 
       let chosenWarehouseLocation = "Armazém Principal";
       let chosenLocationId: string | null = null;
@@ -4718,6 +4722,62 @@ function ItemWizardModal({
                 className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
               />
             </div>
+          </div>
+
+          {/* Nature of Item: Reusable vs Consumable */}
+          <div className="p-4 rounded-[16px] border border-[#ececf0] bg-[#fafafc] space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block font-bold text-xs text-[#111]">
+                Classificação de Material / Consumo
+              </label>
+              <span className="text-[10px] text-[#8e8e93]">
+                {isConsumable ? "Gasto único em eventos" : "Equipamento reutilizável permanente"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIsConsumable(false)}
+                className={`py-2 px-3 rounded-[12px] text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  !isConsumable
+                    ? "bg-[#111] text-white shadow-2xs"
+                    : "bg-white border border-[#ececf0] text-[#3a3a3c] hover:bg-[#f2f2f5]"
+                }`}
+              >
+                <span>📦 Reutilizável</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsConsumable(true)}
+                className={`py-2 px-3 rounded-[12px] text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  isConsumable
+                    ? "bg-orange-600 text-white shadow-2xs"
+                    : "bg-white border border-[#ececf0] text-[#3a3a3c] hover:bg-[#f2f2f5]"
+                }`}
+              >
+                <span>🔥 Consumível</span>
+              </button>
+            </div>
+
+            {isConsumable && (
+              <div className="pt-2 border-t border-[#ececf0] flex items-center justify-between gap-3 text-xs">
+                <span className="text-[11px] text-[#636366]">
+                  Unidades por Embalagem / Pack:
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min="1"
+                    value={packageUnits}
+                    onChange={(e) => setPackageUnits(e.target.value)}
+                    className="w-20 px-2 py-1 text-xs bg-white border border-[#ececf0] rounded-[8px] text-center font-bold"
+                  />
+                  <span className="text-[11px] text-[#8e8e93]">un/pack</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Purchase Status & Financial Accounting */}
