@@ -439,6 +439,29 @@ export default function EventFlowApp({
     }
   };
 
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("start-page-progress"));
+    }
+    try {
+      setUser(null);
+      await Promise.race([
+        logoutAction(),
+        new Promise((resolve) => setTimeout(resolve, 1200)),
+      ]);
+    } catch (err) {
+      console.warn("Logout notice:", err);
+    } finally {
+      if (typeof window !== "undefined") {
+        window.location.replace("/login");
+      }
+    }
+  };
+
   useEffect(() => {
     const handlePopState = () => {
       if (typeof window !== "undefined") {
@@ -1132,15 +1155,17 @@ export default function EventFlowApp({
 
                 <button
                   type="button"
-                  onClick={async () => {
-                    await logoutAction();
-                    setUser(null);
-                  }}
-                  className="min-h-[36px] p-2 sm:px-2.5 sm:py-1 rounded-xl bg-white border border-[#ececf0] hover:border-rose-200 active:bg-rose-100 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer flex items-center gap-1.5 shadow-2xs touch-manipulation"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="min-h-[36px] p-2 sm:px-2.5 sm:py-1 rounded-xl bg-white border border-[#ececf0] hover:border-rose-200 active:bg-rose-100 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer flex items-center gap-1.5 shadow-2xs touch-manipulation disabled:opacity-60"
                   title="Terminar sessão"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Sair</span>
+                  {isLoggingOut ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <LogOut className="w-3.5 h-3.5" />
+                  )}
+                  <span className="hidden sm:inline">{isLoggingOut ? "A sair..." : "Sair"}</span>
                 </button>
               </div>
             ) : (

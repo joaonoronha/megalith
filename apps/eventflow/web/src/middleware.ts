@@ -8,7 +8,7 @@ const PUBLIC_PREFIXES = [
   "/proposta",           // Public client quote review & digital approval
   "/orcamento",          // Alternative public proposal alias
   "/api/webhooks",       // Webhook endpoints (e.g. Calendly)
-  "/api/auth/callback",  // Auth callbacks
+  "/api/auth",           // Auth endpoints (callback, logout, etc.)
   "/api/uploads",        // Uploaded media files
   "/uploads",            // Static upload folder fallback
   "/_next",              // Static assets & chunks
