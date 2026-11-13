@@ -28,6 +28,7 @@ export async function getCurrentUser() {
         name: dbUser.name,
         email: dbUser.email,
         role: dbUser.role as "admin" | "producer" | "warehouse",
+        avatarUrl: dbUser.avatarUrl || null,
       };
     }
 
@@ -36,6 +37,7 @@ export async function getCurrentUser() {
       name: session.name,
       email: session.email,
       role: session.role as "admin" | "producer" | "warehouse",
+      avatarUrl: session.avatarUrl || null,
     };
   } catch {
     return null;
@@ -45,7 +47,7 @@ export async function getCurrentUser() {
 export async function loginUser(email: string, password: string): Promise<{
   success: boolean;
   error?: string;
-  user?: { id: string; name: string; email: string; role: "admin" | "producer" | "warehouse" };
+  user?: { id: string; name: string; email: string; role: "admin" | "producer" | "warehouse"; avatarUrl?: string | null };
 }> {
   const cleanEmail = email.toLowerCase().trim();
   const user = await db.query.users.findFirst({
@@ -68,6 +70,7 @@ export async function loginUser(email: string, password: string): Promise<{
     email: user.email,
     name: user.name,
     role: user.role,
+    avatarUrl: user.avatarUrl || null,
     expiresAt,
   });
 
@@ -87,6 +90,7 @@ export async function loginUser(email: string, password: string): Promise<{
       name: user.name,
       email: user.email,
       role: user.role as "admin" | "producer" | "warehouse",
+      avatarUrl: user.avatarUrl || null,
     },
   };
 }

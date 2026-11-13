@@ -7,7 +7,21 @@ export const users = sqliteTable("users", {
   email: text("email").unique().notNull(),
   passwordHash: text("password_hash").notNull(),
   role: text("role", { enum: ["admin", "producer", "warehouse"] }).default("admin").notNull(),
+  avatarUrl: text("avatar_url"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+});
+
+// 1.1 Live Team Presence & Editing Tracker
+export const userPresence = sqliteTable("user_presence", {
+  userId: text("user_id").primaryKey(),
+  userName: text("user_name").notNull(),
+  userEmail: text("user_email"),
+  userRole: text("user_role").default("admin"),
+  avatarUrl: text("avatar_url"),
+  editingEntityType: text("editing_entity_type"), // "event" | "inventory" | null
+  editingEntityId: text("editing_entity_id"),     // e.g. "evt-001" | "item-002"
+  editingEntityTitle: text("editing_entity_title"),
+  lastSeenAt: integer("last_seen_at", { mode: "timestamp" }).notNull(),
 });
 
 // 2. Clients / CRM

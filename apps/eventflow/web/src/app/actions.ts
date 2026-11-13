@@ -17,6 +17,7 @@ import {
   financialMovements,
   quoteTemplates,
   users,
+  userPresence,
   alerts,
   appUploads,
 } from "@/db/schema";
@@ -943,6 +944,167 @@ export async function uploadItemPhotoAction(formData: FormData) {
   } catch (err: any) {
     console.error("uploadItemPhotoAction error:", err);
     return { success: false, error: err?.message || "Erro ao processar fotografia." };
+  }
+}
+
+// 6.7 Upload User Profile Picture
+export async function uploadUserProfilePictureAction(formData: FormData) {
+  try {
+    await ensureDbMigrated();
+    const { getCurrentUser } = await import("@/lib/auth");
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return { success: false, error: "Não tem sessão iniciada." };
+    }
+
+    const targetUserId = (formData.get("userId") as string) || currentUser.id;
+    if (targetUserId !== currentUser.id && currentUser.role !== "admin") {
+      return { success: false, error: "Apenas administradores podem alterar a fotografia de outros membros." };
+    }
+
+    const file = formData.get("file") as File;
+    if (!file || typeof file.arrayBuffer !== "function" || file.size === 0) {
+      return { success: false, error: "Ficheiro inválido ou vazio." };
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const rawExt = path.extname(file.name || "").toLowerCase() || ".jpg";
+    const uniqueName = `avatar-${targetUserId}-${Date.now()}${rawExt}`;
+    const mime = file.type || (rawExt === ".png" ? "image/png" : rawExt === ".webp" ? "image/webp" : "image/jpeg");
+
+    try {
+      await db.insert(appUploads).values({
+        id: generateId("upl"),
+        filename: uniqueName,
+        mimeType: mime,
+        dataBase64: buffer.toString("base64"),
+        size: buffer.length,
+        createdAt: new Date(),
+      }).onConflictDoNothing();
+    } catch (dbErr) {
+      console.error("Erro ao gravar foto de perfil na DB:", dbErr);
+    }
+
+    try {
+      const uploadsDir = path.join(process.cwd(), "public", "uploads");
+      await fs.mkdir(uploadsDir, { recursive: true });
+      await fs.writeFile(path.join(uploadsDir, uniqueName), buffer);
+    } catch {
+      // Best effort disk cache
+    }
+
+    const avatarUrl = `/api/uploads/${uniqueName}`;
+
+    await db.update(users).set({ avatarUrl }).where(eq(users.id, targetUserId));
+
+    try {
+      await db.update(userPresence).set({ avatarUrl }).where(eq(userPresence.userId, targetUserId));
+    } catch {
+      // Best effort
+    }
+
+    if (currentUser.id === targetUserId) {
+      const { signSessionToken, SESSION_COOKIE_NAME } = await import("@/lib/session");
+      const { cookies } = await import("next/headers");
+      const expiresAt = Date.now() + 14 * 24 * 60 * 60 * 1000;
+      const token = await signSessionToken({
+        userId: currentUser.id,
+        email: currentUser.email,
+        name: currentUser.name,
+        role: currentUser.role,
+        avatarUrl,
+        expiresAt,
+      });
+      const cookieStore = await cookies();
+      cookieStore.set(SESSION_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        expires: new Date(expiresAt),
+      });
+    }
+
+    await recordAuditLog({
+      action: "update",
+      entityType: "user",
+      entityId: targetUserId,
+      title: "Atualização de Fotografia de Perfil",
+      details: `Fotografia de perfil atualizada por ${currentUser.name}`,
+    });
+
+    invalidateAllCaches();
+    safeRevalidate(`/utilizadores/${targetUserId}`);
+    safeRevalidate(`/users/${targetUserId}`);
+
+    return { success: true, avatarUrl };
+  } catch (err: any) {
+    console.error("uploadUserProfilePictureAction error:", err);
+    return { success: false, error: err?.message || "Erro ao processar fotografia de perfil." };
+  }
+}
+
+// 6.8 Remove User Profile Picture
+export async function removeUserProfilePictureAction(userId?: string) {
+  try {
+    await ensureDbMigrated();
+    const { getCurrentUser } = await import("@/lib/auth");
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return { success: false, error: "Não tem sessão iniciada." };
+    }
+
+    const targetUserId = userId || currentUser.id;
+    if (targetUserId !== currentUser.id && currentUser.role !== "admin") {
+      return { success: false, error: "Apenas administradores podem remover a fotografia de outros membros." };
+    }
+
+    await db.update(users).set({ avatarUrl: null }).where(eq(users.id, targetUserId));
+
+    try {
+      await db.update(userPresence).set({ avatarUrl: null }).where(eq(userPresence.userId, targetUserId));
+    } catch {
+      // Best effort
+    }
+
+    if (currentUser.id === targetUserId) {
+      const { signSessionToken, SESSION_COOKIE_NAME } = await import("@/lib/session");
+      const { cookies } = await import("next/headers");
+      const expiresAt = Date.now() + 14 * 24 * 60 * 60 * 1000;
+      const token = await signSessionToken({
+        userId: currentUser.id,
+        email: currentUser.email,
+        name: currentUser.name,
+        role: currentUser.role,
+        avatarUrl: null,
+        expiresAt,
+      });
+      const cookieStore = await cookies();
+      cookieStore.set(SESSION_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        expires: new Date(expiresAt),
+      });
+    }
+
+    await recordAuditLog({
+      action: "update",
+      entityType: "user",
+      entityId: targetUserId,
+      title: "Remoção de Fotografia de Perfil",
+      details: `Fotografia de perfil removida por ${currentUser.name}`,
+    });
+
+    invalidateAllCaches();
+    safeRevalidate(`/utilizadores/${targetUserId}`);
+    safeRevalidate(`/users/${targetUserId}`);
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("removeUserProfilePictureAction error:", err);
+    return { success: false, error: err?.message || "Erro ao remover fotografia de perfil." };
   }
 }
 

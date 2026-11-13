@@ -21,14 +21,22 @@ import {
   MapPin,
   Building,
   Share2,
+  Camera,
+  Loader2,
+  Trash2,
 } from "lucide-react";
-import { updateUserAction } from "@/app/actions";
+import {
+  updateUserAction,
+  uploadUserProfilePictureAction,
+  removeUserProfilePictureAction,
+} from "@/app/actions";
 
 interface TeamUser {
   id: string;
   name: string;
   email: string;
   role: "admin" | "producer" | "warehouse";
+  avatarUrl?: string | null;
   createdAt: Date;
 }
 
@@ -54,7 +62,7 @@ interface ManagedLocation {
 
 interface UserDetailViewProps {
   user: TeamUser;
-  currentUser?: { id: string; name: string; email: string; role: string } | null;
+  currentUser?: { id: string; name: string; email: string; role: string; avatarUrl?: string | null } | null;
   assignedTasks: AssignedTask[];
   managedLocations?: ManagedLocation[];
   canEdit?: boolean;
@@ -72,6 +80,70 @@ export default function UserDetailView({
   const [currentUserState, setCurrentUserState] = useState(currentUser);
   const [copiedId, setCopiedId] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const canChangePhoto = canEdit || currentUserState?.id === user.id;
+
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    setUploadError(null);
+    try {
+      const formData = new FormData();
+      formData.set("file", file);
+      formData.set("userId", user.id);
+
+      const res = await uploadUserProfilePictureAction(formData);
+      if (res.success && res.avatarUrl) {
+        setUser((prev) => ({ ...prev, avatarUrl: res.avatarUrl }));
+        if (currentUserState?.id === user.id) {
+          setCurrentUserState((prev: any) => ({ ...prev, avatarUrl: res.avatarUrl }));
+        }
+        window.dispatchEvent(
+          new CustomEvent("eventflow:user-updated", {
+            detail: { id: user.id, avatarUrl: res.avatarUrl },
+          })
+        );
+      } else {
+        setUploadError(res.error || "Erro ao carregar fotografia.");
+      }
+    } catch (err: any) {
+      setUploadError(err?.message || "Erro inesperado.");
+    } finally {
+      setIsUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    if (!confirm("Tem a certeza de que deseja remover a fotografia de perfil?")) return;
+    setIsUploadingPhoto(true);
+    setUploadError(null);
+    try {
+      const res = await removeUserProfilePictureAction(user.id);
+      if (res.success) {
+        setUser((prev) => ({ ...prev, avatarUrl: null }));
+        if (currentUserState?.id === user.id) {
+          setCurrentUserState((prev: any) => ({ ...prev, avatarUrl: null }));
+        }
+        window.dispatchEvent(
+          new CustomEvent("eventflow:user-updated", {
+            detail: { id: user.id, avatarUrl: null },
+          })
+        );
+      } else {
+        setUploadError(res.error || "Erro ao remover fotografia.");
+      }
+    } catch (err: any) {
+      setUploadError(err?.message || "Erro ao remover fotografia.");
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
 
   useEffect(() => {
     setUser(initialUser);
@@ -161,8 +233,16 @@ export default function UserDetailView({
                 className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1 rounded-xl bg-white border border-[#ececf0] text-xs font-semibold shadow-2xs"
                 title={`${currentUserState.name} (${currentUserState.email}) · Acesso ${currentUserState.role}`}
               >
-                <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold">
-                  {currentUserState.name.charAt(0)}
+                <div className="w-5 h-5 rounded-full bg-[#111] text-white flex items-center justify-center text-[10px] font-bold overflow-hidden flex-shrink-0">
+                  {currentUserState.avatarUrl ? (
+                    <img
+                      src={currentUserState.avatarUrl}
+                      alt={currentUserState.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    currentUserState.name.charAt(0)
+                  )}
                 </div>
                 <span className="text-[#111] hidden sm:inline">{currentUserState.name.split(" ")[0]}</span>
               </div>
@@ -184,14 +264,63 @@ export default function UserDetailView({
 
       {/* Main Container */}
       <main className="max-w-[1000px] mx-auto px-4 pt-6 space-y-6">
+        {uploadError && (
+          <div className="p-3.5 rounded-[16px] bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium flex items-center justify-between">
+            <span>{uploadError}</span>
+            <button
+              onClick={() => setUploadError(null)}
+              className="text-rose-500 hover:text-rose-800 font-bold"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* ================================================================= */}
         {/* HERO CARD */}
         {/* ================================================================= */}
         <section className="bg-white border border-[#ececf0] rounded-[24px] p-6 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-[20px] bg-[#111111] text-white flex items-center justify-center font-bold text-xl shadow-xs flex-shrink-0">
-                {user.name.slice(0, 2).toUpperCase()}
+              <div className="relative group flex-shrink-0">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-[22px] bg-[#111111] text-white flex items-center justify-center font-bold text-xl sm:text-2xl shadow-xs overflow-hidden border-2 border-white ring-1 ring-[#ececf0]">
+                  {user.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    user.name.slice(0, 2).toUpperCase()
+                  )}
+                  {isUploadingPhoto && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <Loader2 className="w-5 h-5 text-white animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                {canChangePhoto && (
+                  <>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handlePhotoSelect}
+                      disabled={isUploadingPhoto}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingPhoto}
+                      title="Alterar fotografia de perfil (carregar do dispositivo)"
+                      className="absolute -bottom-1 -right-1 p-1.5 sm:p-2 rounded-full bg-white border border-[#ececf0] text-[#111] hover:bg-[#007aff] hover:text-white hover:border-[#007aff] transition shadow-md cursor-pointer flex items-center justify-center"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -243,6 +372,21 @@ export default function UserDetailView({
                     <Calendar className="w-3.5 h-3.5" />
                     <span>Membro desde {formatDate(user.createdAt)}</span>
                   </div>
+                  {user.avatarUrl && canChangePhoto && (
+                    <>
+                      <span>•</span>
+                      <button
+                        type="button"
+                        onClick={handleRemovePhoto}
+                        disabled={isUploadingPhoto}
+                        className="inline-flex items-center gap-1 text-rose-600 hover:text-rose-700 transition cursor-pointer font-semibold"
+                        title="Remover fotografia de perfil"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Remover foto</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
