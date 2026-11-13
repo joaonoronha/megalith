@@ -37,11 +37,13 @@ import {
   AlertCircle,
   RefreshCw,
   Video,
+  ScanLine,
 } from "lucide-react";
 import AuditLogModal from "@/components/AuditLogModal";
 import AlertsDrawerModal from "@/components/AlertsDrawerModal";
 import StorageLocationsModal, { StorageLocation } from "@/components/StorageLocationsModal";
 import ReceiptScannerModal from "@/components/ReceiptScannerModal";
+import BarcodeScannerModal from "@/components/BarcodeScannerModal";
 import FinanceView from "@/components/FinanceView";
 import { formatRelativeTime } from "@/lib/date-format";
 import { isMeetingEvent, canEventReceiveQuote, countsForFinance, isCancelledEvent } from "@/lib/events";
@@ -564,6 +566,7 @@ export default function EventFlowApp({
   const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [showItemWizard, setShowItemWizard] = useState(false);
   const [showReceiptScanner, setShowReceiptScanner] = useState(false);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [showClientWizard, setShowClientWizard] = useState(false);
   const [showTriageModal, setShowTriageModal] = useState(false);
   const [triageItem, setTriageItem] = useState<any>(null);
@@ -2599,6 +2602,17 @@ export default function EventFlowApp({
 
                 <button
                   type="button"
+                  onClick={() => setShowBarcodeScanner(true)}
+                  className="p-2.5 sm:px-3.5 sm:py-2.5 rounded-[12px] bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[#111] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  title="Ler Código de Barras (Câmara do dispositivo)"
+                  aria-label="Ler Código de Barras"
+                >
+                  <ScanLine className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-[#007aff]" />
+                  <span className="hidden sm:inline">Código de Barras</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setShowItemWizard(true)}
                   className="p-2.5 sm:px-4 sm:py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
                   title="Novo Artigo"
@@ -3612,6 +3626,18 @@ export default function EventFlowApp({
           storageLocations={locationsList}
           onSuccess={() => {
             setShowReceiptScanner(false);
+            window.location.reload();
+          }}
+        />
+      )}
+
+      {/* 5.2 BARCODE SCANNER MODAL (zxing-wasm Camera Scanner) */}
+      {showBarcodeScanner && (
+        <BarcodeScannerModal
+          isOpen={showBarcodeScanner}
+          onClose={() => setShowBarcodeScanner(false)}
+          storageLocations={locationsList}
+          onItemAddedOrUpdated={() => {
             window.location.reload();
           }}
         />

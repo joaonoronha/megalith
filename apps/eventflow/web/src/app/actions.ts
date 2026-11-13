@@ -509,6 +509,7 @@ export async function createItemAction(formData: FormData) {
     isConsumable,
     packageUnits,
     imageUrl: imageUrl || "https://images.unsplash.com/photo-1549497538-303791108f95?auto=format&fit=crop&w=400&q=80",
+    barcode: ((formData.get("barcode") as string) || "").trim() || null,
     damagedQuantity: 0,
     inMaintenanceQuantity: 0,
   };
@@ -658,6 +659,7 @@ export async function updateItemPatchAction(
     isConsumable?: boolean | null;
     packageUnits?: number | null;
     imageUrl?: string | null;
+    barcode?: string | null;
     damagedQuantity?: number | null;
     inMaintenanceQuantity?: number | null;
   }
@@ -683,6 +685,7 @@ export async function updateItemPatchAction(
   if (patch.isConsumable !== undefined) updateData.isConsumable = Boolean(patch.isConsumable);
   if (patch.packageUnits !== undefined) updateData.packageUnits = patch.packageUnits === null ? 1 : Math.max(1, patch.packageUnits);
   if (patch.imageUrl !== undefined) updateData.imageUrl = patch.imageUrl || null;
+  if (patch.barcode !== undefined) updateData.barcode = patch.barcode?.trim() || null;
   if (patch.damagedQuantity !== undefined) updateData.damagedQuantity = patch.damagedQuantity === null ? 0 : Math.max(0, patch.damagedQuantity);
   if (patch.inMaintenanceQuantity !== undefined) updateData.inMaintenanceQuantity = patch.inMaintenanceQuantity === null ? 0 : Math.max(0, patch.inMaintenanceQuantity);
 
@@ -3272,6 +3275,241 @@ export async function commitReceiptInventoryAction(payload: {
     };
   }
 }
+
+// 35. Search Barcode Action (DB first -> Open Food Facts -> Open Products Facts)
+export interface BarcodeSearchResult {
+  success: boolean;
+  found: boolean;
+  source: "database" | "openfoodfacts" | "openproductsfacts" | "none";
+  barcode: string;
+  item?: {
+    id: string;
+    sku: string;
+    name: string;
+    category: string;
+    totalQuantity: number;
+    unitPrice: number;
+    warehouseLocation: string | null;
+    imageUrl: string | null;
+    isConsumable: boolean;
+  };
+  suggestedItem?: {
+    name: string;
+    category: string;
+    imageUrl: string | null;
+    isConsumable: boolean;
+  } | null;
+  error?: string;
+}
+
+export async function searchBarcodeAction(rawBarcode: string): Promise<BarcodeSearchResult> {
+  const barcode = (rawBarcode || "").trim();
+  if (!barcode) {
+    return { success: false, found: false, source: "none", barcode: "", error: "Código inválido." };
+  }
+
+  try {
+    await ensureDbMigrated();
+
+    // 1. Check in our Database (barcode, sku, or id)
+    const existing = await db
+      .select()
+      .from(inventoryItems)
+      .where(
+        or(
+          eq(inventoryItems.barcode, barcode),
+          eq(inventoryItems.sku, barcode),
+          eq(inventoryItems.id, barcode)
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      const match = existing[0];
+      return {
+        success: true,
+        found: true,
+        source: "database",
+        barcode,
+        item: {
+          id: match.id,
+          sku: match.sku,
+          name: match.name,
+          category: match.category,
+          totalQuantity: match.totalQuantity,
+          unitPrice: match.unitPrice,
+          warehouseLocation: match.warehouseLocation,
+          imageUrl: match.imageUrl,
+          isConsumable: Boolean(match.isConsumable),
+        },
+      };
+    }
+
+    // 2. Query Open Food Facts API
+    try {
+      const offController = new AbortController();
+      const offTimeout = setTimeout(() => offController.abort(), 4000);
+      const offRes = await fetch(
+        `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json`,
+        {
+          headers: {
+            "User-Agent": "EventFlowCFM/1.0 (info@cfmeventos.pt)",
+          },
+          signal: offController.signal,
+        }
+      );
+      clearTimeout(offTimeout);
+
+      if (offRes.ok) {
+        const offData = await offRes.json();
+        if (offData && offData.status === 1 && offData.product) {
+          const p = offData.product;
+          const name = (
+            p.product_name_pt ||
+            p.product_name ||
+            p.generic_name_pt ||
+            p.generic_name ||
+            p.brands ||
+            ""
+          ).trim();
+
+          if (name) {
+            const rawCat = p.categories ? p.categories.split(",")[0].trim() : "Alimentação & Bebidas";
+            return {
+              success: true,
+              found: false,
+              source: "openfoodfacts",
+              barcode,
+              suggestedItem: {
+                name,
+                category: rawCat || "Alimentação & Bebidas",
+                imageUrl: p.image_front_url || p.image_url || null,
+                isConsumable: true,
+              },
+            };
+          }
+        }
+      }
+    } catch {
+      // Continue to Open Products Facts
+    }
+
+    // 3. Query Open Products Facts API
+    try {
+      const opfController = new AbortController();
+      const opfTimeout = setTimeout(() => opfController.abort(), 4000);
+      const opfRes = await fetch(
+        `https://world.openproductsfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json`,
+        {
+          headers: {
+            "User-Agent": "EventFlowCFM/1.0 (info@cfmeventos.pt)",
+          },
+          signal: opfController.signal,
+        }
+      );
+      clearTimeout(opfTimeout);
+
+      if (opfRes.ok) {
+        const opfData = await opfRes.json();
+        if (opfData && opfData.status === 1 && opfData.product) {
+          const p = opfData.product;
+          const name = (p.product_name_pt || p.product_name || p.brands || "").trim();
+          if (name) {
+            const rawCat = p.categories ? p.categories.split(",")[0].trim() : "Material / Consumíveis";
+            return {
+              success: true,
+              found: false,
+              source: "openproductsfacts",
+              barcode,
+              suggestedItem: {
+                name,
+                category: rawCat || "Material / Consumíveis",
+                imageUrl: p.image_front_url || p.image_url || null,
+                isConsumable: false,
+              },
+            };
+          }
+        }
+      }
+    } catch {
+      // Continue to none
+    }
+
+    // 4. Not found anywhere -> prompt user with simplified form
+    return {
+      success: true,
+      found: false,
+      source: "none",
+      barcode,
+      suggestedItem: null,
+    };
+  } catch (err: any) {
+    console.error("searchBarcodeAction error:", err);
+    return {
+      success: false,
+      found: false,
+      source: "none",
+      barcode,
+      error: "Erro ao consultar o artigo.",
+    };
+  }
+}
+
+// 36. Add stock to an existing item from barcode scan
+export async function addBarcodeStockAction(itemId: string, addQuantity: number) {
+  if (!itemId) return { success: false, error: "ID do artigo é obrigatório." };
+  if (!addQuantity || addQuantity <= 0) {
+    return { success: false, error: "Quantidade deve ser superior a zero." };
+  }
+
+  try {
+    await ensureDbMigrated();
+    const existing = await db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.id, itemId))
+      .limit(1);
+
+    if (existing.length === 0) {
+      return { success: false, error: "Artigo não encontrado." };
+    }
+
+    const item = existing[0];
+    const newTotal = (item.totalQuantity || 0) + addQuantity;
+
+    await db
+      .update(inventoryItems)
+      .set({
+        totalQuantity: newTotal,
+        updatedAt: new Date(),
+      })
+      .where(eq(inventoryItems.id, itemId));
+
+    await recordAuditLog({
+      entityType: "inventory",
+      entityId: itemId,
+      action: "atualizado",
+      title: "Stock incrementado",
+      details: `Entrada rápida de +${addQuantity} un. no artigo "${item.name}" (total atual: ${newTotal} un.).`,
+    });
+
+    invalidateAllCaches();
+    safeRevalidate("/inventario");
+    safeRevalidate("/inventory");
+    safeRevalidate(`/inventario/${itemId}`);
+    safeRevalidate(`/artigos/${itemId}`);
+
+    return {
+      success: true,
+      newTotal,
+      itemName: item.name,
+    };
+  } catch (err: any) {
+    console.error("addBarcodeStockAction error:", err);
+    return { success: false, error: "Erro ao adicionar stock ao artigo." };
+  }
+}
+
 
 
 
