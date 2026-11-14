@@ -54,7 +54,7 @@ import FinanceView from "@/components/FinanceView";
 import CompletedEventsProfitChart from "@/components/CompletedEventsProfitChart";
 import { usePresence } from "@/lib/usePresence";
 import { formatRelativeTime } from "@/lib/date-format";
-import { isMeetingEvent, canEventReceiveQuote, countsForFinance, isCancelledEvent } from "@/lib/events";
+import { isMeetingEvent, canEventReceiveQuote, countsForFinance, isCancelledEvent, getRandomEventCoverImage } from "@/lib/events";
 import { computeCompletedEventsProfit } from "@/lib/profit-trajectory";
 import {
   createEventAction,
@@ -5184,9 +5184,7 @@ function EventWizardModal({
   const [status, setStatus] = useState("planeamento");
   const [totalBudget, setTotalBudget] = useState("1800");
   const [notes, setNotes] = useState("");
-  const [coverImageUrl, setCoverImageUrl] = useState(
-    "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=600&q=80"
-  );
+  const [coverImageUrl, setCoverImageUrl] = useState(() => getRandomEventCoverImage());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [nameError, setNameError] = useState(false);
   const [startDateError, setStartDateError] = useState(false);
@@ -5241,7 +5239,8 @@ function EventWizardModal({
       formData.set("status", status);
       formData.set("totalBudget", totalBudget);
       formData.set("notes", notes);
-      formData.set("coverImageUrl", coverImageUrl);
+      const finalCoverImage = coverImageUrl || getRandomEventCoverImage(category);
+      formData.set("coverImageUrl", finalCoverImage);
 
       // Default vibe palette (e.g. honey and earth tones if theme like Winnie the Pooh, otherwise elegant neutrals)
       const defaultColors = theme.toLowerCase().includes("pooh")
@@ -5268,7 +5267,7 @@ function EventWizardModal({
         status,
         totalBudget: parseFloat(totalBudget || "0"),
         notes,
-        coverImageUrl,
+        coverImageUrl: finalCoverImage,
       });
     } catch (err) {
       console.error(err);

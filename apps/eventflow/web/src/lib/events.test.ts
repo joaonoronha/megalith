@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { isMeetingEvent, canEventReceiveQuote, isCancelledEvent, countsForFinance } from "./events.js";
+import { isMeetingEvent, canEventReceiveQuote, isCancelledEvent, countsForFinance, getRandomEventCoverImage, EVENT_COVER_IMAGES } from "./events.js";
 
 describe("CFM Events: Meeting and Quota Business Rules", () => {
   test("identifies Calendly meetings by URI", () => {
@@ -202,6 +202,25 @@ describe("CFM Events: Meeting and Quota Business Rules", () => {
     const activeSaidas = activeMovements.filter((m) => m.type === "saida").reduce((s, m) => s + m.amount, 0);
     assert.equal(activeEntradas, 5000, "Cancelled event income of 4500 must not be included");
     assert.equal(activeSaidas, 2000, "Cancelled event expense of 1500 must not be included");
+  });
+
+  test("assigns random event-related cover images when creating an event", () => {
+    const generalImg = getRandomEventCoverImage("Geral");
+    assert.ok(typeof generalImg === "string" && generalImg.startsWith("https://images.unsplash.com/"));
+    assert.ok(EVENT_COVER_IMAGES.includes(generalImg));
+
+    const weddingImg = getRandomEventCoverImage("Casamento");
+    assert.ok(typeof weddingImg === "string" && weddingImg.startsWith("https://images.unsplash.com/"));
+
+    const birthdayImg = getRandomEventCoverImage("Aniversário Infantil");
+    assert.ok(typeof birthdayImg === "string" && birthdayImg.startsWith("https://images.unsplash.com/"));
+
+    const corporateImg = getRandomEventCoverImage("Gala Corporativa");
+    assert.ok(typeof corporateImg === "string" && corporateImg.startsWith("https://images.unsplash.com/"));
+
+    // Default with undefined/null
+    const fallbackImg = getRandomEventCoverImage(null);
+    assert.ok(typeof fallbackImg === "string" && fallbackImg.startsWith("https://images.unsplash.com/"));
   });
 });
 

@@ -63,3 +63,57 @@ export function countsForFinance(evt: EventLike | null | undefined): boolean {
   if (!evt) return false;
   return !isMeetingEvent(evt) && !isCancelledEvent(evt);
 }
+
+/**
+ * Curated high-resolution Unsplash event cover photos for CFM Events.
+ */
+export const EVENT_COVER_IMAGES = [
+  "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80", // Casamento jardim
+  "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1200&q=80", // Gala corporativa e iluminação
+  "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?auto=format&fit=crop&w=1200&q=80", // Jantar elegante / receção
+  "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=1200&q=80", // Aniversário / balões festivos
+  "https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&w=1200&q=80", // Festa com luzes ao ar livre
+  "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1200&q=80", // Celebração de palco & iluminação
+  "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80", // Conferência & evento corporativo
+  "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80", // Cocktail & celebração social
+  "https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=1200&q=80", // Banquete sofisticado
+  "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=1200&q=80", // Flores e decoração elegante
+  "https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?auto=format&fit=crop&w=1200&q=80", // Casamento / pôr-do-sol
+  "https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?auto=format&fit=crop&w=1200&q=80", // Celebração ao ar livre
+  "https://images.unsplash.com/photo-1520854221256-17451cc331bf?auto=format&fit=crop&w=1200&q=80", // Pista de dança & festa
+  "https://images.unsplash.com/photo-1583939003579-730e3918a45a?auto=format&fit=crop&w=1200&q=80", // Casamento romântico
+];
+
+/**
+ * Returns a random event-related cover image, optionally tuned by event category.
+ */
+export function getRandomEventCoverImage(category?: string | null): string {
+  const cat = (category || "").toLowerCase().trim();
+  if (cat.includes("infantil") || cat.includes("aniversário") || cat.includes("aniversario")) {
+    const birthdayPool = [
+      "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?auto=format&fit=crop&w=1200&q=80",
+    ];
+    return birthdayPool[Math.floor(Math.random() * birthdayPool.length)];
+  }
+  if (cat.includes("casamento") || cat.includes("batizado")) {
+    const weddingPool = [
+      "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1583939003579-730e3918a45a?auto=format&fit=crop&w=1200&q=80",
+    ];
+    return weddingPool[Math.floor(Math.random() * weddingPool.length)];
+  }
+  if (cat.includes("gala") || cat.includes("corporativ") || cat.includes("marca")) {
+    const corporatePool = [
+      "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1527529482837-4698179dc6ce?auto=format&fit=crop&w=1200&q=80",
+    ];
+    return corporatePool[Math.floor(Math.random() * corporatePool.length)];
+  }
+  return EVENT_COVER_IMAGES[Math.floor(Math.random() * EVENT_COVER_IMAGES.length)];
+}

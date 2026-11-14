@@ -29,7 +29,7 @@ import { generateId, generateReferenceCode, formatCustomId, determineItemSku } f
 import { recordAuditLog, getAuditLogsForEntity, getRecentAuditLogs } from "@/lib/audit";
 import fs from "fs/promises";
 import path from "path";
-import { isMeetingEvent } from "@/lib/events";
+import { isMeetingEvent, getRandomEventCoverImage } from "@/lib/events";
 import { getCurrentUser } from "@/lib/auth";
 
 async function requireAuth() {
@@ -104,7 +104,7 @@ export async function createEventAction(formData: FormData) {
     vibeColors: vibeColors || null,
     specialNeeds: specialNeeds || null,
     notes,
-    coverImageUrl: coverImageUrl || "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=600&q=80",
+    coverImageUrl: coverImageUrl.trim() || getRandomEventCoverImage(category),
     createdAt: new Date(),
   });
 

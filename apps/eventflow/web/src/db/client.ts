@@ -232,6 +232,32 @@ export async function ensureDbMigrated(): Promise<void> {
       // Best effort
     }
 
+    // 12. Fix item where SKU was accidentally set to slug instead of scanned barcode (Tinta primário branco 2,5L)
+    try {
+      await client.execute(`
+        UPDATE inventory_items
+        SET sku = barcode
+        WHERE barcode IS NOT NULL
+          AND barcode != ''
+          AND (
+            name LIKE '%Tinta%primário%'
+            OR name LIKE '%Tinta%primario%'
+            OR sku LIKE 'TINTA-PRIMARIO%'
+            OR sku LIKE 'TINTA_PRIMARIO%'
+          )
+      `);
+      await client.execute(`
+        UPDATE financial_movements
+        SET notes = REPLACE(notes, 'TINTA-PRIMARIO-BRANCO-2-5L', (
+          SELECT barcode FROM inventory_items WHERE (name LIKE '%Tinta%primário%' OR name LIKE '%Tinta%primario%') AND barcode IS NOT NULL LIMIT 1
+        ))
+        WHERE notes LIKE '%TINTA-PRIMARIO-BRANCO-2-5L%'
+          AND EXISTS (SELECT 1 FROM inventory_items WHERE (name LIKE '%Tinta%primário%' OR name LIKE '%Tinta%primario%') AND barcode IS NOT NULL);
+      `);
+    } catch {
+      // Best effort
+    }
+
     isMigrated = true;
   })();
 

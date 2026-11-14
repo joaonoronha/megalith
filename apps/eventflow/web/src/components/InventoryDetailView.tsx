@@ -601,8 +601,8 @@ export default function InventoryDetailView({
                       value={item.sku}
                       onChange={(e) => handleFieldChange("sku", e.target.value.toUpperCase())}
                       placeholder="SKU-001"
-                      className="w-24 bg-transparent font-bold text-[#111] focus:outline-none uppercase"
-                      title="Edite o SKU"
+                      className="min-w-[120px] max-w-[220px] w-auto bg-transparent font-bold text-[#111] focus:outline-none uppercase"
+                      title="Edite o SKU ou código de barras"
                     />
                     <button
                       type="button"

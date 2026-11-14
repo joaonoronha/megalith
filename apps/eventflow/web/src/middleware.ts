@@ -9,6 +9,7 @@ const PUBLIC_PREFIXES = [
   "/orcamento",          // Alternative public proposal alias
   "/api/webhooks",       // Webhook endpoints (e.g. Calendly)
   "/api/auth",           // Auth endpoints (callback, logout, etc.)
+  "/api/migrate",        // Schema & data sync migration endpoint
   "/api/uploads",        // Uploaded media files
   "/uploads",            // Static upload folder fallback
   "/_next",              // Static assets & chunks
