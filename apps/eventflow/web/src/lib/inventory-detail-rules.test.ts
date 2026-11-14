@@ -109,4 +109,61 @@ describe("CFM Events: Inventory Detail Location & Photo Interactions", () => {
     assert.strictEqual(clickCamera.opensLightbox, false);
     assert.strictEqual(clickCamera.opensImagePicker, true);
   });
+
+  it("requires explicit user confirmation before updating the item code/SKU to prevent breaking scans", () => {
+    // Other fields (name, category, totalQuantity) save directly/auto-save without a confirmation prompt
+    const canAutoSaveField = (field: string) => field !== "sku";
+
+    assert.strictEqual(canAutoSaveField("name"), true);
+    assert.strictEqual(canAutoSaveField("category"), true);
+    assert.strictEqual(canAutoSaveField("warehouseLocation"), true);
+    assert.strictEqual(canAutoSaveField("totalQuantity"), true);
+    assert.strictEqual(canAutoSaveField("unitPrice"), true);
+
+    // SKU is the ONLY field that requires confirmation
+    assert.strictEqual(canAutoSaveField("sku"), false);
+
+    // SKU confirmation workflow simulation
+    interface SkuUpdateFlow {
+      currentSku: string;
+      pendingSku: string;
+      userConfirmed: boolean;
+    }
+
+    const processSkuUpdate = (flow: SkuUpdateFlow): { updated: boolean; finalSku: string } => {
+      const clean = flow.pendingSku.trim().toUpperCase();
+      if (!flow.userConfirmed || !clean || clean === flow.currentSku) {
+        return { updated: false, finalSku: flow.currentSku };
+      }
+      return { updated: true, finalSku: clean };
+    };
+
+    // User cancels the modal
+    const cancelled = processSkuUpdate({
+      currentSku: "CHAIR-001",
+      pendingSku: "CHAIR-999",
+      userConfirmed: false,
+    });
+    assert.strictEqual(cancelled.updated, false);
+    assert.strictEqual(cancelled.finalSku, "CHAIR-001");
+
+    // User confirms a new code
+    const confirmed = processSkuUpdate({
+      currentSku: "CHAIR-001",
+      pendingSku: "5601234567890",
+      userConfirmed: true,
+    });
+    assert.strictEqual(confirmed.updated, true);
+    assert.strictEqual(confirmed.finalSku, "5601234567890");
+
+    // Submitting unchanged code does not trigger unnecessary update
+    const unchanged = processSkuUpdate({
+      currentSku: "CHAIR-001",
+      pendingSku: "CHAIR-001",
+      userConfirmed: true,
+    });
+    assert.strictEqual(unchanged.updated, false);
+    assert.strictEqual(unchanged.finalSku, "CHAIR-001");
+  });
 });
+

@@ -12,6 +12,7 @@ import {
   Trash2,
   Calendar,
   AlertCircle,
+  Plus,
 } from "lucide-react";
 import { countsForFinance, isCancelledEvent } from "@/lib/events";
 
@@ -403,55 +404,59 @@ export default function FinanceView({
   };
 
   return (
-    <div className="space-y-6 pb-20 max-w-5xl mx-auto">
+    <section className="bg-white border border-[#ececf0] rounded-[22px] p-4 sm:p-6 shadow-xs space-y-5 sm:space-y-6">
       {/* ========================================================= */}
-      {/* 1. HEADER (ICON, TITLE, SUBTITLE & PERIOD SELECTOR ON RIGHT) */}
+      {/* 1. HEADER (TITLE, SUBTITLE & ACTION CONTROLS ON RIGHT)    */}
       {/* ========================================================= */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
-        <div className="flex items-center gap-3.5">
-          {/* Blue Rounded Icon with 3 bar chart bars */}
-          <div className="w-12 h-12 rounded-[16px] bg-[#e6f0ff] flex items-center justify-center shrink-0">
-            <svg
-              className="w-6 h-6 text-[#007aff]"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-            >
-              <rect x="3" y="10" width="4" height="11" rx="2" />
-              <rect x="10" y="5" width="4" height="16" rx="2" />
-              <rect x="17" y="13" width="4" height="8" rx="2" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-[26px] sm:text-[28px] font-bold text-[#111111] tracking-[-0.02em] leading-tight">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[#ececf0]">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-[20px] sm:text-[22px] font-bold text-[#111111]">
               Finanças
-            </h1>
-            <p className="text-xs sm:text-[13px] text-[#8e8e93]">
-              O seu negócio num relance
-            </p>
+            </h2>
+            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#f2f2f5] text-[#48484a]">
+              {totals.profit >= 0 ? "Saldo positivo" : "Atenção ao saldo"}
+            </span>
           </div>
+          <p className="text-xs text-[#8e8e93] mt-0.5">
+            O seu negócio num relance · Balanço de faturação, despesas e lucros
+          </p>
         </div>
 
-        {/* Date picker on the right (Buttons removed) */}
-        <div className="relative self-start sm:self-auto">
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="appearance-none bg-white border border-[#ececf0] rounded-[12px] pl-3.5 pr-8 py-2 text-xs font-semibold text-[#111111] shadow-2xs hover:bg-[#fafafc] focus:outline-none focus:ring-2 focus:ring-[#007aff]/30 cursor-pointer"
-          >
-            <option value="6months">Últimos 6 meses</option>
-            <option value="3months">Últimos 3 meses</option>
-            <option value="thisMonth">Este mês</option>
-            <option value="year">Este ano</option>
-            <option value="all">Todo o histórico</option>
-          </select>
-          <ChevronDown className="w-3.5 h-3.5 text-[#8e8e93] pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
+        {/* Date picker & action button on the right */}
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <div className="relative">
+            <select
+              value={selectedPeriod}
+              onChange={(e) => setSelectedPeriod(e.target.value)}
+              className="appearance-none bg-[#f8f8fa] hover:bg-[#f2f2f5] border border-[#ececf0] rounded-[12px] pl-3 pr-8 py-2 text-xs font-semibold text-[#111111] shadow-2xs focus:outline-none focus:ring-2 focus:ring-[#007aff]/30 cursor-pointer transition"
+            >
+              <option value="6months">Últimos 6 meses</option>
+              <option value="3months">Últimos 3 meses</option>
+              <option value="thisMonth">Este mês</option>
+              <option value="year">Este ano</option>
+              <option value="all">Todo o histórico</option>
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-[#8e8e93] pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
+          </div>
+
+          {onOpenMovementModal && (
+            <button
+              type="button"
+              onClick={onOpenMovementModal}
+              className="p-2 sm:px-3 sm:py-2 rounded-[12px] bg-[#111] hover:bg-[#222] text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Novo Movimento</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* ========================================================= */}
       {/* 2. CARD: RESUMO PRINCIPAL DO NEGÓCIO */}
       {/* ========================================================= */}
-      <section className="bg-white border border-[#ececf0] rounded-[24px] p-6 sm:p-7 shadow-xs relative overflow-hidden">
+      <div className="bg-[#f8f8fa] border border-[#ececf0] rounded-[18px] p-5 sm:p-6 relative overflow-hidden">
         {/* Top row: Status indicator & decorative trend */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3.5">
@@ -467,11 +472,11 @@ export default function FinanceView({
               )}
             </div>
             <div>
-              <h2 className="text-[18px] sm:text-[19px] font-bold text-[#111111] tracking-[-0.01em]">
+              <h3 className="text-[17px] sm:text-[18px] font-bold text-[#111111] tracking-[-0.01em]">
                 {totals.profit >= 0
                   ? "O seu negócio está a correr bem!"
                   : "Atenção ao saldo operacional"}
-              </h2>
+              </h3>
               <p className="text-xs sm:text-[13px] text-[#8e8e93] mt-0.5">
                 {totals.profitGrowthPct !== null
                   ? totals.profitGrowthPct >= 0
@@ -511,14 +516,14 @@ export default function FinanceView({
         </div>
 
         {/* 3 Metric Columns with Dividers */}
-        <div className="mt-7 pt-6 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#ececf0] gap-4 sm:gap-0">
+        <div className="mt-5 pt-5 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#ececf0] gap-4 sm:gap-0">
           {/* Column 1: Money made (profit) */}
           <div className="sm:pr-6">
             <div className="text-xs font-medium text-[#6e6e73]">
               Lucro líquido (ganho)
             </div>
             <div
-              className={`text-[32px] sm:text-[36px] font-extrabold tracking-tight leading-none mt-1.5 mb-1.5 ${
+              className={`text-[30px] sm:text-[34px] font-extrabold tracking-tight leading-none mt-1.5 mb-1.5 ${
                 totals.profit >= 0 ? "text-[#00875a]" : "text-[#ef4444]"
               }`}
             >
@@ -549,7 +554,7 @@ export default function FinanceView({
             <div className="text-xs font-medium text-[#6e6e73]">
               Receita total (faturado)
             </div>
-            <div className="text-[32px] sm:text-[36px] font-extrabold text-[#111111] tracking-tight leading-none mt-1.5">
+            <div className="text-[30px] sm:text-[34px] font-extrabold text-[#111111] tracking-tight leading-none mt-1.5">
               {formatEuro(totals.revenue)}
             </div>
           </div>
@@ -559,35 +564,24 @@ export default function FinanceView({
             <div className="text-xs font-medium text-[#6e6e73]">
               Total de despesas
             </div>
-            <div className="text-[32px] sm:text-[36px] font-extrabold text-[#111111] tracking-tight leading-none mt-1.5">
+            <div className="text-[30px] sm:text-[34px] font-extrabold text-[#111111] tracking-tight leading-none mt-1.5">
               {formatEuro(totals.expenses)}
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
       {/* ========================================================= */}
       {/* 3. CARD: "Estamos a melhorar?" (CHART & CALLOUT) */}
       {/* ========================================================= */}
-      <section className="bg-white border border-[#ececf0] rounded-[24px] p-6 sm:p-7 shadow-xs space-y-6">
+      <div className="bg-white border border-[#ececf0] rounded-[18px] p-5 sm:p-6 shadow-2xs space-y-5">
         {/* Header with Title and Legend */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2.5">
-            <svg
-              className="w-5 h-5 text-[#007aff]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-              <polyline points="16 7 22 7 22 13" />
-            </svg>
-            <h2 className="text-[18px] sm:text-[19px] font-bold text-[#111111] tracking-[-0.01em]">
+            <TrendingUp className="w-4 h-4 text-[#007aff]" />
+            <h3 className="text-[16px] sm:text-[17px] font-bold text-[#111111] tracking-[-0.01em]">
               Estamos a melhorar?
-            </h2>
+            </h3>
           </div>
 
           {chartData.hasEnoughData && (
@@ -774,39 +768,39 @@ export default function FinanceView({
             </p>
           </div>
         ) : null}
-      </section>
+      </div>
 
       {/* ========================================================= */}
       {/* 4. TWO-COLUMN SECTION */}
       {/* ========================================================= */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
         {/* Left Card: "Para onde vai o dinheiro?" */}
-        <section className="bg-white border border-[#ececf0] rounded-[24px] p-6 sm:p-7 shadow-xs flex flex-col justify-between">
+        <div className="bg-white border border-[#ececf0] rounded-[18px] p-5 sm:p-6 shadow-2xs flex flex-col justify-between">
           <div>
             {/* Header with Blue Wallet Icon */}
-            <div className="flex items-center gap-2.5 mb-5">
-              <div className="w-7 h-7 rounded-[10px] bg-[#e6f0ff] text-[#007aff] flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="w-7 h-7 rounded-[9px] bg-[#e6f0ff] text-[#007aff] flex items-center justify-center shrink-0">
                 <Wallet className="w-4 h-4" />
               </div>
-              <h3 className="text-[17px] sm:text-[18px] font-bold text-[#111111] tracking-[-0.01em]">
+              <h3 className="text-[16px] sm:text-[17px] font-bold text-[#111111] tracking-[-0.01em]">
                 Para onde vai o dinheiro?
               </h3>
             </div>
 
             {/* Categories with Horizontal Progress Bars */}
             {categoryBreakdown.length > 0 ? (
-              <div className="space-y-4 my-2">
+              <div className="space-y-3.5 my-2">
                 {categoryBreakdown.map((cat, idx) => (
                   <div
                     key={cat.name}
-                    className="flex items-center justify-between gap-3 text-xs sm:text-sm"
+                    className="flex items-center justify-between gap-3 text-xs sm:text-[13px]"
                   >
                     <span className="font-medium text-[#374151] w-32 sm:w-36 shrink-0 truncate">
                       {cat.name}
                     </span>
 
                     {/* Horizontal Bar */}
-                    <div className="flex-1 h-2.5 bg-[#f0f0f4] rounded-full overflow-hidden">
+                    <div className="flex-1 h-2 bg-[#f0f0f4] rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{
@@ -823,14 +817,14 @@ export default function FinanceView({
                       />
                     </div>
 
-                    <span className="font-medium text-[#111111] shrink-0 text-right min-w-[90px]">
+                    <span className="font-medium text-[#111111] shrink-0 text-right min-w-[85px]">
                       {formatEuro(cat.amount)} ({cat.pct}%)
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="py-8 px-4 rounded-[16px] bg-[#f8f8fa] text-center text-xs text-[#8e8e93]">
+              <div className="py-7 px-4 rounded-[14px] bg-[#f8f8fa] text-center text-xs text-[#8e8e93]">
                 Não existem despesas categorizadas registadas neste período.
               </div>
             )}
@@ -840,29 +834,29 @@ export default function FinanceView({
           {filteredMovements.filter(
             (m) => m.type === "saida" || m.type === "investimento"
           ).length > 0 && (
-            <div className="pt-4 border-t border-[#ececf0] mt-6">
+            <div className="pt-3.5 border-t border-[#ececf0] mt-5">
               <button
                 type="button"
                 onClick={() => setShowBreakdownModal(true)}
-                className="text-xs sm:text-sm font-semibold text-[#007aff] hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs sm:text-[13px] font-semibold text-[#007aff] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>Ver detalhe completo</span>
-                <span className="text-base leading-none">→</span>
+                <span className="text-sm leading-none">→</span>
               </button>
             </div>
           )}
-        </section>
+        </div>
 
         {/* Right Card: "Desempenho dos seus eventos" */}
-        <section className="bg-white border border-[#ececf0] rounded-[24px] p-6 sm:p-7 shadow-xs flex flex-col justify-between">
+        <div className="bg-white border border-[#ececf0] rounded-[18px] p-5 sm:p-6 shadow-2xs flex flex-col justify-between">
           <div>
             {/* Header with Golden Trophy Icon */}
-            <div className="flex items-start gap-2.5 mb-5">
-              <div className="w-7 h-7 rounded-[10px] bg-[#fef3c7] text-[#f59e0b] flex items-center justify-center shrink-0 mt-0.5">
+            <div className="flex items-start gap-2.5 mb-4">
+              <div className="w-7 h-7 rounded-[9px] bg-[#fef3c7] text-[#f59e0b] flex items-center justify-center shrink-0 mt-0.5">
                 <Trophy className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-[17px] sm:text-[18px] font-bold text-[#111111] tracking-[-0.01em]">
+                <h3 className="text-[16px] sm:text-[17px] font-bold text-[#111111] tracking-[-0.01em]">
                   Desempenho dos seus eventos
                 </h3>
                 <p className="text-xs text-[#8e8e93] mt-0.5">
@@ -875,11 +869,11 @@ export default function FinanceView({
 
             {/* Event Profitability List */}
             {eventsPerformance.length > 0 ? (
-              <div className="space-y-3.5 my-2">
+              <div className="space-y-3 my-2">
                 {eventsPerformance.map((ev) => (
                   <div
                     key={ev.id}
-                    className="flex items-center justify-between text-xs sm:text-sm"
+                    className="flex items-center justify-between text-xs sm:text-[13px]"
                   >
                     <span className="font-medium text-[#111111] truncate pr-2">
                       {ev.name}
@@ -897,7 +891,7 @@ export default function FinanceView({
                 ))}
               </div>
             ) : (
-              <div className="py-8 px-4 rounded-[16px] bg-[#f8f8fa] text-center text-xs text-[#8e8e93]">
+              <div className="py-7 px-4 rounded-[14px] bg-[#f8f8fa] text-center text-xs text-[#8e8e93]">
                 Não existem eventos ativos para apresentar neste período.
               </div>
             )}
@@ -905,7 +899,7 @@ export default function FinanceView({
 
           {/* Footer Link: Ver todos os eventos */}
           {eventsPerformance.length > 0 && (
-            <div className="pt-4 border-t border-[#ececf0] mt-6">
+            <div className="pt-3.5 border-t border-[#ececf0] mt-5">
               <button
                 type="button"
                 onClick={() => {
@@ -913,26 +907,24 @@ export default function FinanceView({
                     onNavigateToEvents();
                   }
                 }}
-                className="text-xs sm:text-sm font-semibold text-[#007aff] hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs sm:text-[13px] font-semibold text-[#007aff] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>Ver todos os eventos</span>
-                <span className="text-base leading-none">→</span>
+                <span className="text-sm leading-none">→</span>
               </button>
             </div>
           )}
-        </section>
+        </div>
       </div>
 
       {/* ========================================================= */}
       {/* 5. CARD: "Valores a receber" */}
       {/* ========================================================= */}
-      <section className="bg-white border border-[#ececf0] rounded-[24px] p-6 sm:p-7 shadow-xs">
+      <div className="bg-[#f8f8fa] border border-[#ececf0] rounded-[18px] p-5 sm:p-6">
         {/* Header with Blue Clock Icon */}
-        <div className="flex items-center gap-2.5 mb-5">
-          <div className="w-7 h-7 rounded-[10px] bg-[#e6f0ff] text-[#007aff] flex items-center justify-center shrink-0">
-            <Clock className="w-4 h-4" />
-          </div>
-          <h3 className="text-[17px] sm:text-[18px] font-bold text-[#111111] tracking-[-0.01em]">
+        <div className="flex items-center gap-2 mb-4">
+          <Clock className="w-4 h-4 text-[#007aff]" />
+          <h3 className="text-[16px] sm:text-[17px] font-bold text-[#111111] tracking-[-0.01em]">
             Valores a receber
           </h3>
         </div>
@@ -941,7 +933,7 @@ export default function FinanceView({
         <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#ececf0] gap-4 sm:gap-0 pt-1">
           {/* Column 1: From clients */}
           <div className="sm:pr-6">
-            <div className="text-[28px] sm:text-[32px] font-extrabold text-[#111111] tracking-tight leading-none mb-1">
+            <div className="text-[26px] sm:text-[30px] font-extrabold text-[#111111] tracking-tight leading-none mb-1">
               {formatEuro(totals.moneyToReceive)}
             </div>
             <div className="text-xs font-medium text-[#8e8e93]">De clientes</div>
@@ -950,7 +942,7 @@ export default function FinanceView({
           {/* Column 2: Overdue */}
           <div className="pt-4 sm:pt-0 sm:px-6">
             <div
-              className={`text-[28px] sm:text-[32px] font-extrabold tracking-tight leading-none mb-1 ${
+              className={`text-[26px] sm:text-[30px] font-extrabold tracking-tight leading-none mb-1 ${
                 totals.overdue > 0 ? "text-[#ef4444]" : "text-[#111111]"
               }`}
             >
@@ -961,7 +953,7 @@ export default function FinanceView({
 
           {/* Column 3: Upcoming */}
           <div className="pt-4 sm:pt-0 sm:pl-6">
-            <div className="text-[28px] sm:text-[32px] font-extrabold text-[#111111] tracking-tight leading-none mb-1">
+            <div className="text-[26px] sm:text-[30px] font-extrabold text-[#111111] tracking-tight leading-none mb-1">
               {formatEuro(totals.upcoming)}
             </div>
             <div className="text-xs font-medium text-[#8e8e93]">
@@ -969,7 +961,7 @@ export default function FinanceView({
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
       {/* ========================================================= */}
       {/* MODAL: DETALHE COMPLETO DE DESPESAS */}
@@ -1114,6 +1106,6 @@ export default function FinanceView({
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

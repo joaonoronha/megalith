@@ -173,6 +173,10 @@ export default function InventoryDetailView({
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [showPhotoLightbox, setShowPhotoLightbox] = useState(false);
+  const [showSkuConfirmModal, setShowSkuConfirmModal] = useState(false);
+  const [pendingSku, setPendingSku] = useState("");
+  const [skuError, setSkuError] = useState<string | null>(null);
+  const [isUpdatingSku, setIsUpdatingSku] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -181,6 +185,35 @@ export default function InventoryDetailView({
   const [customImageUrl, setCustomImageUrl] = useState(item.imageUrl || "");
   const [damageQuantity, setDamageQuantity] = useState(1);
   const [isPending, startTransition] = useTransition();
+
+  const handleConfirmSkuUpdate = async () => {
+    const clean = pendingSku.trim().toUpperCase();
+    if (!clean) {
+      setSkuError("O código do artigo não pode estar vazio.");
+      return;
+    }
+    if (clean === item.sku) {
+      setShowSkuConfirmModal(false);
+      return;
+    }
+
+    setIsUpdatingSku(true);
+    setSkuError(null);
+    try {
+      const res = await updateItemPatchAction(item.id, { sku: clean });
+      if (res.success) {
+        setItem((prev) => ({ ...prev, sku: clean }));
+        setShowSkuConfirmModal(false);
+        setPendingSku("");
+      } else {
+        setSkuError(res.error || "Erro ao atualizar código.");
+      }
+    } catch (err: any) {
+      setSkuError(err?.message || "Erro inesperado ao atualizar código.");
+    } finally {
+      setIsUpdatingSku(false);
+    }
+  };
 
   useEffect(() => {
     if (!showPhotoLightbox) return;
@@ -594,28 +627,45 @@ export default function InventoryDetailView({
                     )}
                   </button>
 
-                  {/* Unified Item Code Input */}
-                  <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#fafafc] border border-[#ececf0] text-xs font-mono">
+                  {/* Protected Item Code Badge with Confirmation Action */}
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#fafafc] border border-[#ececf0] text-xs font-mono shadow-2xs">
                     <span className="text-[#8e8e93] font-bold">Código:</span>
-                    <input
-                      type="text"
-                      value={item.sku}
-                      onChange={(e) => handleFieldChange("sku", e.target.value.toUpperCase())}
-                      placeholder="Código / Barcode"
-                      className="min-w-[120px] max-w-[220px] w-auto bg-transparent font-bold text-[#111] focus:outline-none uppercase"
-                      title="Código de referência ou código de barras"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPendingSku(item.sku);
+                        setSkuError(null);
+                        setShowSkuConfirmModal(true);
+                      }}
+                      className="font-bold text-[#111] hover:text-[#007aff] transition cursor-pointer select-all tracking-wide"
+                      title="Clique para alterar o código (requer confirmação)"
+                    >
+                      {item.sku}
+                    </button>
                     <button
                       type="button"
                       onClick={handleCopySku}
-                      className="text-[#8e8e93] hover:text-[#111] ml-0.5 cursor-pointer"
+                      className="text-[#8e8e93] hover:text-[#111] p-0.5 rounded hover:bg-[#ececf0] transition cursor-pointer"
                       title="Copiar código"
                     >
                       {copiedSku ? (
-                        <Check className="w-3 h-3 text-emerald-600" />
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
                       ) : (
-                        <Copy className="w-3 h-3" />
+                        <Copy className="w-3.5 h-3.5" />
                       )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPendingSku(item.sku);
+                        setSkuError(null);
+                        setShowSkuConfirmModal(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] font-sans font-semibold text-[#007aff] hover:text-[#005bb5] bg-[#f0f7ff] hover:bg-[#e0efff] px-2 py-0.5 rounded-full transition cursor-pointer ml-1"
+                      title="Alterar código do artigo (requer confirmação para evitar quebra de leituras)"
+                    >
+                      <Pencil className="w-3 h-3" />
+                      <span>Alterar</span>
                     </button>
                   </div>
                 </div>
@@ -1426,6 +1476,125 @@ export default function InventoryDetailView({
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
+      {/* SKU / ITEM CODE CONFIRMATION MODAL */}
+      {/* ================================================================= */}
+      {showSkuConfirmModal && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-[24px] w-full max-w-md border border-[#ececf0] shadow-2xl overflow-hidden p-6 text-xs space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-[#ececf0] pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#111]">Alterar Código do Artigo</h3>
+                  <p className="text-[11px] text-[#8e8e93] truncate max-w-[240px]">
+                    {item.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSkuConfirmModal(false);
+                  setPendingSku("");
+                  setSkuError(null);
+                }}
+                className="w-8 h-8 rounded-full hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Warning Box */}
+            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 space-y-1.5">
+              <div className="flex items-center gap-2 font-bold text-xs text-amber-900">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Atenção: Impacto em Leituras e Scanners</span>
+              </div>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                A alteração do código ou código de barras deste artigo pode quebrar qualquer leitura futura por scanner se já existirem etiquetas físicas, autocolantes ou impressões com o código atual.
+              </p>
+            </div>
+
+            {/* Form Fields */}
+            <div className="space-y-3 pt-1">
+              <div>
+                <label className="block text-[11px] font-bold text-[#8e8e93] mb-1">
+                  Código Atual
+                </label>
+                <div className="px-3 py-2 bg-[#f2f2f7] border border-[#ececf0] rounded-[10px] font-mono text-xs font-bold text-[#636366]">
+                  {item.sku}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-[#3a3a3c] mb-1">
+                  Novo Código / Barcode *
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={pendingSku}
+                  onChange={(e) => {
+                    setPendingSku(e.target.value.toUpperCase());
+                    if (skuError) setSkuError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleConfirmSkuUpdate();
+                    }
+                  }}
+                  placeholder="Ex: SKU-001 ou 5601234567890"
+                  className="w-full px-3 py-2 text-xs font-mono font-bold uppercase bg-white border border-[#ececf0] focus:border-[#007aff] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                />
+                {skuError && (
+                  <p className="text-[11px] text-rose-600 font-semibold mt-1">
+                    {skuError}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-3 border-t border-[#ececf0] flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSkuConfirmModal(false);
+                  setPendingSku("");
+                  setSkuError(null);
+                }}
+                disabled={isUpdatingSku}
+                className="px-4 py-2 rounded-[12px] bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#3a3a3c] font-semibold transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSkuUpdate}
+                disabled={isUpdatingSku || !pendingSku.trim() || pendingSku.trim().toUpperCase() === item.sku}
+                className="px-4 py-2 rounded-[12px] bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isUpdatingSku ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>A atualizar...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Confirmar Alteração</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
