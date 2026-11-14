@@ -972,6 +972,58 @@ export async function uploadItemPhotoAction(formData: FormData) {
   }
 }
 
+// 6.6b Upload Event Cover / Back Splash Photo
+export async function uploadEventCoverAction(formData: FormData) {
+  try {
+    const file = formData.get("file") as File;
+    const eventId = formData.get("eventId") as string | null;
+    if (!file || typeof file.arrayBuffer !== "function" || file.size === 0) {
+      return { success: false, error: "Ficheiro inválido ou vazio." };
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const rawExt = path.extname(file.name || "").toLowerCase() || ".jpg";
+    const sanitizedBase = path.basename(file.name || "capa", rawExt).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
+    const uniqueName = `event-cover-${Date.now()}-${generateId("f")}-${sanitizedBase}${rawExt}`;
+    const mime = file.type || (rawExt === ".png" ? "image/png" : rawExt === ".webp" ? "image/webp" : "image/jpeg");
+
+    try {
+      await db.insert(appUploads).values({
+        id: generateId("upl"),
+        filename: uniqueName,
+        mimeType: mime,
+        dataBase64: buffer.toString("base64"),
+        size: buffer.length,
+        createdAt: new Date(),
+      }).onConflictDoNothing();
+    } catch (dbErr) {
+      console.error("Erro ao gravar capa do evento na DB:", dbErr);
+    }
+
+    try {
+      const uploadsDir = path.join(process.cwd(), "public", "uploads");
+      await fs.mkdir(uploadsDir, { recursive: true });
+      await fs.writeFile(path.join(uploadsDir, uniqueName), buffer);
+    } catch {
+      // Best effort disk cache
+    }
+
+    const url = `/api/uploads/${uniqueName}`;
+
+    if (eventId) {
+      await db.update(events).set({
+        coverImageUrl: url,
+        updatedAt: new Date(),
+      }).where(eq(events.id, eventId));
+    }
+
+    return { success: true, url };
+  } catch (err: any) {
+    console.error("uploadEventCoverAction error:", err);
+    return { success: false, error: err?.message || "Erro ao processar fotografia de capa." };
+  }
+}
+
 // 6.7 Upload User Profile Picture
 export async function uploadUserProfilePictureAction(formData: FormData) {
   try {
