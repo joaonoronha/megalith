@@ -5213,7 +5213,6 @@ function EventWizardModal({
     : new Date().toISOString().split("T")[0];
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
-  const [customId, setCustomId] = useState("");
   const [localClients, setLocalClients] = useState(clients);
   const [clientId, setClientId] = useState("");
   const [showCreateClientModal, setShowCreateClientModal] = useState(false);
@@ -5279,7 +5278,6 @@ function EventWizardModal({
     try {
       const formData = new FormData();
       formData.set("name", name);
-      if (customId.trim()) formData.set("customId", customId.trim());
       formData.set("clientId", clientId);
       formData.set("venue", venue);
       formData.set("category", category);
@@ -5371,22 +5369,6 @@ function EventWizardModal({
                     Por favor indique o nome do evento para avançar.
                   </span>
                 )}
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#3a3a3c] mb-1">
-                  ID Personalizado do Evento (Opcional)
-                </label>
-                <input
-                  type="text"
-                  value={customId}
-                  onChange={(e) => setCustomId(e.target.value)}
-                  placeholder="Ex: evt-aniversario-martim (vazio = automático evt_...)"
-                  className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                />
-                <span className="text-[10px] text-[#8e8e93] mt-0.5 block">
-                  Identificador único do evento no sistema. Se omitido, é gerado um ID criptográfico sem colisões.
-                </span>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
