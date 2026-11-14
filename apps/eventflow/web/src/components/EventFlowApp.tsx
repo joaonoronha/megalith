@@ -261,6 +261,23 @@ export default function EventFlowApp({
   const [homeAlertFilter, setHomeAlertFilter] = useState<"all" | "new" | "snoozed">("all");
   const [openHomeSnoozeMenuId, setOpenHomeSnoozeMenuId] = useState<string | null>(null);
 
+  // Active navigation loading feedback
+  const [navigatingEntityId, setNavigatingEntityId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setNavigatingEntityId(null);
+  }, [pathname]);
+
+  const navigateTo = (url: string, entityId?: string) => {
+    if (entityId) setNavigatingEntityId(entityId);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("start-page-progress"));
+    }
+    startTransition(() => {
+      router.push(url);
+    });
+  };
+
   // Synchronize state when initial props update (e.g. on router.refresh() or server sync)
   useEffect(() => {
     setMeetingsList(initialMeetings);
@@ -1324,7 +1341,7 @@ export default function EventFlowApp({
               avgMargin={completedEventsProfitData.avgMargin}
               events={completedEventsProfitData.events}
               monthlyTrajectory={completedEventsProfitData.monthlyTrajectory}
-              onSelectEvent={(eventId) => router.push(`/eventos/${eventId}`)}
+              onSelectEvent={(eventId) => navigateTo(`/eventos/${eventId}`, eventId)}
               onNavigateFinance={(e) => handleTabSwitch("finance", "/financas", e)}
             />
 
@@ -1356,7 +1373,8 @@ export default function EventFlowApp({
                     return (
                       <div
                         key={evt.id}
-                        onClick={() => router.push(`/eventos/${evt.id}`)}
+                        onClick={() => navigateTo(`/eventos/${evt.id}`, evt.id)}
+                        onMouseEnter={() => router.prefetch(`/eventos/${evt.id}`)}
                         className="py-3 px-3 -mx-3 rounded-[16px] hover:bg-[#f8f8fa] active:bg-[#f0f0f3] flex items-center justify-between gap-3 relative cursor-pointer transition group"
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1401,18 +1419,25 @@ export default function EventFlowApp({
                           className="relative flex-shrink-0"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <button
-                            onClick={() =>
-                              setActiveStatusDropdown(
-                                isDropdownOpen ? null : evt.id
-                              )
-                            }
-                            className={`px-3 py-1 rounded-full text-[12px] font-semibold ${statusObj.bg} ${statusObj.text} hover:opacity-85 transition cursor-pointer flex items-center gap-1`}
-                            title="Clique para alterar estado"
-                          >
-                            <span>{statusObj.label}</span>
-                            <span className="text-[9px] opacity-60">▼</span>
-                          </button>
+                          {navigatingEntityId === evt.id ? (
+                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#007aff]/10 text-[#007aff] text-[12px] font-semibold border border-[#007aff]/20 shadow-2xs">
+                              <div className="w-3 h-3 rounded-full border-2 border-[#007aff]/30 border-t-[#007aff] animate-spin" />
+                              <span>A abrir...</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() =>
+                                setActiveStatusDropdown(
+                                  isDropdownOpen ? null : evt.id
+                                )
+                              }
+                              className={`px-3 py-1 rounded-full text-[12px] font-semibold ${statusObj.bg} ${statusObj.text} hover:opacity-85 transition cursor-pointer flex items-center gap-1`}
+                              title="Clique para alterar estado"
+                            >
+                              <span>{statusObj.label}</span>
+                              <span className="text-[9px] opacity-60">▼</span>
+                            </button>
+                          )}
 
                           {isDropdownOpen && (
                             <div className="absolute right-0 top-full mt-1.5 z-30 bg-white border border-[#ececf0] rounded-xl shadow-lg p-1.5 w-36 text-xs space-y-1">
@@ -2116,7 +2141,7 @@ export default function EventFlowApp({
                     return (
                       <div
                         key={e.id}
-                        onClick={() => router.push(e.detailUrl || (isMeeting ? `/reunioes/${e.id}` : `/eventos/${e.id}`))}
+                        onClick={() => navigateTo(e.detailUrl || (isMeeting ? `/reunioes/${e.id}` : `/eventos/${e.id}`), e.id)}
                         className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition cursor-pointer group ${
                           isMeeting
                             ? "bg-[#faf9ff] hover:bg-[#f3f0ff]"
@@ -2333,8 +2358,11 @@ export default function EventFlowApp({
                   return (
                     <div
                       key={e.id}
-                      onClick={() => router.push(`/eventos/${e.id}`)}
-                      className="relative overflow-hidden rounded-[20px] border border-black/10 bg-neutral-900 shadow-xs hover:shadow-xl hover:border-black/20 transition-all duration-300 p-2.5 sm:p-3 flex flex-col justify-end cursor-pointer group min-h-[140px] sm:min-h-[125px]"
+                      onClick={() => navigateTo(`/eventos/${e.id}`, e.id)}
+                      onMouseEnter={() => router.prefetch(`/eventos/${e.id}`)}
+                      className={`relative overflow-hidden rounded-[20px] border border-black/10 bg-neutral-900 shadow-xs hover:shadow-xl hover:border-black/20 transition-all duration-300 p-2.5 sm:p-3 flex flex-col justify-end cursor-pointer group min-h-[140px] sm:min-h-[125px] ${
+                        navigatingEntityId === e.id ? "ring-2 ring-[#007aff] scale-[0.99] opacity-95" : ""
+                      }`}
                     >
                       {/* Backsplash image background */}
                       <img
@@ -2404,33 +2432,50 @@ export default function EventFlowApp({
                           </div>
                         </div>
 
-                        {/* Right: Interactive Status Dropdown & Action Controls */}
-                        <div
-                          className="flex items-center gap-2.5 self-start sm:self-center flex-shrink-0"
-                          onClick={(ev) => ev.stopPropagation()}
-                          onMouseDown={(ev) => ev.stopPropagation()}
-                        >
-                          <select
-                            value={e.status}
+                        {/* Right: Interactive Status Dropdown & Action Controls / Loading Feedback */}
+                        {navigatingEntityId === e.id ? (
+                          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#007aff]/30 backdrop-blur-md border border-[#007aff]/50 text-white text-xs font-semibold shadow-xs self-start sm:self-center flex-shrink-0 animate-pulse">
+                            <div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                            <span>A abrir...</span>
+                          </div>
+                        ) : (
+                          <div
+                            className="flex items-center gap-2.5 self-start sm:self-center flex-shrink-0"
                             onClick={(ev) => ev.stopPropagation()}
                             onMouseDown={(ev) => ev.stopPropagation()}
-                            onChange={(evt) => {
-                              evt.stopPropagation();
-                              handleStatusChange(e.id, evt.target.value);
-                            }}
-                            className={`text-xs font-semibold px-3 py-1.5 rounded-full border border-white/20 shadow-xs outline-none cursor-pointer transition ${statusObj.bg} ${statusObj.text}`}
                           >
-                            <option value="confirmado">Confirmado</option>
-                            <option value="preparacao">Preparação</option>
-                            <option value="planeamento">Planeamento</option>
-                            <option value="orcamento">Orçamento</option>
-                            <option value="concluido">Concluído</option>
-                            <option value="cancelado">Cancelado</option>
-                          </select>
+                            <select
+                              value={e.status}
+                              onClick={(ev) => ev.stopPropagation()}
+                              onMouseDown={(ev) => ev.stopPropagation()}
+                              onChange={(evt) => {
+                                evt.stopPropagation();
+                                handleStatusChange(e.id, evt.target.value);
+                              }}
+                              className={`text-xs font-semibold px-3 py-1.5 rounded-full border border-white/20 shadow-xs outline-none cursor-pointer transition ${statusObj.bg} ${statusObj.text}`}
+                            >
+                              <option value="confirmado">Confirmado</option>
+                              <option value="preparacao">Preparação</option>
+                              <option value="planeamento">Planeamento</option>
+                              <option value="orcamento">Orçamento</option>
+                              <option value="concluido">Concluído</option>
+                              <option value="cancelado">Cancelado</option>
+                            </select>
 
-                          <ChevronRight className="w-4 h-4 text-white/70 group-hover:text-white group-hover:translate-x-0.5 transition hidden sm:block" />
-                        </div>
+                            <ChevronRight className="w-4 h-4 text-white/70 group-hover:text-white group-hover:translate-x-0.5 transition hidden sm:block" />
+                          </div>
+                        )}
                       </div>
+
+                      {/* Active Loading Overlay upon tap */}
+                      {navigatingEntityId === e.id && (
+                        <div className="absolute inset-0 z-20 bg-black/45 backdrop-blur-xs rounded-[20px] pointer-events-none flex items-center justify-center animate-fadeIn">
+                          <div className="px-4 py-2 rounded-full bg-black/85 backdrop-blur-md border border-white/20 text-white text-xs font-semibold shadow-xl flex items-center gap-2.5">
+                            <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                            <span>A abrir evento...</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -2733,7 +2778,8 @@ export default function EventFlowApp({
                   return (
                     <div
                       key={item.id}
-                      onClick={() => router.push(`/inventario/${item.id}`)}
+                      onClick={() => navigateTo(`/inventario/${item.id}`, item.id)}
+                      onMouseEnter={() => router.prefetch(`/inventario/${item.id}`)}
                       className="hover:bg-[#fafafa] transition cursor-pointer group"
                     >
                       {/* MOBILE ROW (< lg): Slim & Compact with Just Icons */}
