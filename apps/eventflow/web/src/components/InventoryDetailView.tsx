@@ -37,6 +37,13 @@ import StorageLocationsModal, { StorageLocation, TeamUser } from "@/components/S
 import { formatRelativeTime } from "@/lib/date-format";
 import { usePresence } from "@/lib/usePresence";
 import {
+  formatCurrencyPt,
+  eurosToCents,
+  centsToEuros,
+  applyCurrencyKeyPress,
+  parsePastedCurrency,
+} from "@/lib/currency";
+import {
   updateItemPatchAction,
   updateItemTriageAction,
   markItemAsBoughtAction,
@@ -334,6 +341,50 @@ export default function InventoryDetailView({
         savePatch({ [field]: value });
       }, 500);
     }
+  };
+
+  // Controlled cent-shift currency state
+  const [priceCents, setPriceCents] = useState(() => eurosToCents(item.unitPrice));
+
+  useEffect(() => {
+    setPriceCents(eurosToCents(item.unitPrice));
+  }, [item.unitPrice]);
+
+  const handlePriceKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (["Tab", "Enter", "Escape", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && ["a", "c", "v", "x"].includes(e.key.toLowerCase())) {
+      return;
+    }
+
+    const input = e.currentTarget;
+    const isAllSelected =
+      input.selectionStart !== null &&
+      input.selectionEnd !== null &&
+      input.selectionStart === 0 &&
+      input.selectionEnd === input.value.length;
+
+    const nextCents = applyCurrencyKeyPress(priceCents, e.key, isAllSelected);
+    if (nextCents !== null) {
+      e.preventDefault();
+      setPriceCents(nextCents);
+      const euroVal = centsToEuros(nextCents);
+      handleFieldChange("unitPrice", euroVal);
+      handleFieldChange("replacementCost", euroVal);
+    } else {
+      e.preventDefault();
+    }
+  };
+
+  const handlePricePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text");
+    const nextCents = parsePastedCurrency(pasted);
+    setPriceCents(nextCents);
+    const euroVal = centsToEuros(nextCents);
+    handleFieldChange("unitPrice", euroVal);
+    handleFieldChange("replacementCost", euroVal);
   };
 
   const selectedLocationId = useMemo(() => {
@@ -803,23 +854,32 @@ export default function InventoryDetailView({
             </div>
 
             {/* Price & Action Badge */}
-            <div className="flex flex-row md:flex-col items-center md:items-end justify-between w-full md:w-auto gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-[#ececf0] shrink-0">
-              <div className="text-left md:text-right">
-                <div className="flex items-center md:justify-end gap-1">
-                  <span className="text-xl font-bold text-[#111]">€</span>
+            <div className="flex flex-row md:flex-col items-center md:items-end justify-between w-full md:w-auto gap-2.5 pt-3 md:pt-0 border-t md:border-t-0 border-[#ececf0] shrink-0">
+              {/* Compact & Intuitive Price Widget */}
+              <div
+                className="bg-[#fafafc] hover:bg-[#f5f5f7] border border-[#ececf0] focus-within:border-[#007aff] focus-within:ring-2 focus-within:ring-[#007aff]/10 focus-within:bg-white rounded-[14px] px-3 py-1.5 transition text-right shadow-2xs"
+                title="Preço de aluguer cobrado ao cliente por evento (guarda automaticamente)"
+              >
+                <div className="flex items-center justify-between md:justify-end gap-2 mb-0.5">
+                  <span className="text-[10px] font-bold text-[#8e8e93] uppercase tracking-wider block">
+                    {item.isConsumable ? "Preço unitário" : "Preço de aluguer"}
+                  </span>
+                  <span className="text-[9px] text-[#8e8e93] font-medium hidden sm:inline">
+                    {item.isConsumable ? "por un." : "por evento"}
+                  </span>
+                </div>
+                <div className="inline-flex items-center justify-end font-extrabold text-[#111]">
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={item.unitPrice}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value) || 0;
-                      handleFieldChange("unitPrice", val);
-                      handleFieldChange("replacementCost", val);
-                    }}
-                    className="text-2xl font-extrabold text-[#111] bg-transparent border-b border-transparent hover:border-[#ececf0] focus:border-[#007aff] focus:bg-[#fafafa] px-1 rounded-[6px] focus:outline-none w-24 text-right"
-                    title="Preço do artigo (guarda automaticamente)"
+                    type="text"
+                    inputMode="numeric"
+                    value={formatCurrencyPt(centsToEuros(priceCents))}
+                    onKeyDown={handlePriceKeyDown}
+                    onPaste={handlePricePaste}
+                    onChange={() => {}}
+                    className="min-w-[60px] max-w-[110px] w-auto text-right font-extrabold text-base text-[#111] bg-transparent focus:outline-none selection:bg-[#007aff]/20 cursor-text"
+                    aria-label={item.isConsumable ? "Preço unitário" : "Preço de aluguer"}
                   />
+                  <span className="text-base font-extrabold text-[#111] ml-0.5 select-none">€</span>
                 </div>
               </div>
 
