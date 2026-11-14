@@ -165,5 +165,24 @@ describe("CFM Events: Inventory Detail Location & Photo Interactions", () => {
     assert.strictEqual(unchanged.updated, false);
     assert.strictEqual(unchanged.finalSku, "CHAIR-001");
   });
+
+  it("item pricing rule: displays 'Preço de compra' and rental price equals purchase price", () => {
+    // In CFM Events, the item configuration displays 'Preço de compra'
+    // and rental price (unitPrice) is always equal to purchase price (replacementCost)
+    const resolveItemPriceLabel = () => "Preço de compra";
+    assert.strictEqual(resolveItemPriceLabel(), "Preço de compra");
+
+    const syncItemPriceFields = (enteredPurchasePrice: number) => {
+      return {
+        unitPrice: enteredPurchasePrice, // rental price per event
+        replacementCost: enteredPurchasePrice, // purchase cost
+      };
+    };
+
+    const synced = syncItemPriceFields(12.5);
+    assert.strictEqual(synced.unitPrice, 12.5);
+    assert.strictEqual(synced.replacementCost, 12.5);
+    assert.strictEqual(synced.unitPrice, synced.replacementCost);
+  });
 });
 

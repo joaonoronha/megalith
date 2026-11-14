@@ -858,14 +858,11 @@ export default function InventoryDetailView({
               {/* Compact & Intuitive Price Widget */}
               <div
                 className="bg-[#fafafc] hover:bg-[#f5f5f7] border border-[#ececf0] focus-within:border-[#007aff] focus-within:ring-2 focus-within:ring-[#007aff]/10 focus-within:bg-white rounded-[14px] px-3 py-1.5 transition text-right shadow-2xs"
-                title="Preço de aluguer cobrado ao cliente por evento (guarda automaticamente)"
+                title="Preço de compra do artigo (guarda automaticamente)"
               >
                 <div className="flex items-center justify-between md:justify-end gap-2 mb-0.5">
                   <span className="text-[10px] font-bold text-[#8e8e93] uppercase tracking-wider block">
-                    {item.isConsumable ? "Preço unitário" : "Preço de aluguer"}
-                  </span>
-                  <span className="text-[9px] text-[#8e8e93] font-medium hidden sm:inline">
-                    {item.isConsumable ? "por un." : "por evento"}
+                    Preço de compra
                   </span>
                 </div>
                 <div className="inline-flex items-center justify-end font-extrabold text-[#111]">
@@ -877,7 +874,7 @@ export default function InventoryDetailView({
                     onPaste={handlePricePaste}
                     onChange={() => {}}
                     className="min-w-[60px] max-w-[110px] w-auto text-right font-extrabold text-base text-[#111] bg-transparent focus:outline-none selection:bg-[#007aff]/20 cursor-text"
-                    aria-label={item.isConsumable ? "Preço unitário" : "Preço de aluguer"}
+                    aria-label="Preço de compra"
                   />
                   <span className="text-base font-extrabold text-[#111] ml-0.5 select-none">€</span>
                 </div>

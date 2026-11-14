@@ -295,13 +295,12 @@ export async function reconcileReceiptWithInventory(
       ? matched.category
       : mapToEventCategory(rawItem.suggestedCategory, rawItem.description);
 
-    // Calculate proposed rental price (unitPrice in inventory is the rental price per event)
+    // Calculate proposed rental price (in CFM Events, rental price equals purchase price)
     let unitRentalPrice = 0;
     if (matched && matched.unitPrice > 0) {
       unitRentalPrice = matched.unitPrice;
     } else {
-      // Default rule of thumb in event rentals: rental price is ~20%-35% of acquisition cost
-      unitRentalPrice = Math.max(1, Math.round(rawItem.unitPrice * 0.25 * 10) / 10);
+      unitRentalPrice = rawItem.unitPrice;
     }
 
     // Auto-generate clean SKU for new items

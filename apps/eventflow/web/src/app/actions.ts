@@ -3514,7 +3514,7 @@ export async function commitReceiptInventoryAction(payload: {
         warehouseLocation: warehouseLoc,
         locationId: item.locationId || null,
         dimensions: item.dimensions || null,
-        unitPrice: item.unitRentalPrice || Math.max(1, Math.round(item.unitPurchasePrice * 0.25 * 10) / 10),
+        unitPrice: item.unitRentalPrice || item.unitPurchasePrice || 0,
         replacementCost: item.unitPurchasePrice || 0,
         imageUrl: "https://images.unsplash.com/photo-1549497538-303791108f95?auto=format&fit=crop&w=400&q=80",
         damagedQuantity: 0,

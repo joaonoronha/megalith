@@ -684,13 +684,11 @@ export default function ReceiptScannerModal({
                               step="0.01"
                               min={0}
                               value={item.unitPurchasePrice}
-                              onChange={(e) =>
-                                handleItemFieldChange(
-                                  item.id,
-                                  "unitPurchasePrice",
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                handleItemFieldChange(item.id, "unitPurchasePrice", val);
+                                handleItemFieldChange(item.id, "unitRentalPrice", val);
+                              }}
                               className="w-full px-2.5 py-1.5 bg-white border border-[#d1d1d6] rounded-[8px] text-[#1c1c1e] focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>
