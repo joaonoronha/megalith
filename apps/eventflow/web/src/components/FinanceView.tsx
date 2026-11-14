@@ -7,15 +7,11 @@ import {
   Trophy,
   Clock,
   Check,
-  CheckCircle2,
   ChevronDown,
-  Plus,
-  Coins,
-  Trash2,
   X,
+  Trash2,
   Calendar,
-  ExternalLink,
-  ArrowUpRight,
+  AlertCircle,
 } from "lucide-react";
 import { countsForFinance, isCancelledEvent } from "@/lib/events";
 
@@ -46,32 +42,13 @@ export default function FinanceView({
   onOpenMovementModal,
   onNavigateToEvents,
 }: FinanceViewProps) {
-  // Time period filter
+  // Period filter: 6months, 3months, thisMonth, year, all
   const [selectedPeriod, setSelectedPeriod] = useState<string>("6months");
 
   // Hovered month on the SVG chart for tooltips
   const [hoveredPoint, setHoveredPoint] = useState<number | null>(null);
 
-  // Modals
-  const [showAddIncomeModal, setShowAddIncomeModal] = useState(false);
-  const [incomeEventId, setIncomeEventId] = useState("");
-  const [incomeAmount, setIncomeAmount] = useState("");
-  const [incomeDesc, setIncomeDesc] = useState("");
-  const [incomeDate, setIncomeDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [incomeNotes, setIncomeNotes] = useState("");
-  const [isSubmittingIncome, setIsSubmittingIncome] = useState(false);
-  const [incomeError, setIncomeError] = useState<string | null>(null);
-
-  const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
-  const [expenseDesc, setExpenseDesc] = useState("");
-  const [expenseAmount, setExpenseAmount] = useState("");
-  const [expenseCategory, setExpenseCategory] = useState("Espaço / Local");
-  const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [expenseEventId, setExpenseEventId] = useState("");
-  const [expenseNotes, setExpenseNotes] = useState("");
-  const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
-  const [expenseError, setExpenseError] = useState<string | null>(null);
-
+  // Modal for breakdown
   const [showBreakdownModal, setShowBreakdownModal] = useState(false);
   const [movementToDelete, setMovementToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -88,87 +65,233 @@ export default function FinanceView({
     );
   };
 
-  // Base mock data matching the exact mockup figures
-  const mockTotals = {
-    profit: 16450,
-    profitGrowthPct: 21,
-    revenue: 48250,
-    expenses: 31800,
-    moneyToReceive: 7500,
-    overdue: 2000,
-    upcoming: 5500,
-  };
-
-  // Calculate actual dynamic totals from database if movements and events exist
-  const activeMovements = useMemo(() => movements || [], [movements]);
+  // Filter valid events and movements
   const activeEvents = useMemo(() => {
     return (events || []).filter((e) => countsForFinance(e) && !isCancelledEvent(e));
   }, [events]);
 
-  const dynamicTotals = useMemo(() => {
-    const totalEntradas = activeMovements
+  const activeMovements = useMemo(() => movements || [], [movements]);
+
+  // Date filtering helper
+  const now = useMemo(() => new Date(), []);
+
+  const isWithinPeriod = (dateStr: string | Date | null | undefined): boolean => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return false;
+
+    if (selectedPeriod === "all") return true;
+
+    if (selectedPeriod === "thisMonth") {
+      return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth()
+      );
+    }
+
+    if (selectedPeriod === "year") {
+      return d.getFullYear() === now.getFullYear();
+    }
+
+    if (selectedPeriod === "3months") {
+      const past3 = new Date(now);
+      past3.setMonth(now.getMonth() - 3);
+      return d >= past3;
+    }
+
+    // Default: 6months
+    const past6 = new Date(now);
+    past6.setMonth(now.getMonth() - 6);
+    return d >= past6;
+  };
+
+  // Filter events and movements by selected period
+  const filteredEvents = useMemo(() => {
+    return activeEvents.filter((e) => isWithinPeriod(e.startDate));
+  }, [activeEvents, selectedPeriod]);
+
+  const filteredMovements = useMemo(() => {
+    return activeMovements.filter((m) => isWithinPeriod(m.date));
+  }, [activeMovements, selectedPeriod]);
+
+  // Totals calculations (Strictly from real data, zero mocks)
+  const totals = useMemo(() => {
+    const totalEntradas = filteredMovements
       .filter((m) => m.type === "entrada")
       .reduce((sum, m) => sum + Number(m.amount || 0), 0);
 
-    const totalSaidas = activeMovements
+    const totalSaidas = filteredMovements
       .filter((m) => m.type === "saida" || m.type === "investimento")
       .reduce((sum, m) => sum + Number(m.amount || 0), 0);
 
-    // If there is no real cash flow recorded yet, use the faithful mock values
-    if (totalEntradas === 0 && totalSaidas === 0 && activeEvents.length === 0) {
-      return mockTotals;
-    }
-
-    const eventRevenue = activeEvents.reduce(
+    const totalFaturadoEventos = filteredEvents.reduce(
       (sum, e) => sum + (Number(e.customerPrice) || 0),
       0
     );
-    const eventExpenses = activeEvents.reduce(
+
+    const totalOrcadoEventos = filteredEvents.reduce(
       (sum, e) => sum + (Number(e.totalBudget) || 0),
       0
     );
 
-    const revenue = totalEntradas > 0 ? totalEntradas : eventRevenue || mockTotals.revenue;
-    const expenses = totalSaidas > 0 ? totalSaidas : eventExpenses || mockTotals.expenses;
+    // If movements exist, revenue/expenses are actual cash flows; otherwise fallback to contracted events totals
+    const revenue = totalEntradas > 0 ? totalEntradas : totalFaturadoEventos;
+    const expenses = totalSaidas > 0 ? totalSaidas : totalOrcadoEventos;
     const profit = revenue - expenses;
-    const moneyToReceive = Math.max(0, eventRevenue - totalEntradas) || mockTotals.moneyToReceive;
+
+    // Previous period profit for MoM growth calculation
+    let prevPeriodRevenue = 0;
+    let prevPeriodExpenses = 0;
+
+    if (selectedPeriod === "6months" || selectedPeriod === "3months" || selectedPeriod === "thisMonth") {
+      const monthsSpan = selectedPeriod === "thisMonth" ? 1 : selectedPeriod === "3months" ? 3 : 6;
+      const prevEnd = new Date(now);
+      prevEnd.setMonth(now.getMonth() - monthsSpan);
+      const prevStart = new Date(prevEnd);
+      prevStart.setMonth(prevEnd.getMonth() - monthsSpan);
+
+      const prevMovs = activeMovements.filter((m) => {
+        if (!m.date) return false;
+        const d = new Date(m.date);
+        return d >= prevStart && d < prevEnd;
+      });
+
+      const prevEntradas = prevMovs
+        .filter((m) => m.type === "entrada")
+        .reduce((sum, m) => sum + Number(m.amount || 0), 0);
+
+      const prevSaidas = prevMovs
+        .filter((m) => m.type === "saida" || m.type === "investimento")
+        .reduce((sum, m) => sum + Number(m.amount || 0), 0);
+
+      prevPeriodRevenue = prevEntradas;
+      prevPeriodExpenses = prevSaidas;
+    }
+
+    const prevProfit = prevPeriodRevenue - prevPeriodExpenses;
+    let profitGrowthPct: number | null = null;
+    if (prevProfit > 0 && profit !== 0) {
+      profitGrowthPct = Math.round(((profit - prevProfit) / prevProfit) * 100);
+    }
+
+    // Money to receive: contracted revenue - received entries
+    const moneyToReceive = Math.max(0, totalFaturadoEventos - totalEntradas);
+
+    // Overdue vs Upcoming: based on event end date
+    let overdue = 0;
+    let upcoming = 0;
+
+    filteredEvents.forEach((ev) => {
+      const price = Number(ev.customerPrice) || 0;
+      const evEntradas = activeMovements
+        .filter((m) => m.eventId === ev.id && m.type === "entrada")
+        .reduce((sum, m) => sum + Number(m.amount || 0), 0);
+
+      const pending = Math.max(0, price - evEntradas);
+      if (pending > 0) {
+        const evDate = new Date(ev.endDate || ev.startDate);
+        if (evDate < now) {
+          overdue += pending;
+        } else {
+          upcoming += pending;
+        }
+      }
+    });
+
+    const hasData = filteredMovements.length > 0 || filteredEvents.length > 0;
 
     return {
+      hasData,
       profit,
-      profitGrowthPct: mockTotals.profitGrowthPct,
+      profitGrowthPct,
       revenue,
       expenses,
       moneyToReceive,
-      overdue: mockTotals.overdue,
-      upcoming: Math.max(0, moneyToReceive - mockTotals.overdue) || mockTotals.upcoming,
+      overdue,
+      upcoming,
     };
-  }, [activeMovements, activeEvents]);
+  }, [filteredMovements, filteredEvents, activeMovements, selectedPeriod, now]);
 
-  // Chart data points (6 months: Jun to Nov) matching the visual mock curve
-  const chartData = [
-    { month: "Jun", revenue: 36500, expenses: 30000 },
-    { month: "Jul", revenue: 45000, expenses: 37500 },
-    { month: "Ago", revenue: 49000, expenses: 40000 },
-    { month: "Set", revenue: 42000, expenses: 34000 },
-    { month: "Out", revenue: 50500, expenses: 41000 },
-    { month: "Nov", revenue: 54200, expenses: 44000 },
-  ];
+  // Monthly trajectory chart points calculated dynamically from real data
+  const chartData = useMemo(() => {
+    // Collect the past 6 months chronologically
+    const months: { key: string; label: string; year: number; month: number }[] = [];
+    const ptMonths = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-  // SVG Chart coordinate mapping
-  // Chart dimensions: viewBox 0 0 760 220
-  // Y-axis: 0 to 60k
-  // y=20 (60k), y=73 (40k), y=126 (20k), y=180 (0k)
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const year = d.getFullYear();
+      const month = d.getMonth();
+      const key = `${year}-${String(month + 1).padStart(2, "0")}`;
+      months.push({ key, label: ptMonths[month], year, month });
+    }
+
+    let totalPointsWithData = 0;
+
+    const data = months.map((m) => {
+      const mMovements = activeMovements.filter((mov) => {
+        if (!mov.date) return false;
+        const d = new Date(mov.date);
+        return d.getFullYear() === m.year && d.getMonth() === m.month;
+      });
+
+      const mEvents = activeEvents.filter((ev) => {
+        if (!ev.startDate) return false;
+        const d = new Date(ev.startDate);
+        return d.getFullYear() === m.year && d.getMonth() === m.month;
+      });
+
+      const entradas = mMovements
+        .filter((mov) => mov.type === "entrada")
+        .reduce((sum, mov) => sum + Number(mov.amount || 0), 0);
+
+      const saidas = mMovements
+        .filter((mov) => mov.type === "saida" || mov.type === "investimento")
+        .reduce((sum, mov) => sum + Number(mov.amount || 0), 0);
+
+      const eventRevenue = mEvents.reduce((sum, e) => sum + (Number(e.customerPrice) || 0), 0);
+      const eventExpenses = mEvents.reduce((sum, e) => sum + (Number(e.totalBudget) || 0), 0);
+
+      const revenue = entradas > 0 ? entradas : eventRevenue;
+      const expenses = saidas > 0 ? saidas : eventExpenses;
+
+      if (revenue > 0 || expenses > 0) {
+        totalPointsWithData++;
+      }
+
+      return {
+        month: m.label,
+        revenue,
+        expenses,
+      };
+    });
+
+    return {
+      points: data,
+      hasEnoughData: totalPointsWithData >= 2,
+    };
+  }, [activeMovements, activeEvents, now]);
+
+  // Dynamic maximum scale for SVG chart
+  const maxChartVal = useMemo(() => {
+    let max = 10000;
+    chartData.points.forEach((p) => {
+      if (p.revenue > max) max = p.revenue;
+      if (p.expenses > max) max = p.expenses;
+    });
+    return Math.ceil((max * 1.15) / 10000) * 10000;
+  }, [chartData]);
+
   const getY = (val: number) => {
-    const maxVal = 60000;
     const topY = 20;
     const bottomY = 180;
-    return bottomY - (val / maxVal) * (bottomY - topY);
+    return bottomY - (val / (maxChartVal || 1)) * (bottomY - topY);
   };
 
   const getX = (idx: number) => {
     const startX = 65;
     const endX = 720;
-    const step = (endX - startX) / (chartData.length - 1);
+    const step = (endX - startX) / (chartData.points.length - 1 || 1);
     return startX + idx * step;
   };
 
@@ -195,19 +318,18 @@ export default function FinanceView({
   };
 
   const revenuePath = useMemo(
-    () => buildSmoothPath(chartData.map((d) => d.revenue)),
-    []
+    () => buildSmoothPath(chartData.points.map((d) => d.revenue)),
+    [chartData, maxChartVal]
   );
   const expensesPath = useMemo(
-    () => buildSmoothPath(chartData.map((d) => d.expenses)),
-    []
+    () => buildSmoothPath(chartData.points.map((d) => d.expenses)),
+    [chartData, maxChartVal]
   );
 
-  // Expense categories breakdown
+  // Real expense categories breakdown
   const categoryBreakdown = useMemo(() => {
-    // If user has recorded movement categories, group them
     const groups: Record<string, number> = {};
-    activeMovements
+    filteredMovements
       .filter((m) => m.type === "saida" || m.type === "investimento")
       .forEach((m) => {
         const cat = m.category || "Outros";
@@ -219,7 +341,7 @@ export default function FinanceView({
     if (totalExp > 0) {
       return Object.entries(groups)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 4)
+        .slice(0, 5)
         .map(([name, amount]) => ({
           name,
           amount,
@@ -227,104 +349,28 @@ export default function FinanceView({
         }));
     }
 
-    // Default categories matching mockup
-    return [
-      { name: "Espaço / Local", amount: 9500, pct: 30 },
-      { name: "Catering / Alimentação", amount: 8000, pct: 25 },
-      { name: "Produção / Equipamento", amount: 5500, pct: 17 },
-    ];
-  }, [activeMovements]);
+    return [];
+  }, [filteredMovements]);
 
-  // Events performance breakdown
+  // Real events performance breakdown
   const eventsPerformance = useMemo(() => {
-    if (activeEvents.length > 0) {
-      return activeEvents.slice(0, 5).map((ev) => {
-        const price = Number(ev.customerPrice) || 0;
-        const budget = Number(ev.totalBudget) || 0;
-        const profit = price - budget;
-        return {
-          id: ev.id,
-          name: ev.name,
-          profit,
-          isProfit: profit >= 0,
-        };
-      });
-    }
+    if (filteredEvents.length === 0) return [];
 
-    // Mock events from the design
-    return [
-      { id: "mock-1", name: "Festival de Verão", profit: 4500, isProfit: true },
-      { id: "mock-2", name: "Jantar Privado", profit: 2500, isProfit: true },
-      { id: "mock-3", name: "Cimeira Empresarial", profit: 1600, isProfit: true },
-      { id: "mock-4", name: "Noite Musical", profit: -800, isProfit: false },
-    ];
-  }, [activeEvents]);
+    return filteredEvents.slice(0, 6).map((ev) => {
+      const price = Number(ev.customerPrice) || 0;
+      const budget = Number(ev.totalBudget) || 0;
+      const profit = price - budget;
+      return {
+        id: ev.id,
+        name: ev.name,
+        profit,
+        isProfit: profit >= 0,
+      };
+    });
+  }, [filteredEvents]);
 
   const profitableEventsCount = eventsPerformance.filter((e) => e.isProfit).length;
-  const totalEventsCount = eventsPerformance.length > 4 ? eventsPerformance.length : 8;
-
-  // Handlers for Add Movement
-  const handleAddIncomeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmittingIncome(true);
-    setIncomeError(null);
-
-    try {
-      const formData = new FormData();
-      formData.set("type", "entrada");
-      formData.set("description", incomeDesc.trim());
-      formData.set("amount", incomeAmount.trim());
-      formData.set("category", "Recebimento Cliente");
-      formData.set("date", new Date(incomeDate).toISOString());
-      if (incomeEventId) formData.set("eventId", incomeEventId);
-      if (incomeNotes) formData.set("notes", incomeNotes.trim());
-
-      const res = await onAddMovement(formData);
-      if (res && res.success) {
-        setShowAddIncomeModal(false);
-        setIncomeDesc("");
-        setIncomeAmount("");
-        setIncomeNotes("");
-      } else {
-        setIncomeError(res?.error || "Erro ao registar recebimento.");
-      }
-    } catch (err: any) {
-      setIncomeError(err?.message || "Erro inesperado ao registar recebimento.");
-    } finally {
-      setIsSubmittingIncome(false);
-    }
-  };
-
-  const handleAddExpenseSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmittingExpense(true);
-    setExpenseError(null);
-
-    try {
-      const formData = new FormData();
-      formData.set("type", "saida");
-      formData.set("description", expenseDesc.trim());
-      formData.set("amount", expenseAmount.trim());
-      formData.set("category", expenseCategory);
-      formData.set("date", new Date(expenseDate).toISOString());
-      if (expenseEventId) formData.set("eventId", expenseEventId);
-      if (expenseNotes) formData.set("notes", expenseNotes.trim());
-
-      const res = await onAddMovement(formData);
-      if (res && res.success) {
-        setShowAddExpenseModal(false);
-        setExpenseDesc("");
-        setExpenseAmount("");
-        setExpenseNotes("");
-      } else {
-        setExpenseError(res?.error || "Erro ao adicionar despesa.");
-      }
-    } catch (err: any) {
-      setExpenseError(err?.message || "Erro inesperado ao registar despesa.");
-    } finally {
-      setIsSubmittingExpense(false);
-    }
-  };
+  const totalEventsCount = filteredEvents.length;
 
   const handleDeleteConfirm = async () => {
     if (!movementToDelete) return;
@@ -348,7 +394,7 @@ export default function FinanceView({
   return (
     <div className="space-y-6 pb-20 max-w-5xl mx-auto">
       {/* ========================================================= */}
-      {/* 1. HEADER (ICON, TITLE, SUBTITLE & PERIOD SELECTOR) */}
+      {/* 1. HEADER (ICON, TITLE, SUBTITLE & PERIOD SELECTOR ON RIGHT) */}
       {/* ========================================================= */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
         <div className="flex items-center gap-3.5">
@@ -374,99 +420,83 @@ export default function FinanceView({
           </div>
         </div>
 
-        {/* Right actions: Period dropdown + Quick action buttons */}
-        <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Quick Add Buttons */}
-          <button
-            type="button"
-            onClick={() => {
-              setIncomeEventId("");
-              setIncomeAmount("");
-              setIncomeDesc("");
-              setShowAddIncomeModal(true);
-            }}
-            className="px-3 py-1.5 rounded-[12px] bg-[#eaf8ee] hover:bg-[#d8f2df] text-[#217a3b] border border-[#cbeed4] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
-            title="Registar recebimento de cliente"
+        {/* Date picker on the right (Buttons removed) */}
+        <div className="relative self-start sm:self-auto">
+          <select
+            value={selectedPeriod}
+            onChange={(e) => setSelectedPeriod(e.target.value)}
+            className="appearance-none bg-white border border-[#ececf0] rounded-[12px] pl-3.5 pr-8 py-2 text-xs font-semibold text-[#111111] shadow-2xs hover:bg-[#fafafc] focus:outline-none focus:ring-2 focus:ring-[#007aff]/30 cursor-pointer"
           >
-            <Coins className="w-3.5 h-3.5" />
-            <span>+ Recebimento</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setExpenseEventId("");
-              setExpenseAmount("");
-              setExpenseDesc("");
-              setShowAddExpenseModal(true);
-            }}
-            className="px-3 py-1.5 rounded-[12px] bg-white hover:bg-[#f8f8fa] text-[#111111] border border-[#ececf0] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
-            title="Lançar nova despesa"
-          >
-            <Plus className="w-3.5 h-3.5 text-[#8e8e93]" />
-            <span>+ Despesa</span>
-          </button>
-
-          {/* Period Selector Dropdown */}
-          <div className="relative">
-            <select
-              value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="appearance-none bg-white border border-[#ececf0] rounded-[12px] pl-3.5 pr-8 py-1.5 text-xs font-semibold text-[#111111] shadow-2xs hover:bg-[#fafafc] focus:outline-none focus:ring-2 focus:ring-[#007aff]/30 cursor-pointer"
-            >
-              <option value="6months">Últimos 6 meses</option>
-              <option value="3months">Últimos 3 meses</option>
-              <option value="thisMonth">Este mês</option>
-              <option value="year">Este ano</option>
-              <option value="all">Todo o histórico</option>
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-[#8e8e93] pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
-          </div>
+            <option value="6months">Últimos 6 meses</option>
+            <option value="3months">Últimos 3 meses</option>
+            <option value="thisMonth">Este mês</option>
+            <option value="year">Este ano</option>
+            <option value="all">Todo o histórico</option>
+          </select>
+          <ChevronDown className="w-3.5 h-3.5 text-[#8e8e93] pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
         </div>
       </div>
 
       {/* ========================================================= */}
-      {/* 2. CARD: "O seu negócio está a correr bem!" */}
+      {/* 2. CARD: RESUMO PRINCIPAL DO NEGÓCIO */}
       {/* ========================================================= */}
       <section className="bg-white border border-[#ececf0] rounded-[24px] p-6 sm:p-7 shadow-xs relative overflow-hidden">
-        {/* Top row: Check icon, title, subtitle & decorative mint green trend badge */}
+        {/* Top row: Status indicator & decorative trend */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3.5">
-            <div className="w-9 h-9 rounded-full bg-[#10b981] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-              <Check className="w-5 h-5 stroke-[2.75]" />
+            <div
+              className={`w-9 h-9 rounded-full text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs ${
+                totals.profit >= 0 ? "bg-[#10b981]" : "bg-[#ef4444]"
+              }`}
+            >
+              {totals.profit >= 0 ? (
+                <Check className="w-5 h-5 stroke-[2.75]" />
+              ) : (
+                <AlertCircle className="w-5 h-5 stroke-[2.75]" />
+              )}
             </div>
             <div>
               <h2 className="text-[18px] sm:text-[19px] font-bold text-[#111111] tracking-[-0.01em]">
-                O seu negócio está a correr bem!
+                {totals.profit >= 0
+                  ? "O seu negócio está a correr bem!"
+                  : "Atenção ao saldo operacional"}
               </h2>
               <p className="text-xs sm:text-[13px] text-[#8e8e93] mt-0.5">
-                Está a gerar mais lucro do que no período anterior.
+                {totals.profitGrowthPct !== null
+                  ? totals.profitGrowthPct >= 0
+                    ? `Está a gerar +${totals.profitGrowthPct}% de lucro em relação ao período anterior.`
+                    : `${totals.profitGrowthPct}% de lucro em relação ao período anterior.`
+                  : totals.hasData
+                  ? "Balanço calculado com base nos eventos e movimentos registados."
+                  : "Sem dados suficientes registados para o período selecionado."}
               </p>
             </div>
           </div>
 
-          {/* Decorative Mint Green Graphic Illustration with upward zigzag arrow */}
-          <div className="hidden sm:flex items-center justify-center w-28 h-12 rounded-full bg-[#e8f7ee] p-2 shrink-0">
-            <svg
-              className="w-20 h-8 text-[#10b981]"
-              viewBox="0 0 80 32"
-              fill="none"
-              stroke="currentColor"
-            >
-              <path
-                d="M 6 24 L 24 18 L 40 22 L 56 12 L 72 4"
-                strokeWidth="3.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M 60 4 L 72 4 L 72 16"
-                strokeWidth="3.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
+          {/* Decorative Trend Badge */}
+          {totals.hasData && totals.profit >= 0 && (
+            <div className="hidden sm:flex items-center justify-center w-28 h-12 rounded-full bg-[#e8f7ee] p-2 shrink-0">
+              <svg
+                className="w-20 h-8 text-[#10b981]"
+                viewBox="0 0 80 32"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path
+                  d="M 6 24 L 24 18 L 40 22 L 56 12 L 72 4"
+                  strokeWidth="3.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M 60 4 L 72 4 L 72 16"
+                  strokeWidth="3.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+          )}
         </div>
 
         {/* 3 Metric Columns with Dividers */}
@@ -476,13 +506,31 @@ export default function FinanceView({
             <div className="text-xs font-medium text-[#6e6e73]">
               Lucro líquido (ganho)
             </div>
-            <div className="text-[32px] sm:text-[36px] font-extrabold text-[#00875a] tracking-tight leading-none mt-1.5 mb-1.5">
-              {formatEuro(dynamicTotals.profit)}
+            <div
+              className={`text-[32px] sm:text-[36px] font-extrabold tracking-tight leading-none mt-1.5 mb-1.5 ${
+                totals.profit >= 0 ? "text-[#00875a]" : "text-[#ef4444]"
+              }`}
+            >
+              {totals.profit >= 0
+                ? formatEuro(totals.profit)
+                : `-${formatEuro(Math.abs(totals.profit))}`}
             </div>
-            <div className="text-xs font-semibold text-[#00875a] flex items-center gap-1">
-              <span>↑</span>
-              <span>{dynamicTotals.profitGrowthPct}% vs período anterior</span>
-            </div>
+            {totals.profitGrowthPct !== null ? (
+              <div
+                className={`text-xs font-semibold flex items-center gap-1 ${
+                  totals.profitGrowthPct >= 0 ? "text-[#00875a]" : "text-[#ef4444]"
+                }`}
+              >
+                <span>{totals.profitGrowthPct >= 0 ? "↑" : "↓"}</span>
+                <span>
+                  {Math.abs(totals.profitGrowthPct)}% vs período anterior
+                </span>
+              </div>
+            ) : (
+              <div className="text-[11px] text-[#8e8e93]">
+                {totals.hasData ? "Período base" : "Sem dados anteriores"}
+              </div>
+            )}
           </div>
 
           {/* Column 2: Money earned (revenue) */}
@@ -491,7 +539,7 @@ export default function FinanceView({
               Receita total (faturado)
             </div>
             <div className="text-[32px] sm:text-[36px] font-extrabold text-[#111111] tracking-tight leading-none mt-1.5">
-              {formatEuro(dynamicTotals.revenue)}
+              {formatEuro(totals.revenue)}
             </div>
           </div>
 
@@ -501,14 +549,14 @@ export default function FinanceView({
               Total de despesas
             </div>
             <div className="text-[32px] sm:text-[36px] font-extrabold text-[#111111] tracking-tight leading-none mt-1.5">
-              {formatEuro(dynamicTotals.expenses)}
+              {formatEuro(totals.expenses)}
             </div>
           </div>
         </div>
       </section>
 
       {/* ========================================================= */}
-      {/* 3. CARD: "Estamos a melhorar?" (CHART & GOOD NEWS CALLOUT) */}
+      {/* 3. CARD: "Estamos a melhorar?" (CHART & CALLOUT) */}
       {/* ========================================================= */}
       <section className="bg-white border border-[#ececf0] rounded-[24px] p-6 sm:p-7 shadow-xs space-y-6">
         {/* Header with Title and Legend */}
@@ -531,162 +579,190 @@ export default function FinanceView({
             </h2>
           </div>
 
-          {/* Legend */}
-          <div className="flex items-center gap-4 text-xs font-medium text-[#4b5563]">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#007aff]" />
-              <span>Receita</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#a855f7]" />
-              <span>Despesas</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Chart SVG */}
-        <div className="w-full relative">
-          <svg
-            className="w-full h-56 sm:h-64 overflow-visible"
-            viewBox="0 0 760 220"
-          >
-            {/* Horizontal Grid lines */}
-            {[60000, 40000, 20000, 0].map((val) => {
-              const y = getY(val);
-              return (
-                <g key={val}>
-                  <line
-                    x1="45"
-                    y1={y}
-                    x2="745"
-                    y2={y}
-                    stroke="#f0f0f4"
-                    strokeWidth="1"
-                  />
-                  <text
-                    x="35"
-                    y={y + 4}
-                    textAnchor="end"
-                    className="text-[11px] fill-[#9ca3af] font-sans font-medium"
-                  >
-                    {val === 0 ? "€0" : `€${val / 1000}k`}
-                  </text>
-                </g>
-              );
-            })}
-
-            {/* Blue line: Revenue */}
-            <path
-              d={revenuePath}
-              fill="none"
-              stroke="#007aff"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-
-            {/* Purple line: Expenses */}
-            <path
-              d={expensesPath}
-              fill="none"
-              stroke="#a855f7"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-
-            {/* Revenue Circles */}
-            {chartData.map((d, idx) => {
-              const cx = getX(idx);
-              const cy = getY(d.revenue);
-              return (
-                <circle
-                  key={`rev-${idx}`}
-                  cx={cx}
-                  cy={cy}
-                  r={hoveredPoint === idx ? "6" : "4"}
-                  fill="#007aff"
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                  className="transition-all cursor-pointer"
-                  onMouseEnter={() => setHoveredPoint(idx)}
-                  onMouseLeave={() => setHoveredPoint(null)}
-                />
-              );
-            })}
-
-            {/* Expenses Circles */}
-            {chartData.map((d, idx) => {
-              const cx = getX(idx);
-              const cy = getY(d.expenses);
-              return (
-                <circle
-                  key={`exp-${idx}`}
-                  cx={cx}
-                  cy={cy}
-                  r={hoveredPoint === idx ? "6" : "4"}
-                  fill="#a855f7"
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                  className="transition-all cursor-pointer"
-                  onMouseEnter={() => setHoveredPoint(idx)}
-                  onMouseLeave={() => setHoveredPoint(null)}
-                />
-              );
-            })}
-
-            {/* X-axis Month Labels */}
-            {chartData.map((d, idx) => {
-              const cx = getX(idx);
-              return (
-                <text
-                  key={`month-${idx}`}
-                  x={cx}
-                  y="208"
-                  textAnchor="middle"
-                  className="text-[12px] fill-[#6b7280] font-sans font-medium"
-                >
-                  {d.month}
-                </text>
-              );
-            })}
-          </svg>
-
-          {/* Interactive hover tooltip */}
-          {hoveredPoint !== null && (
-            <div
-              className="absolute pointer-events-none bg-[#111111] text-white text-[11px] rounded-lg px-2.5 py-1.5 shadow-lg transform -translate-x-1/2 -translate-y-full z-10 space-y-0.5"
-              style={{
-                left: `${(getX(hoveredPoint) / 760) * 100}%`,
-                top: `${(getY(chartData[hoveredPoint].revenue) / 220) * 100}%`,
-                marginTop: "-12px",
-              }}
-            >
-              <div className="font-bold text-white border-b border-white/20 pb-0.5">
-                {chartData[hoveredPoint].month}
+          {chartData.hasEnoughData && (
+            <div className="flex items-center gap-4 text-xs font-medium text-[#4b5563]">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#007aff]" />
+                <span>Receita</span>
               </div>
-              <div className="text-[#60a5fa]">
-                Receita: {formatEuro(chartData[hoveredPoint].revenue)}
-              </div>
-              <div className="text-[#c084fc]">
-                Despesas: {formatEuro(chartData[hoveredPoint].expenses)}
-              </div>
-              <div className="text-[#4ade80] font-semibold">
-                Lucro: +{formatEuro(chartData[hoveredPoint].revenue - chartData[hoveredPoint].expenses)}
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#a855f7]" />
+                <span>Despesas</span>
               </div>
             </div>
           )}
         </div>
 
-        {/* Good News Callout Banner */}
-        <div className="bg-[#eaf8ee] border border-[#cbeed4]/70 rounded-[16px] p-3.5 sm:p-4 flex items-center gap-3">
-          <div className="w-5 h-5 rounded-full bg-[#10b981] text-white flex items-center justify-center shrink-0">
-            <Check className="w-3.5 h-3.5 stroke-[3]" />
+        {/* Chart SVG or Empty State */}
+        {chartData.hasEnoughData ? (
+          <div className="w-full relative">
+            <svg
+              className="w-full h-56 sm:h-64 overflow-visible"
+              viewBox="0 0 760 220"
+            >
+              {/* Horizontal Grid lines */}
+              {[maxChartVal, Math.round(maxChartVal * 0.66), Math.round(maxChartVal * 0.33), 0].map(
+                (val) => {
+                  const y = getY(val);
+                  return (
+                    <g key={val}>
+                      <line
+                        x1="45"
+                        y1={y}
+                        x2="745"
+                        y2={y}
+                        stroke="#f0f0f4"
+                        strokeWidth="1"
+                      />
+                      <text
+                        x="35"
+                        y={y + 4}
+                        textAnchor="end"
+                        className="text-[11px] fill-[#9ca3af] font-sans font-medium"
+                      >
+                        {val === 0 ? "€0" : `€${Math.round(val / 1000)}k`}
+                      </text>
+                    </g>
+                  );
+                }
+              )}
+
+              {/* Blue line: Revenue */}
+              <path
+                d={revenuePath}
+                fill="none"
+                stroke="#007aff"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+
+              {/* Purple line: Expenses */}
+              <path
+                d={expensesPath}
+                fill="none"
+                stroke="#a855f7"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+
+              {/* Revenue Circles */}
+              {chartData.points.map((d, idx) => {
+                const cx = getX(idx);
+                const cy = getY(d.revenue);
+                return (
+                  <circle
+                    key={`rev-${idx}`}
+                    cx={cx}
+                    cy={cy}
+                    r={hoveredPoint === idx ? "6" : "4"}
+                    fill="#007aff"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                    className="transition-all cursor-pointer"
+                    onMouseEnter={() => setHoveredPoint(idx)}
+                    onMouseLeave={() => setHoveredPoint(null)}
+                  />
+                );
+              })}
+
+              {/* Expenses Circles */}
+              {chartData.points.map((d, idx) => {
+                const cx = getX(idx);
+                const cy = getY(d.expenses);
+                return (
+                  <circle
+                    key={`exp-${idx}`}
+                    cx={cx}
+                    cy={cy}
+                    r={hoveredPoint === idx ? "6" : "4"}
+                    fill="#a855f7"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                    className="transition-all cursor-pointer"
+                    onMouseEnter={() => setHoveredPoint(idx)}
+                    onMouseLeave={() => setHoveredPoint(null)}
+                  />
+                );
+              })}
+
+              {/* X-axis Month Labels */}
+              {chartData.points.map((d, idx) => {
+                const cx = getX(idx);
+                return (
+                  <text
+                    key={`month-${idx}`}
+                    x={cx}
+                    y="208"
+                    textAnchor="middle"
+                    className="text-[12px] fill-[#6b7280] font-sans font-medium"
+                  >
+                    {d.month}
+                  </text>
+                );
+              })}
+            </svg>
+
+            {/* Interactive hover tooltip */}
+            {hoveredPoint !== null && (
+              <div
+                className="absolute pointer-events-none bg-[#111111] text-white text-[11px] rounded-lg px-2.5 py-1.5 shadow-lg transform -translate-x-1/2 -translate-y-full z-10 space-y-0.5"
+                style={{
+                  left: `${(getX(hoveredPoint) / 760) * 100}%`,
+                  top: `${(getY(chartData.points[hoveredPoint].revenue) / 220) * 100}%`,
+                  marginTop: "-12px",
+                }}
+              >
+                <div className="font-bold text-white border-b border-white/20 pb-0.5">
+                  {chartData.points[hoveredPoint].month}
+                </div>
+                <div className="text-[#60a5fa]">
+                  Receita: {formatEuro(chartData.points[hoveredPoint].revenue)}
+                </div>
+                <div className="text-[#c084fc]">
+                  Despesas: {formatEuro(chartData.points[hoveredPoint].expenses)}
+                </div>
+                <div className="text-[#4ade80] font-semibold">
+                  Lucro:{" "}
+                  {chartData.points[hoveredPoint].revenue >=
+                  chartData.points[hoveredPoint].expenses
+                    ? `+${formatEuro(
+                        chartData.points[hoveredPoint].revenue -
+                          chartData.points[hoveredPoint].expenses
+                      )}`
+                    : `-${formatEuro(
+                        chartData.points[hoveredPoint].expenses -
+                          chartData.points[hoveredPoint].revenue
+                      )}`}
+                </div>
+              </div>
+            )}
           </div>
-          <p className="text-xs sm:text-[13px] font-semibold text-[#166534]">
-            Boas notícias! Está a faturar mais enquanto mantém as despesas controladas.
-          </p>
-        </div>
+        ) : (
+          <div className="py-12 px-4 rounded-[16px] bg-[#f8f8fa] border border-[#ececf0] text-center space-y-1.5">
+            <p className="text-sm font-semibold text-[#111111]">
+              Não existem dados suficientes para apresentar o gráfico evolutivo.
+            </p>
+            <p className="text-xs text-[#8e8e93]">
+              Registe movimentos de caixa ou conclua eventos em meses consecutivos para acompanhar a evolução.
+            </p>
+          </div>
+        )}
+
+        {/* Good News / Status Callout Banner */}
+        {chartData.hasEnoughData ? (
+          <div className="bg-[#eaf8ee] border border-[#cbeed4]/70 rounded-[16px] p-3.5 sm:p-4 flex items-center gap-3">
+            <div className="w-5 h-5 rounded-full bg-[#10b981] text-white flex items-center justify-center shrink-0">
+              <Check className="w-3.5 h-3.5 stroke-[3]" />
+            </div>
+            <p className="text-xs sm:text-[13px] font-semibold text-[#166534]">
+              {totals.profit >= 0
+                ? "Boas notícias! Está a faturar mais enquanto mantém as despesas controladas."
+                : "Acompanhe de perto as saídas de caixa para restaurar a margem positiva."}
+            </p>
+          </div>
+        ) : null}
       </section>
 
       {/* ========================================================= */}
@@ -707,47 +783,63 @@ export default function FinanceView({
             </div>
 
             {/* Categories with Horizontal Progress Bars */}
-            <div className="space-y-4 my-2">
-              {categoryBreakdown.map((cat, idx) => (
-                <div
-                  key={cat.name}
-                  className="flex items-center justify-between gap-3 text-xs sm:text-sm"
-                >
-                  <span className="font-medium text-[#374151] w-32 sm:w-36 shrink-0 truncate">
-                    {cat.name}
-                  </span>
+            {categoryBreakdown.length > 0 ? (
+              <div className="space-y-4 my-2">
+                {categoryBreakdown.map((cat, idx) => (
+                  <div
+                    key={cat.name}
+                    className="flex items-center justify-between gap-3 text-xs sm:text-sm"
+                  >
+                    <span className="font-medium text-[#374151] w-32 sm:w-36 shrink-0 truncate">
+                      {cat.name}
+                    </span>
 
-                  {/* Horizontal Bar */}
-                  <div className="flex-1 h-2.5 bg-[#f0f0f4] rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${Math.max(5, Math.min(100, cat.pct))}%`,
-                        backgroundColor:
-                          idx === 0 ? "#0d9488" : idx === 1 ? "#0f766e" : "#14b8a6",
-                      }}
-                    />
+                    {/* Horizontal Bar */}
+                    <div className="flex-1 h-2.5 bg-[#f0f0f4] rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.max(5, Math.min(100, cat.pct))}%`,
+                          backgroundColor:
+                            idx === 0
+                              ? "#0d9488"
+                              : idx === 1
+                              ? "#0f766e"
+                              : idx === 2
+                              ? "#14b8a6"
+                              : "#2dd4bf",
+                        }}
+                      />
+                    </div>
+
+                    <span className="font-medium text-[#111111] shrink-0 text-right min-w-[90px]">
+                      {formatEuro(cat.amount)} ({cat.pct}%)
+                    </span>
                   </div>
-
-                  <span className="font-medium text-[#111111] shrink-0 text-right min-w-[90px]">
-                    {formatEuro(cat.amount)} ({cat.pct}%)
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 px-4 rounded-[16px] bg-[#f8f8fa] text-center text-xs text-[#8e8e93]">
+                Não existem despesas categorizadas registadas neste período.
+              </div>
+            )}
           </div>
 
           {/* Footer Link: Ver detalhe completo */}
-          <div className="pt-4 border-t border-[#ececf0] mt-6">
-            <button
-              type="button"
-              onClick={() => setShowBreakdownModal(true)}
-              className="text-xs sm:text-sm font-semibold text-[#007aff] hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <span>Ver detalhe completo</span>
-              <span className="text-base leading-none">→</span>
-            </button>
-          </div>
+          {filteredMovements.filter(
+            (m) => m.type === "saida" || m.type === "investimento"
+          ).length > 0 && (
+            <div className="pt-4 border-t border-[#ececf0] mt-6">
+              <button
+                type="button"
+                onClick={() => setShowBreakdownModal(true)}
+                className="text-xs sm:text-sm font-semibold text-[#007aff] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>Ver detalhe completo</span>
+                <span className="text-base leading-none">→</span>
+              </button>
+            </div>
+          )}
         </section>
 
         {/* Right Card: "Desempenho dos seus eventos" */}
@@ -763,48 +855,60 @@ export default function FinanceView({
                   Desempenho dos seus eventos
                 </h3>
                 <p className="text-xs text-[#8e8e93] mt-0.5">
-                  {profitableEventsCount} de {totalEventsCount} eventos deram lucro
+                  {totalEventsCount > 0
+                    ? `${profitableEventsCount} de ${totalEventsCount} eventos deram lucro`
+                    : "Sem eventos realizados neste período"}
                 </p>
               </div>
             </div>
 
             {/* Event Profitability List */}
-            <div className="space-y-3.5 my-2">
-              {eventsPerformance.map((ev) => (
-                <div
-                  key={ev.id}
-                  className="flex items-center justify-between text-xs sm:text-sm"
-                >
-                  <span className="font-medium text-[#111111] truncate pr-2">
-                    {ev.name}
-                  </span>
-                  <span
-                    className={`font-bold shrink-0 ${
-                      ev.profit >= 0 ? "text-[#00875a]" : "text-[#ef4444]"
-                    }`}
+            {eventsPerformance.length > 0 ? (
+              <div className="space-y-3.5 my-2">
+                {eventsPerformance.map((ev) => (
+                  <div
+                    key={ev.id}
+                    className="flex items-center justify-between text-xs sm:text-sm"
                   >
-                    {ev.profit >= 0 ? `+${formatEuro(ev.profit)}` : `-${formatEuro(Math.abs(ev.profit))}`}
-                  </span>
-                </div>
-              ))}
-            </div>
+                    <span className="font-medium text-[#111111] truncate pr-2">
+                      {ev.name}
+                    </span>
+                    <span
+                      className={`font-bold shrink-0 ${
+                        ev.profit >= 0 ? "text-[#00875a]" : "text-[#ef4444]"
+                      }`}
+                    >
+                      {ev.profit >= 0
+                        ? `+${formatEuro(ev.profit)}`
+                        : `-${formatEuro(Math.abs(ev.profit))}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 px-4 rounded-[16px] bg-[#f8f8fa] text-center text-xs text-[#8e8e93]">
+                Não existem eventos ativos para apresentar neste período.
+              </div>
+            )}
           </div>
 
           {/* Footer Link: Ver todos os eventos */}
-          <div className="pt-4 border-t border-[#ececf0] mt-6">
-            <button
-              type="button"
-              onClick={() => {
-                if (onNavigateToEvents) {
-                  onNavigateToEvents();
-                }
-              }}
-              className="text-xs sm:text-sm font-semibold text-[#007aff] hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <span>Ver todos os eventos</span>
-              <span className="text-base leading-none">→</span>
-            </button>
-          </div>
+          {eventsPerformance.length > 0 && (
+            <div className="pt-4 border-t border-[#ececf0] mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onNavigateToEvents) {
+                    onNavigateToEvents();
+                  }
+                }}
+                className="text-xs sm:text-sm font-semibold text-[#007aff] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>Ver todos os eventos</span>
+                <span className="text-base leading-none">→</span>
+              </button>
+            </div>
+          )}
         </section>
       </div>
 
@@ -827,15 +931,19 @@ export default function FinanceView({
           {/* Column 1: From clients */}
           <div className="sm:pr-6">
             <div className="text-[28px] sm:text-[32px] font-extrabold text-[#111111] tracking-tight leading-none mb-1">
-              {formatEuro(dynamicTotals.moneyToReceive)}
+              {formatEuro(totals.moneyToReceive)}
             </div>
             <div className="text-xs font-medium text-[#8e8e93]">De clientes</div>
           </div>
 
           {/* Column 2: Overdue */}
           <div className="pt-4 sm:pt-0 sm:px-6">
-            <div className="text-[28px] sm:text-[32px] font-extrabold text-[#ef4444] tracking-tight leading-none mb-1">
-              {formatEuro(dynamicTotals.overdue)}
+            <div
+              className={`text-[28px] sm:text-[32px] font-extrabold tracking-tight leading-none mb-1 ${
+                totals.overdue > 0 ? "text-[#ef4444]" : "text-[#111111]"
+              }`}
+            >
+              {formatEuro(totals.overdue)}
             </div>
             <div className="text-xs font-medium text-[#8e8e93]">Em atraso</div>
           </div>
@@ -843,7 +951,7 @@ export default function FinanceView({
           {/* Column 3: Upcoming */}
           <div className="pt-4 sm:pt-0 sm:pl-6">
             <div className="text-[28px] sm:text-[32px] font-extrabold text-[#111111] tracking-tight leading-none mb-1">
-              {formatEuro(dynamicTotals.upcoming)}
+              {formatEuro(totals.upcoming)}
             </div>
             <div className="text-xs font-medium text-[#8e8e93]">
               Previsto / Próximo
@@ -883,14 +991,14 @@ export default function FinanceView({
 
             {/* List of expenses */}
             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-              {activeMovements.filter(
+              {filteredMovements.filter(
                 (m) => m.type === "saida" || m.type === "investimento"
               ).length === 0 ? (
                 <div className="p-6 text-center text-[#8e8e93] bg-[#f8f8fa] rounded-[16px]">
-                  Nenhuma despesa individual registada ainda no sistema.
+                  Nenhuma despesa individual registada para o período selecionado.
                 </div>
               ) : (
-                activeMovements
+                filteredMovements
                   .filter((m) => m.type === "saida" || m.type === "investimento")
                   .map((m) => (
                     <div
@@ -902,7 +1010,8 @@ export default function FinanceView({
                           {m.description}
                         </div>
                         <div className="text-[11px] text-[#8e8e93]">
-                          {m.category || "Geral"} · {new Date(m.date).toLocaleDateString("pt-PT")}
+                          {m.category || "Geral"} ·{" "}
+                          {new Date(m.date).toLocaleDateString("pt-PT")}
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -923,18 +1032,7 @@ export default function FinanceView({
               )}
             </div>
 
-            <div className="pt-3 border-t border-[#ececf0] flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowBreakdownModal(false);
-                  setShowAddExpenseModal(true);
-                }}
-                className="px-3.5 py-2 rounded-[12px] bg-[#111111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Adicionar Nova Despesa</span>
-              </button>
+            <div className="pt-3 border-t border-[#ececf0] flex items-center justify-end">
               <button
                 type="button"
                 onClick={() => setShowBreakdownModal(false)}
@@ -943,292 +1041,6 @@ export default function FinanceView({
                 Fechar
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* MODAL: REGISTAR RECEBIMENTO */}
-      {/* ========================================================= */}
-      {showAddIncomeModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-[22px] w-full max-w-md border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-[#eaf8ee] text-[#217a3b] flex items-center justify-center font-bold">
-                  <Coins className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-[#111111]">
-                    Registar Recebimento
-                  </h3>
-                  <p className="text-[11px] text-[#8e8e93]">
-                    Entrada de caixa associada a um evento
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddIncomeModal(false)}
-                className="w-8 h-8 rounded-full hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {incomeError && (
-              <div className="p-3 rounded-[12px] bg-rose-50 border border-rose-200 text-rose-700 text-xs">
-                {incomeError}
-              </div>
-            )}
-
-            <form onSubmit={handleAddIncomeSubmit} className="space-y-3.5">
-              <div>
-                <label className="block font-bold text-[#111111] mb-1">
-                  Evento Associado *
-                </label>
-                <select
-                  required
-                  value={incomeEventId}
-                  onChange={(e) => {
-                    setIncomeEventId(e.target.value);
-                    const ev = events.find((x) => x.id === e.target.value);
-                    if (ev) {
-                      setIncomeDesc(`Recebimento Cliente · ${ev.name}`);
-                      setIncomeAmount(String(ev.customerPrice || ""));
-                    }
-                  }}
-                  className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                >
-                  <option value="">Selecione o evento...</option>
-                  {events
-                    .filter((ev) => countsForFinance(ev))
-                    .map((ev) => (
-                      <option key={ev.id} value={ev.id}>
-                        {ev.name} · {formatEuro(ev.customerPrice || 0)}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#111111] mb-1">
-                    Valor Recebido (€) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={incomeAmount}
-                    onChange={(e) => setIncomeAmount(e.target.value)}
-                    placeholder="Ex: 3850"
-                    className="w-full px-3 py-2 text-sm font-bold bg-white border border-[#ececf0] rounded-[12px] text-[#217a3b] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-[#111111] mb-1">
-                    Data *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={incomeDate}
-                    onChange={(e) => setIncomeDate(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#111111] mb-1">
-                  Descrição *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={incomeDesc}
-                  onChange={(e) => setIncomeDesc(e.target.value)}
-                  placeholder="Ex: Pagamento final Gala Mastercard"
-                  className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#111111] mb-1">
-                  Observações / Comprovativo
-                </label>
-                <textarea
-                  value={incomeNotes}
-                  onChange={(e) => setIncomeNotes(e.target.value)}
-                  rows={2}
-                  placeholder="Transferência bancária, ref. fatura..."
-                  className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmittingIncome || !incomeAmount.trim()}
-                className="w-full py-2.5 rounded-[12px] bg-[#10b981] hover:bg-[#059669] text-white text-xs font-bold transition shadow-xs mt-2 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
-              >
-                <Coins className="w-4 h-4" />
-                <span>
-                  {isSubmittingIncome ? "A registar..." : "Confirmar Recebimento"}
-                </span>
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* MODAL: ADICIONAR DESPESA */}
-      {/* ========================================================= */}
-      {showAddExpenseModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-[22px] w-full max-w-md border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-[#fee2e2] text-[#ef4444] flex items-center justify-center font-bold">
-                  <Plus className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-[#111111]">
-                    Adicionar Despesa
-                  </h3>
-                  <p className="text-[11px] text-[#8e8e93]">
-                    Registo de saída de caixa ou custo de evento
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddExpenseModal(false)}
-                className="w-8 h-8 rounded-full hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {expenseError && (
-              <div className="p-3 rounded-[12px] bg-rose-50 border border-rose-200 text-rose-700 text-xs">
-                {expenseError}
-              </div>
-            )}
-
-            <form onSubmit={handleAddExpenseSubmit} className="space-y-3.5">
-              <div>
-                <label className="block font-bold text-[#111111] mb-1">
-                  Descrição da Despesa *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={expenseDesc}
-                  onChange={(e) => setExpenseDesc(e.target.value)}
-                  placeholder="Ex: Renda do armazém, Catering, Luz..."
-                  className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#111111] mb-1">
-                    Valor (€) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={expenseAmount}
-                    onChange={(e) => setExpenseAmount(e.target.value)}
-                    placeholder="Ex: 850"
-                    className="w-full px-3 py-2 text-sm font-bold bg-white border border-[#ececf0] rounded-[12px] text-[#ef4444] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-[#111111] mb-1">
-                    Categoria *
-                  </label>
-                  <select
-                    value={expenseCategory}
-                    onChange={(e) => setExpenseCategory(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                  >
-                    <option value="Espaço / Local">Espaço / Local</option>
-                    <option value="Catering / Alimentação">Catering / Alimentação</option>
-                    <option value="Produção / Equipamento">Produção / Equipamento</option>
-                    <option value="Rendas & Instalações">Rendas & Instalações</option>
-                    <option value="Equipa & Subcontratados">Equipa & Subcontratados</option>
-                    <option value="Logística & Transportes">Logística & Transportes</option>
-                    <option value="Marketing & Vendas">Marketing & Vendas</option>
-                    <option value="Outros">Outros</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#111111] mb-1">
-                    Data *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={expenseDate}
-                    onChange={(e) => setExpenseDate(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-[#111111] mb-1">
-                    Evento (Opcional)
-                  </label>
-                  <select
-                    value={expenseEventId}
-                    onChange={(e) => setExpenseEventId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                  >
-                    <option value="">Nenhum (Despesa Geral)</option>
-                    {events
-                      .filter((ev) => countsForFinance(ev))
-                      .map((ev) => (
-                        <option key={ev.id} value={ev.id}>
-                          {ev.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#111111] mb-1">
-                  Notas / Referência
-                </label>
-                <textarea
-                  value={expenseNotes}
-                  onChange={(e) => setExpenseNotes(e.target.value)}
-                  rows={2}
-                  placeholder="Fatura nº, fornecedor..."
-                  className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmittingExpense || !expenseAmount.trim()}
-                className="w-full py-2.5 rounded-[12px] bg-[#111111] hover:bg-black text-white text-xs font-bold transition shadow-xs mt-2 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" />
-                <span>
-                  {isSubmittingExpense ? "A registar..." : "Registar Despesa"}
-                </span>
-              </button>
-            </form>
           </div>
         </div>
       )}
