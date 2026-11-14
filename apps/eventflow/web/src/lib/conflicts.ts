@@ -60,9 +60,9 @@ export async function checkItemAvailability(
         eq(eventAllocations.itemId, itemId),
         sql`${events.status} != 'cancelado'`,
         excludeEventId ? sql`${events.id} != ${excludeEventId}` : sql`1 = 1`,
-        // Overlap logic
-        sql`COALESCE(${events.prepDate}, ${events.startDate}) <= ${endDate.getTime() / 1000}`,
-        sql`COALESCE(${events.returnDate}, ${events.endDate}) >= ${startDate.getTime() / 1000}`
+        // Overlap logic: Event overlaps if start <= requestedEndDate AND end >= requestedStartDate
+        sql`COALESCE(${events.prepDate}, ${events.startDate}) <= ${Math.floor(endDate.getTime() / 1000)}`,
+        sql`COALESCE(${events.returnDate}, ${events.endDate}, ${events.startDate}) >= ${Math.floor(startDate.getTime() / 1000)}`
       )
     );
 

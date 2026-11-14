@@ -302,10 +302,8 @@ export async function evaluateAndSyncAlerts() {
           nextStatus = "active";
           nextSnoozedUntil = null;
         }
-      } else if (existing.status === "resolved") {
-        // Reopened!
-        nextStatus = "active";
       }
+      // If status is "resolved" (dismissed), preserve "resolved" so it stays dismissed until new trigger context
 
       await db
         .update(alerts)

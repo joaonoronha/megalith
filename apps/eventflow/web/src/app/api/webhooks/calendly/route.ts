@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db/client";
-import { clients, events } from "@/db/schema";
+import { db, ensureDbMigrated } from "@/db/client";
+import { clients, eventMeetings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
 import { generateId } from "@/lib/id";
+import { revalidatePath } from "next/cache";
 
 export async function GET() {
   return NextResponse.json({
@@ -19,6 +20,7 @@ export async function HEAD() {
 
 export async function POST(req: NextRequest) {
   try {
+    await ensureDbMigrated().catch(() => {});
     const rawBody = await req.text();
     const signature = req.headers.get("calendly-webhook-signature");
     const secret = process.env.CALENDLY_WEBHOOK_SECRET;
@@ -80,28 +82,55 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // 2. Create Event in "Planeamento" stage
-      const eventId = generateId("evt");
-      await db.insert(events).values({
-        id: eventId,
-        name: `${inviteeName} · ${meetingName}`,
-        clientId: clientId,
-        venue: scheduledEvent.location?.location || "Reunião de Briefing",
-        startDate: meetingStart,
-        endDate: meetingEnd,
-        status: "planeamento",
-        category: "Reunião Calendly",
-        theme: "Briefing & Consulta de Evento",
-        notes: `Agendado via Calendly.\n${qaNotes}`,
-        calendlyEventUri: data.event,
-        createdAt: new Date(),
-      });
+      // 2. Check if meeting already exists in eventMeetings
+      const eventUri = data.event;
+      const existingMeeting = eventUri
+        ? await db.query.eventMeetings.findFirst({
+            where: eq(eventMeetings.calendlyUri, eventUri),
+          })
+        : null;
+
+      const meetingLocation = scheduledEvent.location?.location || (scheduledEvent.location?.type === "google_conference" ? "Google Meet" : "Presencial");
+      const meetUrl = scheduledEvent.location?.join_url || (typeof scheduledEvent.location?.location === "string" && scheduledEvent.location.location.startsWith("http") ? scheduledEvent.location.location : null);
+
+      let meetingId = existingMeeting?.id;
+      if (!meetingId) {
+        meetingId = generateId("mtg");
+        await db.insert(eventMeetings).values({
+          id: meetingId,
+          clientId,
+          eventId: null,
+          title: `${inviteeName} · ${meetingName}`,
+          type: meetUrl || scheduledEvent.location?.type === "google_conference" ? "google_meet" : "presencial",
+          status: "agendada",
+          startDate: meetingStart,
+          endDate: meetingEnd,
+          location: meetingLocation,
+          meetUrl: meetUrl || (meetingLocation === "Google Meet" ? `https://meet.google.com/cfm-${meetingId.slice(-6)}` : null),
+          notes: `Agendado via Calendly.\n${qaNotes}`,
+          source: "calendly",
+          calendlyUri: eventUri || null,
+          clientContactName: inviteeName,
+          clientContactEmail: inviteeEmail,
+          clientContactPhone: inviteePhone,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+
+      try {
+        revalidatePath("/");
+        revalidatePath("/reunioes");
+        revalidatePath("/meetings");
+        revalidatePath("/calendario");
+        revalidatePath("/calendar");
+      } catch {}
 
       return NextResponse.json({
         success: true,
-        message: "Client and event created from Calendly booking",
+        message: "Client and meeting created from Calendly booking",
         clientId,
-        eventId,
+        meetingId,
       });
     }
 
@@ -109,11 +138,18 @@ export async function POST(req: NextRequest) {
       const eventUri = data.event;
       if (eventUri) {
         await db
-          .update(events)
-          .set({ status: "cancelado", notes: "Cancelado via Calendly." })
-          .where(eq(events.calendlyEventUri, eventUri));
+          .update(eventMeetings)
+          .set({ status: "cancelada", notes: "Cancelada via Calendly.", updatedAt: new Date() })
+          .where(eq(eventMeetings.calendlyUri, eventUri));
       }
-      return NextResponse.json({ success: true, message: "Event cancelled" });
+      try {
+        revalidatePath("/");
+        revalidatePath("/reunioes");
+        revalidatePath("/meetings");
+        revalidatePath("/calendario");
+        revalidatePath("/calendar");
+      } catch {}
+      return NextResponse.json({ success: true, message: "Meeting cancelled" });
     }
 
     return NextResponse.json({ success: true, message: `Ignored event: ${eventType}` });

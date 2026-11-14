@@ -149,24 +149,7 @@ export async function ensureDbMigrated(): Promise<void> {
       }
     }
 
-    // 9. Equalize unit_price and replacement_cost for inventory items (price = purchase/replacement price)
-    try {
-      await client.execute(`
-        UPDATE inventory_items
-        SET unit_price = CASE
-          WHEN replacement_cost IS NOT NULL AND replacement_cost > 0 THEN replacement_cost
-          WHEN purchase_cost IS NOT NULL AND purchase_cost > 0 THEN purchase_cost
-          ELSE unit_price
-        END,
-        replacement_cost = CASE
-          WHEN replacement_cost IS NOT NULL AND replacement_cost > 0 THEN replacement_cost
-          WHEN purchase_cost IS NOT NULL AND purchase_cost > 0 THEN purchase_cost
-          ELSE unit_price
-        END
-      `);
-    } catch (e) {
-      // Ignore if columns missing or already migrated
-    }
+    // 9. Legacy pricing sync removed to preserve daily rental unit_price vs acquisition replacement_cost.
 
     // 6. Migrate any legacy meeting rows in `events` table to `event_meetings` and remove them from `events`
     try {

@@ -166,7 +166,7 @@ Responde estritamente em formato JSON válido conforme o esquema.`;
   parts.push({ text: promptText });
   contents.push({ parts });
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
   const responseSchema = {
     type: "OBJECT",

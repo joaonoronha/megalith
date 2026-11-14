@@ -124,4 +124,30 @@ describe("CFM Events: Overview Resumo Financeiro & Profit Trajectory", () => {
     assert.strictEqual(result.events[0].profit, 5000);
     assert.strictEqual(result.totalProfit, 5000);
   });
+
+  it("does not let partial deposits suppress full contracted revenue on completed events", () => {
+    const mockEvents = [
+      {
+        id: "evt-partial",
+        name: "Partial Paid Event",
+        status: "concluido",
+        startDate: "2026-10-15T10:00:00Z",
+        customerPrice: 8000,
+        totalBudget: 3000,
+      },
+    ];
+
+    // Client only paid 1000€ deposit so far, 7000€ still pending invoice
+    const mockMovements = [
+      { eventId: "evt-partial", type: "entrada", amount: 1000 },
+      { eventId: "evt-partial", type: "saida", amount: 2500 },
+    ];
+
+    const result = computeCompletedEventsProfit(mockEvents, mockMovements);
+
+    // Revenue must remain at least the contracted 8000€
+    assert.strictEqual(result.events[0].revenue, 8000);
+    assert.strictEqual(result.events[0].costs, 2500);
+    assert.strictEqual(result.events[0].profit, 5500);
+  });
 });
