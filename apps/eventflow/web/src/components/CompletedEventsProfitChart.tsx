@@ -2,7 +2,7 @@
 
 import React, { useState, useId } from "react";
 import Link from "next/link";
-import { TrendingUp, Sparkles, CheckCircle2 } from "lucide-react";
+import { TrendingUp, Sparkles } from "lucide-react";
 import {
   CompletedEventFinancial,
   MonthlyTrajectoryItem,
@@ -116,15 +116,9 @@ export default function CompletedEventsProfitChart({
       {/* Head */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1 border-b border-[#ececf0]/60">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[18px] font-bold tracking-[-0.35px] text-[#111111]">
-              Resumo financeiro
-            </span>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#eaf8ee] text-[#217a3b] border border-[#217a3b]/20 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" />
-              <span>Eventos concluídos</span>
-            </span>
-          </div>
+          <span className="text-[18px] font-bold tracking-[-0.35px] text-[#111111]">
+            Resumo financeiro
+          </span>
           <div className="text-[12px] text-[#8e8e93] mt-0.5">
             Lucro atual apurado com base em eventos passados finalizados
           </div>
