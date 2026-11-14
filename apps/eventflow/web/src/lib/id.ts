@@ -64,3 +64,39 @@ export function formatCustomId(prefix: EntityPrefix, rawInput: string): string {
     ? clean
     : `${prefix}-${clean}`;
 }
+
+/**
+ * Resolves the SKU for an inventory item:
+ * - If an explicit SKU is provided (from barcode scan or user input), preserves it directly without sluggification.
+ * - If a barcode is provided and no SKU is given, uses the barcode directly as the SKU without sluggification.
+ * - Only if neither SKU nor barcode is provided, falls back to sluggifying the item name.
+ */
+export function determineItemSku(params: {
+  sku?: string | null;
+  barcode?: string | null;
+  name?: string | null;
+}): string {
+  const cleanSku = (params.sku || "").trim();
+  if (cleanSku) {
+    return cleanSku.toUpperCase();
+  }
+
+  const cleanBarcode = (params.barcode || "").trim();
+  if (cleanBarcode) {
+    return cleanBarcode.toUpperCase();
+  }
+
+  const cleanName = (params.name || "").trim();
+  if (cleanName) {
+    const baseSlug = cleanName
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .toUpperCase();
+    return baseSlug || `ART-${Date.now()}`;
+  }
+
+  return `ART-${Date.now()}`;
+}

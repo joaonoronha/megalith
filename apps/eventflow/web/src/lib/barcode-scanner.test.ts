@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { determineItemSku } from "./id";
 
 describe("CFM Events: Barcode Scanner Business Rules & Accessibility", () => {
   it("formats barcode search results from database match cleanly without technical jargon", () => {
@@ -117,5 +118,53 @@ describe("CFM Events: Barcode Scanner Business Rules & Accessibility", () => {
     assert.equal(fallbackResult.found, false);
     assert.equal(fallbackResult.source, "none");
     assert.equal(fallbackResult.suggestedItem, null);
+  });
+
+  it("preserves barcode as SKU when barcode is scanned and does NOT sluggify the item name", () => {
+    const scannedBarcode = "5601234567890";
+    const itemName = "Água das Pedras Salgadas 25cl";
+
+    // 1. Barcode provided directly as SKU
+    const skuWithExplicitSku = determineItemSku({
+      sku: scannedBarcode,
+      barcode: scannedBarcode,
+      name: itemName,
+    });
+    assert.equal(skuWithExplicitSku, "5601234567890");
+    assert.notEqual(skuWithExplicitSku, "AGUA-DAS-PEDRAS-SALGADAS-25CL");
+
+    // 2. Barcode provided without explicit SKU (scanned barcode fallback)
+    const skuWithBarcodeOnly = determineItemSku({
+      sku: "",
+      barcode: scannedBarcode,
+      name: itemName,
+    });
+    assert.equal(skuWithBarcodeOnly, "5601234567890");
+    assert.notEqual(skuWithBarcodeOnly, "AGUA-DAS-PEDRAS-SALGADAS-25CL");
+  });
+
+  it("sluggifies the item name only when no SKU and no barcode is provided", () => {
+    const itemName = "Cadeira Chiavari Dourada";
+
+    const generatedSlugSku = determineItemSku({
+      sku: "",
+      barcode: "",
+      name: itemName,
+    });
+
+    assert.equal(generatedSlugSku, "CADEIRA-CHIAVARI-DOURADA");
+  });
+
+  it("preserves custom user-provided SKU without sluggification", () => {
+    const customSku = "MOB-CHA-GOLD-01";
+    const itemName = "Cadeira Chiavari Dourada";
+
+    const resolvedSku = determineItemSku({
+      sku: customSku,
+      barcode: "",
+      name: itemName,
+    });
+
+    assert.equal(resolvedSku, "MOB-CHA-GOLD-01");
   });
 });

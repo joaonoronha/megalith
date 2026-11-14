@@ -25,7 +25,7 @@ import { eq, or, sql, isNull, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import crypto from "crypto";
-import { generateId, generateReferenceCode, formatCustomId } from "@/lib/id";
+import { generateId, generateReferenceCode, formatCustomId, determineItemSku } from "@/lib/id";
 import { recordAuditLog, getAuditLogsForEntity, getRecentAuditLogs } from "@/lib/audit";
 import fs from "fs/promises";
 import path from "path";
@@ -432,7 +432,8 @@ export async function deleteStorageLocationAction(locationId: string) {
 export async function createItemAction(formData: FormData) {
   await requireAuth();
   try {
-    let sku = ((formData.get("sku") as string) || "").trim();
+    const rawSku = (formData.get("sku") as string) || "";
+    const rawBarcode = (formData.get("barcode") as string) || "";
     const name = ((formData.get("name") as string) || "").trim();
     const category = ((formData.get("category") as string) || "").trim();
     const totalQuantity = parseInt((formData.get("totalQuantity") as string) || "1", 10);
@@ -448,17 +449,10 @@ export async function createItemAction(formData: FormData) {
     const replacementCost = price;
     const imageUrl = formData.get("imageUrl") as string;
 
-    // Auto-generate slug SKU if not supplied
-    if (!sku && name) {
-      const baseSlug = name
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .toUpperCase();
-      sku = baseSlug || `ART-${Date.now()}`;
-    }
+    // Resolve SKU:
+    // If a SKU is provided or scanned via barcode, preserve it without sluggifying.
+    // Only sluggify the name if neither SKU nor barcode was provided.
+    let sku = determineItemSku({ sku: rawSku, barcode: rawBarcode, name });
 
     if (sku) {
       const existingSku = await db
@@ -3602,6 +3596,7 @@ export interface BarcodeSearchResult {
   };
   suggestedItem?: {
     name: string;
+    sku?: string;
     category: string;
     imageUrl: string | null;
     isConsumable: boolean;
@@ -3692,6 +3687,7 @@ export async function searchBarcodeAction(rawBarcode: string): Promise<BarcodeSe
               barcode,
               suggestedItem: {
                 name,
+                sku: barcode,
                 category: rawCat || "Alimentação & Bebidas",
                 imageUrl: p.image_front_url || p.image_url || null,
                 isConsumable: true,
@@ -3733,6 +3729,7 @@ export async function searchBarcodeAction(rawBarcode: string): Promise<BarcodeSe
               barcode,
               suggestedItem: {
                 name,
+                sku: barcode,
                 category: rawCat || "Material / Consumíveis",
                 imageUrl: p.image_front_url || p.image_url || null,
                 isConsumable: false,

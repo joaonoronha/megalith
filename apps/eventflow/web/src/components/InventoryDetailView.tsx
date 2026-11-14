@@ -171,6 +171,7 @@ export default function InventoryDetailView({
   const [showTriageModal, setShowTriageModal] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [showImagePicker, setShowImagePicker] = useState(false);
+  const [showPhotoLightbox, setShowPhotoLightbox] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -179,6 +180,17 @@ export default function InventoryDetailView({
   const [customImageUrl, setCustomImageUrl] = useState(item.imageUrl || "");
   const [damageQuantity, setDamageQuantity] = useState(1);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!showPhotoLightbox) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowPhotoLightbox(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showPhotoLightbox]);
 
   // Filter upcoming allocations where this item is currently booked
   const upcomingAllocations = useMemo(() => {
@@ -288,6 +300,34 @@ export default function InventoryDetailView({
         savePatch({ [field]: value });
       }, 500);
     }
+  };
+
+  const selectedLocationId = useMemo(() => {
+    if (item.locationId && locationsList.some((l) => l.id === item.locationId)) {
+      return item.locationId;
+    }
+    if (item.warehouseLocation) {
+      const match = locationsList.find(
+        (l) => l.name.toLowerCase() === item.warehouseLocation?.toLowerCase()
+      );
+      if (match) return match.id;
+    }
+    return "";
+  }, [item.locationId, item.warehouseLocation, locationsList]);
+
+  const handleLocationChange = (newLocationId: string) => {
+    const loc = locationsList.find((l) => l.id === newLocationId);
+    if (!loc) return;
+    setItem((prev) => ({
+      ...prev,
+      locationId: loc.id,
+      warehouseLocation: loc.name,
+    }));
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    savePatch({
+      locationId: loc.id,
+      warehouseLocation: loc.name,
+    });
   };
 
   const handleCopyId = () => {
@@ -458,36 +498,49 @@ export default function InventoryDetailView({
         <section className="bg-white border border-[#ececf0] rounded-[24px] p-6 shadow-xs space-y-6">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6 justify-between">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 min-w-0 flex-1">
-              {/* Item Thumbnail Image with Hover Change Option */}
+              {/* Item Thumbnail Image with Click to Enlarge & Dedicated Camera Button */}
               <div className="relative group shrink-0">
                 {item.imageUrl ? (
-                  <img
-                    src={item.imageUrl}
-                    alt={item.name}
-                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-[18px] object-cover border border-black/5 shadow-2xs"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPhotoLightbox(true)}
+                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-[18px] overflow-hidden border border-black/5 shadow-2xs cursor-pointer group/img relative bg-black/5 block focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                    title="Clique para ver fotografia ampliada"
+                    aria-label="Ver fotografia ampliada"
+                  >
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="w-full h-full object-cover group-hover/img:scale-105 transition duration-300"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition flex items-center justify-center">
+                      <Maximize2 className="w-5 h-5 text-white opacity-0 group-hover/img:opacity-100 transition drop-shadow-md" />
+                    </div>
+                  </button>
                 ) : (
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-[18px] bg-[#f2f2f7] flex items-center justify-center text-[#8e8e93] font-bold text-xl">
+                  <button
+                    type="button"
+                    onClick={() => setShowImagePicker(true)}
+                    className="w-24 h-24 sm:w-28 sm:h-28 rounded-[18px] bg-[#f2f2f7] hover:bg-[#e5e5ea] flex flex-col items-center justify-center text-[#8e8e93] hover:text-[#111] transition cursor-pointer border border-transparent hover:border-[#d1d1d6]"
+                    title="Adicionar foto ao artigo"
+                    aria-label="Adicionar foto ao artigo"
+                  >
                     <Package className="w-10 h-10 stroke-[1.5]" />
-                  </div>
+                    <span className="text-[10px] font-semibold mt-1">Sem foto</span>
+                  </button>
                 )}
+                {/* Dedicated Camera Icon Button to Change Photo */}
                 <button
                   type="button"
-                  onClick={() => setShowImagePicker(true)}
-                  className="absolute inset-0 bg-black/40 rounded-[18px] text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition backdrop-blur-2xs cursor-pointer"
-                  title="Alterar imagem do artigo"
-                >
-                  <Camera className="w-5 h-5 mb-0.5" />
-                  <span className="text-[10px] font-bold">Alterar foto</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowImagePicker(true)}
-                  className="sm:hidden absolute -bottom-1 -right-1 p-1.5 rounded-full bg-[#111] text-white shadow-md border-2 border-white flex items-center justify-center cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowImagePicker(true);
+                  }}
+                  className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[#111] hover:bg-[#333] active:scale-95 text-white shadow-md border-2 border-white flex items-center justify-center cursor-pointer transition transform hover:scale-110 z-10"
                   title="Alterar foto"
                   aria-label="Alterar foto"
                 >
-                  <Camera className="w-3.5 h-3.5" />
+                  <Camera className="w-4 h-4" />
                 </button>
               </div>
 
@@ -580,34 +633,26 @@ export default function InventoryDetailView({
 
                 {/* Inline Location & Manager & Dimensions */}
                 <div className="flex flex-wrap items-center gap-2.5 text-xs">
-                  {/* Warehouse Location Selector */}
-                  <div className="inline-flex items-center gap-1.5 bg-[#f0f7ff] text-[#0066cc] border border-[#d6e7ff] px-2.5 py-1 rounded-[10px]">
-                    <MapPin className="w-3.5 h-3.5 text-[#0066cc] shrink-0" />
-                    <input
-                      type="text"
-                      list="locations-datalist"
-                      value={item.warehouseLocation || ""}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const matchedLoc = locationsList.find(
-                          (l) => l.name.toLowerCase() === val.toLowerCase()
-                        );
-                        handleFieldChange("warehouseLocation", val);
-                        if (matchedLoc) {
-                          handleFieldChange("locationId", matchedLoc.id, true);
-                        }
-                      }}
-                      placeholder="Local de armazenamento..."
-                      className="bg-transparent text-xs font-semibold text-[#0066cc] placeholder:text-[#0066cc]/50 focus:outline-none min-w-[170px]"
-                      title="Edite a localização física no armazém"
-                    />
-                    <datalist id="locations-datalist">
+                  {/* Warehouse Location Selector Dropdown (Existing locations only) */}
+                  <div className="inline-flex items-center gap-1.5 bg-[#f0f7ff] text-[#0066cc] border border-[#d6e7ff] hover:border-[#007aff] px-2.5 py-1 rounded-[10px] transition">
+                    <MapPin className="w-3.5 h-3.5 text-[#0066cc] shrink-0 pointer-events-none" />
+                    <select
+                      value={selectedLocationId}
+                      onChange={(e) => handleLocationChange(e.target.value)}
+                      className="bg-transparent text-xs font-semibold text-[#0066cc] focus:outline-none cursor-pointer pr-1"
+                      title="Selecione um local de armazenamento existente"
+                    >
+                      {!selectedLocationId && (
+                        <option value="" disabled className="text-[#8e8e93]">
+                          {item.warehouseLocation ? `${item.warehouseLocation} (Local não registado)` : "Selecionar local..."}
+                        </option>
+                      )}
                       {locationsList.map((loc) => (
-                        <option key={loc.id} value={loc.name}>
-                          {loc.name} (Gestor: {loc.managerName})
+                        <option key={loc.id} value={loc.id} className="text-[#111]">
+                          {loc.name}{loc.code ? ` (${loc.code})` : ""}{loc.managerName ? ` · Gestor: ${loc.managerName}` : ""}
                         </option>
                       ))}
-                    </datalist>
+                    </select>
                   </div>
 
                   {/* Manager Display & Quick Manage Button */}
@@ -1035,10 +1080,89 @@ export default function InventoryDetailView({
       </main>
 
       {/* ================================================================= */}
+      {/* ENLARGED PHOTO LIGHTBOX MODAL */}
+      {/* ================================================================= */}
+      {showPhotoLightbox && item.imageUrl && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 sm:p-6 select-none animate-in fade-in duration-150"
+          onClick={() => setShowPhotoLightbox(false)}
+        >
+          {/* Modal Card */}
+          <div
+            className="relative max-w-4xl w-full max-h-[92vh] flex flex-col bg-[#1c1c1e] text-white rounded-[24px] overflow-hidden shadow-2xl border border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between bg-black/40 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+                  <Package className="w-4 h-4 text-white/80" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-white truncate">{item.name}</h3>
+                  <div className="flex items-center gap-2 text-[11px] text-[#a1a1a6]">
+                    <span>SKU: {item.sku}</span>
+                    <span>·</span>
+                    <span>{item.category}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPhotoLightbox(false);
+                    setShowImagePicker(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition cursor-pointer"
+                  title="Alterar fotografia"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Alterar foto</span>
+                </button>
+                <a
+                  href={item.imageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition cursor-pointer"
+                  title="Abrir imagem original"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setShowPhotoLightbox(false)}
+                  className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition cursor-pointer"
+                  title="Fechar (Esc)"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Photo Container */}
+            <div className="flex-1 flex items-center justify-center p-4 sm:p-6 bg-black/60 min-h-[300px] max-h-[75vh] overflow-hidden">
+              <img
+                src={item.imageUrl}
+                alt={item.name}
+                className="max-h-[70vh] max-w-full object-contain rounded-xl shadow-lg"
+              />
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-2.5 border-t border-white/10 bg-black/40 text-center text-[11px] text-[#8e8e93]">
+              Pressione <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white font-mono text-[10px]">Esc</kbd> ou clique fora para fechar
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================= */}
       {/* IMAGE PICKER POPOVER / MODAL */}
       {/* ================================================================= */}
       {showImagePicker && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-[22px] w-full max-w-md border border-[#ececf0] shadow-xl overflow-hidden p-6 text-xs space-y-4">
             <input
               ref={photoCameraInputRef}

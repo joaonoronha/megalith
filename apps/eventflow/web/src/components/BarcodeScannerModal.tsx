@@ -101,6 +101,7 @@ export default function BarcodeScannerModal({
 
   // Estado para Criação de Novo Item (Simplificado)
   const [newItemName, setNewItemName] = useState("");
+  const [newItemSku, setNewItemSku] = useState("");
   const [newItemCategory, setNewItemCategory] = useState("Material / Consumíveis");
   const [newItemQuantity, setNewItemQuantity] = useState(1);
   const [newItemLocationId, setNewItemLocationId] = useState(storageLocations[0]?.id || "");
@@ -263,6 +264,7 @@ export default function BarcodeScannerModal({
         // Preencher formulário simplificado com os dados obtidos (Open Facts ou padrão)
         const suggested = res.suggestedItem;
         setNewItemName(suggested?.name || "");
+        setNewItemSku(suggested?.sku || barcode);
         setNewItemCategory(suggested?.category || "Material / Consumíveis");
         setNewItemQuantity(1);
         setNewItemIsConsumable(suggested?.isConsumable || false);
@@ -324,6 +326,10 @@ export default function BarcodeScannerModal({
     try {
       const fd = new FormData();
       fd.append("name", trimmedName);
+      const skuToUse = (newItemSku || activeBarcode || "").trim();
+      if (skuToUse) {
+        fd.append("sku", skuToUse);
+      }
       fd.append("category", newItemCategory || "Material / Consumíveis");
       fd.append("totalQuantity", String(Math.max(1, newItemQuantity || 1)));
       if (newItemLocationId) {
@@ -388,6 +394,8 @@ export default function BarcodeScannerModal({
     setManualCodeInput("");
     setShowManualInput(false);
     setNewItemImageUrl(null);
+    setNewItemName("");
+    setNewItemSku("");
     setScanCycle((c) => c + 1);
   }
 
@@ -835,6 +843,27 @@ export default function BarcodeScannerModal({
                     onChange={(e) => setNewItemName(e.target.value)}
                     placeholder="Ex: Água das Pedras 25cl, Fita Adesiva, Cadeira..."
                     className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                  />
+                </div>
+
+                {/* Código / SKU */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-bold text-[#636366]">
+                      Código / SKU
+                    </label>
+                    {activeBarcode && (
+                      <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-full">
+                        Código de barras lido
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={newItemSku}
+                    onChange={(e) => setNewItemSku(e.target.value)}
+                    placeholder={activeBarcode || "Ex: 5601234567890 ou SKU"}
+                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007aff] font-mono text-[#111]"
                   />
                 </div>
 
