@@ -1370,8 +1370,8 @@ export default function EventFlowApp({
                               }")`,
                             }}
                           >
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-                            <span className="absolute left-2 bottom-1.5 text-white text-[13px] font-extrabold tracking-[-0.2px] drop-shadow-sm">
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                            <span className="absolute left-1.5 bottom-1.5 px-1.5 py-0.5 rounded-[8px] bg-black/60 backdrop-blur-md border border-white/20 text-white text-[12px] font-extrabold tracking-[-0.2px] leading-none shadow-xs">
                               {dayBadge}
                             </span>
                           </div>
@@ -2334,7 +2334,7 @@ export default function EventFlowApp({
                     <div
                       key={e.id}
                       onClick={() => router.push(`/eventos/${e.id}`)}
-                      className="relative overflow-hidden rounded-[16px] border border-black/10 bg-neutral-900 shadow-xs hover:shadow-md hover:border-black/20 transition-all duration-300 px-4 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group"
+                      className="relative overflow-hidden rounded-[20px] border border-black/10 bg-neutral-900 shadow-xs hover:shadow-xl hover:border-black/20 transition-all duration-300 p-2.5 sm:p-3 flex flex-col justify-end cursor-pointer group min-h-[140px] sm:min-h-[125px]"
                     >
                       {/* Backsplash image background */}
                       <img
@@ -2343,96 +2343,94 @@ export default function EventFlowApp({
                         className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none group-hover:scale-105 transition-transform duration-700 ease-out"
                       />
 
-                      {/* Gradient dark overlay for high contrast & readable text */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/75 to-black/55 pointer-events-none" />
+                      {/* Soft ambient gradient overlay that preserves image vibrancy */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent pointer-events-none" />
 
-                      {/* Subtle chromatic overlay from event primary color */}
-                      <div
-                        className="absolute inset-0 opacity-20 mix-blend-color pointer-events-none"
-                        style={{
-                          background: `linear-gradient(135deg, ${colors[0]} 0%, ${
-                            colors[1] || colors[0]
-                          } 100%)`,
-                        }}
-                      />
-
-                      {/* Left: Event Name, Category, Theme, Date, Last Updated */}
-                      <div className="relative z-10 min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap min-w-0">
-                          <h3 className="font-bold text-[15px] sm:text-[16px] text-white drop-shadow-sm group-hover:text-white transition truncate">
-                            {e.name}
-                          </h3>
-                          {e.category && (
-                            <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white/95 border border-white/25 flex-shrink-0">
-                              {e.category}
-                            </span>
-                          )}
-                          {e.theme && (
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/20 backdrop-blur-md text-amber-200 border border-amber-400/30 flex items-center gap-1 flex-shrink-0">
-                              <Sparkles className="w-2.5 h-2.5 text-amber-300" />
-                              <span className="truncate max-w-[140px]">{e.theme}</span>
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2 text-xs text-white/80 mt-1 flex-wrap">
-                          <span className="flex items-center gap-1.5 text-white/90">
-                            <CalendarIcon className="w-3.5 h-3.5 text-white/70 flex-shrink-0" />
-                            <span>{formatEventByline(e.startDate, e.venue)}</span>
+                      {/* Top floating header: category badge & theme color dots */}
+                      <div className="relative z-10 flex items-center justify-between gap-2 mb-auto pb-3 pointer-events-none">
+                        {e.category ? (
+                          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-black/45 backdrop-blur-md backdrop-saturate-150 text-white border border-white/25 shadow-xs">
+                            {e.category}
                           </span>
-                          <span className="text-white/40">·</span>
-                          <span className="flex items-center gap-1 text-white/70">
-                            <Clock className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />
-                            <span>
-                              Atualizado {formatRelativeTime(e.updatedAt, "pt")}
-                              {e.lastUpdatedByName ? ` por ${e.lastUpdatedByName}` : ""}
-                            </span>
-                          </span>
-                        </div>
+                        ) : (
+                          <span />
+                        )}
+
+                        {colors.length > 0 && (
+                          <div
+                            className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/45 backdrop-blur-md backdrop-saturate-150 border border-white/20 shadow-xs"
+                            title="Cores do tema do evento"
+                          >
+                            {colors.map((color, i) => (
+                              <span
+                                key={i}
+                                className="w-2.5 h-2.5 rounded-full border border-white/40 shadow-xs flex-shrink-0"
+                                style={{ backgroundColor: color }}
+                              />
+                            ))}
+                          </div>
+                        )}
                       </div>
 
-                      {/* Right: Interactive Status Dropdown & Action Controls */}
-                      <div
-                        className="relative z-10 flex items-center gap-2.5 self-start sm:self-center flex-shrink-0"
-                        onClick={(ev) => ev.stopPropagation()}
-                        onMouseDown={(ev) => ev.stopPropagation()}
-                      >
-                        <select
-                          value={e.status}
+                      {/* Frosted Glass Floating Capsule Dock for text & controls */}
+                      <div className="relative z-10 w-full rounded-[14px] bg-black/60 backdrop-blur-md backdrop-saturate-150 border border-white/20 p-3 sm:px-4 sm:py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-lg shadow-black/25">
+                        {/* Left: Event Name, Theme, Date, Last Updated */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap min-w-0">
+                            <h3 className="font-bold text-[15px] sm:text-[16px] text-white drop-shadow-xs group-hover:text-white transition truncate">
+                              {e.name}
+                            </h3>
+                            {e.theme && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-400/25 backdrop-blur-md text-amber-200 border border-amber-300/35 flex items-center gap-1 flex-shrink-0">
+                                <Sparkles className="w-2.5 h-2.5 text-amber-300" />
+                                <span className="truncate max-w-[140px]">{e.theme}</span>
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 text-xs text-white/90 mt-1 flex-wrap">
+                            <span className="flex items-center gap-1.5 text-white/95 font-medium">
+                              <CalendarIcon className="w-3.5 h-3.5 text-white/80 flex-shrink-0" />
+                              <span>{formatEventByline(e.startDate, e.venue)}</span>
+                            </span>
+                            <span className="text-white/40">·</span>
+                            <span className="flex items-center gap-1 text-white/75 text-[11px]">
+                              <Clock className="w-3.5 h-3.5 text-white/70 flex-shrink-0" />
+                              <span>
+                                Atualizado {formatRelativeTime(e.updatedAt, "pt")}
+                                {e.lastUpdatedByName ? ` por ${e.lastUpdatedByName}` : ""}
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Right: Interactive Status Dropdown & Action Controls */}
+                        <div
+                          className="flex items-center gap-2.5 self-start sm:self-center flex-shrink-0"
                           onClick={(ev) => ev.stopPropagation()}
                           onMouseDown={(ev) => ev.stopPropagation()}
-                          onChange={(evt) => {
-                            evt.stopPropagation();
-                            handleStatusChange(e.id, evt.target.value);
-                          }}
-                          className={`text-xs font-semibold px-3 py-1.5 rounded-full border border-white/20 shadow-xs outline-none cursor-pointer transition ${statusObj.bg} ${statusObj.text}`}
                         >
-                          <option value="confirmado">Confirmado</option>
-                          <option value="preparacao">Preparação</option>
-                          <option value="planeamento">Planeamento</option>
-                          <option value="orcamento">Orçamento</option>
-                          <option value="concluido">Concluído</option>
-                          <option value="cancelado">Cancelado</option>
-                        </select>
+                          <select
+                            value={e.status}
+                            onClick={(ev) => ev.stopPropagation()}
+                            onMouseDown={(ev) => ev.stopPropagation()}
+                            onChange={(evt) => {
+                              evt.stopPropagation();
+                              handleStatusChange(e.id, evt.target.value);
+                            }}
+                            className={`text-xs font-semibold px-3 py-1.5 rounded-full border border-white/20 shadow-xs outline-none cursor-pointer transition ${statusObj.bg} ${statusObj.text}`}
+                          >
+                            <option value="confirmado">Confirmado</option>
+                            <option value="preparacao">Preparação</option>
+                            <option value="planeamento">Planeamento</option>
+                            <option value="orcamento">Orçamento</option>
+                            <option value="concluido">Concluído</option>
+                            <option value="cancelado">Cancelado</option>
+                          </select>
 
-                        <ChevronRight className="w-4 h-4 text-white/70 group-hover:text-white group-hover:translate-x-0.5 transition hidden sm:block" />
-                      </div>
-
-                      {/* Theme color dots displayed on the bottom right */}
-                      {colors.length > 0 && (
-                        <div
-                          className="absolute right-3 bottom-2.5 z-10 flex items-center gap-1.5 pointer-events-none px-2 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/15 shadow-2xs"
-                          title="Cores do tema do evento"
-                        >
-                          {colors.map((color, i) => (
-                            <span
-                              key={i}
-                              className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border border-white/40 shadow-xs flex-shrink-0"
-                              style={{ backgroundColor: color }}
-                            />
-                          ))}
+                          <ChevronRight className="w-4 h-4 text-white/70 group-hover:text-white group-hover:translate-x-0.5 transition hidden sm:block" />
                         </div>
-                      )}
+                      </div>
                     </div>
                   );
                 })}
