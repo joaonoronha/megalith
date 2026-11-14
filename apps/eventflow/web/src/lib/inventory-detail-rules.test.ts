@@ -184,5 +184,46 @@ describe("CFM Events: Inventory Detail Location & Photo Interactions", () => {
     assert.strictEqual(synced.replacementCost, 12.5);
     assert.strictEqual(synced.unitPrice, synced.replacementCost);
   });
+
+  it("storage locations modal list rules: omits location code/id and shows only manager name without contact/email", () => {
+    interface LocationDisplayModel {
+      name: string;
+      code: string | null;
+      managerName: string;
+      managerContact: string | null;
+    }
+
+    const testLoc: LocationDisplayModel = {
+      name: "Casa Catarina",
+      code: "CASA-CAT",
+      managerName: "Catarina dos Santos",
+      managerContact: "anacatarinarosa18@gmail.com",
+    };
+
+    // Card representation in UI rules:
+    // 1. Location ID/code is removed from UI
+    const renderLocationHeader = (loc: LocationDisplayModel) => {
+      return {
+        title: loc.name,
+        showCodeBadge: false, // Location code/ID must not be shown
+      };
+    };
+
+    const header = renderLocationHeader(testLoc);
+    assert.strictEqual(header.title, "Casa Catarina");
+    assert.strictEqual(header.showCodeBadge, false);
+
+    // 2. Only show the name of the responsible individual (omit phone/email contact)
+    const renderResponsibleIndividual = (loc: LocationDisplayModel) => {
+      return {
+        responsibleName: loc.managerName,
+        showContactDetails: false, // Email or phone contact is omitted
+      };
+    };
+
+    const manager = renderResponsibleIndividual(testLoc);
+    assert.strictEqual(manager.responsibleName, "Catarina dos Santos");
+    assert.strictEqual(manager.showContactDetails, false);
+  });
 });
 

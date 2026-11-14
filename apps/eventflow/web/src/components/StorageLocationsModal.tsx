@@ -5,8 +5,6 @@ import {
   X,
   MapPin,
   User,
-  Phone,
-  Mail,
   Building,
   Plus,
   Edit2,
@@ -17,7 +15,6 @@ import {
   Boxes,
   ExternalLink,
   ShieldCheck,
-  Search,
 } from "lucide-react";
 import {
   createStorageLocationAction,
@@ -73,7 +70,6 @@ export default function StorageLocationsModal({
   initialMode = "list",
 }: StorageLocationsModalProps) {
   const [activeTab, setActiveTab] = useState<"list" | "create">(initialMode);
-  const [searchQuery, setSearchQuery] = useState("");
   const [editingLocation, setEditingLocation] = useState<StorageLocation | null>(null);
 
   // New Location Form State
@@ -271,17 +267,7 @@ export default function StorageLocationsModal({
     return { count: matching.length, totalQty };
   };
 
-  const filteredLocations = locations.filter((loc) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      loc.name.toLowerCase().includes(q) ||
-      loc.managerName.toLowerCase().includes(q) ||
-      loc.code?.toLowerCase().includes(q) ||
-      loc.address?.toLowerCase().includes(q) ||
-      loc.managerContact?.toLowerCase().includes(q)
-    );
-  });
+  const filteredLocations = locations;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
@@ -366,29 +352,6 @@ export default function StorageLocationsModal({
           {/* TAB 1: LIST LOCATIONS */}
           {activeTab === "list" && !editingLocation && (
             <div className="space-y-3.5">
-              {/* Search Toolbar */}
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="w-3.5 h-3.5 text-[#8e8e93] absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Filtrar por nome de local, gestor, código ou morada..."
-                    className="w-full pl-8 pr-3 py-1.5 bg-[#f2f2f5] border border-transparent focus:border-[#007aff] focus:bg-white rounded-[10px] text-xs focus:outline-none transition"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("create")}
-                  className="px-3 py-1.5 bg-[#111] hover:bg-black text-white rounded-[10px] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Novo Local</span>
-                </button>
-              </div>
-
               {/* Locations Cards Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {filteredLocations.map((loc) => {
@@ -398,7 +361,7 @@ export default function StorageLocationsModal({
                       key={loc.id}
                       className="p-4 rounded-[18px] border border-[#ececf0] bg-white hover:border-[#007aff]/40 transition shadow-2xs flex flex-col justify-between gap-3 relative group"
                     >
-                      {/* Top Row: Name, Code & Action Buttons */}
+                      {/* Top Row: Name & Action Buttons */}
                       <div>
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
@@ -406,11 +369,6 @@ export default function StorageLocationsModal({
                               <span className="font-bold text-sm text-[#111] truncate">
                                 {loc.name}
                               </span>
-                              {loc.code && (
-                                <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#f2f2f5] text-[#3a3a3c] border border-[#ececf0]">
-                                  {loc.code}
-                                </span>
-                              )}
                             </div>
                             {loc.address && (
                               <div className="text-[11px] text-[#8e8e93] flex items-center gap-1 mt-0.5">
@@ -440,33 +398,14 @@ export default function StorageLocationsModal({
                           </div>
                         </div>
 
-                        {/* Manager Badge & Details */}
-                        <div className="mt-3 p-2.5 rounded-[12px] bg-[#f9f9fb] border border-[#ececf0]/80 space-y-1">
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-[#8e8e93] flex items-center gap-1">
-                            <ShieldCheck className="w-3 h-3 text-[#007aff]" />
-                            <span>Pessoa Responsável / Gestor:</span>
+                        {/* Responsible Individual */}
+                        <div className="mt-2.5 p-2 rounded-[10px] bg-[#f9f9fb] border border-[#ececf0]/80 flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-[#eef4ff] text-[#0066cc] flex items-center justify-center font-bold text-[10px] shrink-0">
+                            {loc.managerName.charAt(0).toUpperCase()}
                           </div>
-
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-5 h-5 rounded-full bg-[#eef4ff] text-[#0066cc] flex items-center justify-center font-bold text-[10px]">
-                                {loc.managerName.charAt(0).toUpperCase()}
-                              </div>
-                              <span className="font-semibold text-xs text-[#111]">
-                                {loc.managerName}
-                              </span>
-                            </div>
-
-                            {loc.managerContact && (
-                              <div className="text-[11px] text-[#636366] flex items-center gap-1">
-                                {loc.managerContact.includes("@") ? (
-                                  <Mail className="w-3 h-3 text-[#8e8e93]" />
-                                ) : (
-                                  <Phone className="w-3 h-3 text-[#8e8e93]" />
-                                )}
-                                <span className="font-mono text-[10px]">{loc.managerContact}</span>
-                              </div>
-                            )}
+                          <div className="flex items-center gap-1 text-xs">
+                            <span className="text-[#8e8e93]">Responsável:</span>
+                            <span className="font-semibold text-[#111]">{loc.managerName}</span>
                           </div>
                         </div>
 
@@ -511,9 +450,9 @@ export default function StorageLocationsModal({
               {filteredLocations.length === 0 && (
                 <div className="text-center py-10 px-4 border border-dashed border-[#ececf0] rounded-[18px] bg-[#fafafc]">
                   <MapPin className="w-8 h-8 text-[#8e8e93] mx-auto mb-2 opacity-50" />
-                  <div className="text-xs font-bold text-[#111]">Nenhum local encontrado</div>
+                  <div className="text-xs font-bold text-[#111]">Nenhum local registado</div>
                   <p className="text-[11px] text-[#8e8e93] mt-1">
-                    Experimente outra pesquisa ou adicione um novo local de armazenamento.
+                    Adicione um novo local de armazenamento no separador "+ Especificar Novo Local".
                   </p>
                 </div>
               )}

@@ -2059,6 +2059,39 @@ export async function toggleEventTaskAction(taskId: string, completed: boolean, 
   return { success: true };
 }
 
+// 16.1 Assign or Reassign User to Event or Meeting Task
+export async function updateEventTaskAssigneeAction(
+  taskId: string,
+  assignedTo: string | null,
+  targetId: string
+) {
+  if (!taskId) return { success: false, error: "ID da tarefa é obrigatório." };
+
+  const cleanAssignedTo = assignedTo?.trim() || null;
+
+  await db
+    .update(eventTasks)
+    .set({ assignedTo: cleanAssignedTo })
+    .where(eq(eventTasks.id, taskId));
+
+  await recordAuditLog({
+    entityType: "event",
+    entityId: targetId,
+    action: "tarefa",
+    title: cleanAssignedTo ? "Responsável da tarefa atribuído" : "Responsável da tarefa removido",
+    details: cleanAssignedTo
+      ? `Tarefa #${taskId} atribuída a "${cleanAssignedTo}"`
+      : `Responsável removido da tarefa #${taskId}`,
+  });
+
+  invalidateAllCaches();
+  safeRevalidate(`/eventos/${targetId}`);
+  safeRevalidate(`/events/${targetId}`);
+  safeRevalidate(`/reunioes/${targetId}`);
+  safeRevalidate(`/meetings/${targetId}`);
+  return { success: true };
+}
+
 // 17. Delete Event or Meeting Task
 export async function deleteEventTaskAction(taskId: string, targetId: string) {
   await db
