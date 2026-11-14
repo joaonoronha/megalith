@@ -1934,6 +1934,11 @@ export default function EventDetailView({
   const [showCoverPicker, setShowCoverPicker] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
 
+  // Mobile Collapsible sections for Hero details
+  const [isMobileColorsOpen, setIsMobileColorsOpen] = useState(false);
+  const [isMobileValuesOpen, setIsMobileValuesOpen] = useState(false);
+  const [isMobileTimeWindowOpen, setIsMobileTimeWindowOpen] = useState(false);
+
   // Custom Items state (Single-event bespoke items added directly to quota/budget)
   const [customItems, setCustomItems] = useState<EventCustomItem[]>(initialCustomItems || []);
   const [inventoryTab, setInventoryTab] = useState<"stock" | "custom">("stock");
@@ -2039,6 +2044,20 @@ export default function EventDetailView({
   };
 
   const [operationalSchedule, setOperationalSchedule] = useState(() => extractDateAndTimes(event));
+
+  const formattedScheduleDate = useMemo(() => {
+    if (!operationalSchedule.date) return "Sem data definida";
+    try {
+      const parts = operationalSchedule.date.split("-");
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        return d.toLocaleDateString("pt-PT", { day: "numeric", month: "short" });
+      }
+      return operationalSchedule.date;
+    } catch {
+      return operationalSchedule.date;
+    }
+  }, [operationalSchedule.date]);
 
   const handleScheduleChange = (patchSched: Partial<ReturnType<typeof extractDateAndTimes>>) => {
     const updated = { ...operationalSchedule, ...patchSched };
@@ -3141,8 +3160,8 @@ export default function EventDetailView({
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/30 pointer-events-none" />
 
             {/* Top Badges over image */}
-            <div className="relative z-10 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
+            <div className="relative z-10 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {/* Category Inline Selector */}
                 <select
                   value={event.category || "Geral"}
@@ -3184,7 +3203,10 @@ export default function EventDetailView({
                     </span>
                   </a>
                 )}
+              </div>
 
+              {/* Actions on Cover: Partilhar & Alterar Imagem */}
+              <div className="flex items-center gap-2 shrink-0">
                 {/* Share Link Button */}
                 <button
                   type="button"
@@ -3195,115 +3217,160 @@ export default function EventDetailView({
                       setTimeout(() => setCopiedEventId(false), 2000);
                     }
                   }}
-                  className="px-3 py-1 rounded-full text-xs font-semibold bg-black/40 hover:bg-black/60 backdrop-blur-md text-white/95 border border-white/20 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  className="px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold bg-black/40 hover:bg-black/60 backdrop-blur-md text-white/95 border border-white/20 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
                   title="Copiar link direto para este evento"
                 >
                   {copiedEventId ? (
                     <>
                       <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Link copiado!</span>
+                      <span className="hidden sm:inline">Link copiado!</span>
                     </>
                   ) : (
                     <>
                       <Share2 className="w-3.5 h-3.5 text-white/80" />
-                      <span>Partilhar</span>
+                      <span className="hidden sm:inline">Partilhar</span>
                     </>
                   )}
                 </button>
 
-                {/* Theme Inline Editable Tag */}
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F5A623] text-black shadow-xs">
-                  <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="text-[11px] font-bold">Tema:</span>
-                  <input
-                    type="text"
-                    value={event.theme || ""}
-                    placeholder="Sem tema..."
-                    onChange={(e) => handleFieldChange("theme", e.target.value)}
-                    className="bg-transparent border-b border-black/30 hover:border-black focus:border-black text-xs font-bold text-black placeholder:text-black/60 outline-none px-1 py-0 w-36 transition"
-                  />
-                </div>
-              </div>
+                {/* Cover Image Quick Switcher */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowCoverPicker(!showCoverPicker)}
+                    className="px-2.5 sm:px-3 py-1 rounded-full text-xs font-medium bg-black/40 hover:bg-black/60 backdrop-blur-md text-white/95 border border-white/20 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Alterar Imagem</span>
+                  </button>
 
-              {/* Cover Image Quick Switcher */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowCoverPicker(!showCoverPicker)}
-                  className="px-3 py-1 rounded-full text-xs font-medium bg-black/50 hover:bg-black/80 backdrop-blur-md text-white/90 border border-white/20 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  <span>Alterar Imagem</span>
-                </button>
-
-                {showCoverPicker && (
-                  <div className="absolute right-0 top-9 w-72 bg-white rounded-[16px] shadow-xl border border-[#ececf0] p-3 text-xs text-[#111] z-20 space-y-2">
-                    <div className="font-bold text-xs">Foto de Capa do Evento</div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {PRESET_COVERS.map((preset, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            handleFieldChange("coverImageUrl", preset.url, true);
-                            setShowCoverPicker(false);
+                  {showCoverPicker && (
+                    <div className="absolute right-0 top-9 w-72 bg-white rounded-[16px] shadow-xl border border-[#ececf0] p-3 text-xs text-[#111] z-20 space-y-2">
+                      <div className="font-bold text-xs">Foto de Capa do Evento</div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {PRESET_COVERS.map((preset, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              handleFieldChange("coverImageUrl", preset.url, true);
+                              setShowCoverPicker(false);
+                            }}
+                            className="p-1.5 text-left rounded-lg bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[11px] font-medium truncate cursor-pointer"
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-[#8e8e93] font-bold uppercase mb-1">Ou URL personalizado:</label>
+                        <input
+                          type="url"
+                          placeholder="https://images.unsplash.com/..."
+                          defaultValue={event.coverImageUrl || ""}
+                          onBlur={(e) => {
+                            if (e.target.value.trim()) {
+                              handleFieldChange("coverImageUrl", e.target.value.trim(), true);
+                              setShowCoverPicker(false);
+                            }
                           }}
-                          className="p-1.5 text-left rounded-lg bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[11px] font-medium truncate"
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
+                          className="w-full px-2 py-1 text-xs border border-[#ececf0] rounded-md outline-none focus:ring-1 focus:ring-[#007aff]"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] text-[#8e8e93] font-bold uppercase mb-1">Ou URL personalizado:</label>
-                      <input
-                        type="url"
-                        placeholder="https://images.unsplash.com/..."
-                        defaultValue={event.coverImageUrl || ""}
-                        onBlur={(e) => {
-                          if (e.target.value.trim()) {
-                            handleFieldChange("coverImageUrl", e.target.value.trim(), true);
-                            setShowCoverPicker(false);
-                          }
-                        }}
-                        className="w-full px-2 py-1 text-xs border border-[#ececf0] rounded-md outline-none focus:ring-1 focus:ring-[#007aff]"
-                      />
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Bottom Title & Venue on Image */}
-            <div className="relative z-10 text-white space-y-2 pt-8">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-white/90 font-medium">
-                <div className="flex items-center gap-1 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-md">
-                  <MapPin className="w-3.5 h-3.5 text-white/70" />
-                  <input
-                    type="text"
-                    value={event.venue || ""}
-                    placeholder="Adicionar local / quinta..."
-                    onChange={(e) => handleFieldChange("venue", e.target.value)}
-                    className="bg-transparent text-white placeholder:text-white/60 text-xs font-semibold outline-none border-b border-transparent hover:border-white/40 focus:border-white px-1 py-0 w-52 transition"
-                  />
-                </div>
-              </div>
-
-              {/* Instantaneously Editable Event Name */}
+            {/* Bottom Title, Venue & Theme (Tidied Up) */}
+            <div className="relative z-10 text-white space-y-2.5 pt-6">
+              {/* Event Name */}
               <input
                 type="text"
                 value={event.name}
                 onChange={(e) => handleFieldChange("name", e.target.value)}
                 placeholder="Nome do Evento..."
-                className="w-full text-2xl md:text-3xl font-extrabold tracking-tight text-white bg-transparent border-b border-transparent hover:border-white/30 focus:border-white focus:bg-black/30 px-2 py-1 rounded-lg outline-none transition drop-shadow-sm"
+                className="w-full text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white bg-transparent border-b border-transparent hover:border-white/30 focus:border-white focus:bg-black/25 px-2 py-1 -ml-2 rounded-lg outline-none transition drop-shadow-md leading-tight"
               />
+
+              {/* Venue & Theme Metadata Row */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Venue / Local */}
+                <div className="inline-flex items-center gap-1.5 bg-black/40 hover:bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 text-xs text-white/95 transition shadow-xs">
+                  <MapPin className="w-3.5 h-3.5 text-white/70 shrink-0" />
+                  <input
+                    type="text"
+                    value={event.venue || ""}
+                    placeholder="Adicionar local / quinta..."
+                    onChange={(e) => handleFieldChange("venue", e.target.value)}
+                    className="bg-transparent text-white placeholder:text-white/60 text-xs font-semibold outline-none w-44 sm:w-56"
+                  />
+                </div>
+
+                {/* Theme / Tema */}
+                <div className="inline-flex items-center gap-1.5 bg-black/40 hover:bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 text-xs text-white/95 transition shadow-xs">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span className="text-[11px] font-bold text-white/75">Tema:</span>
+                  <input
+                    type="text"
+                    value={event.theme || ""}
+                    placeholder="Sem tema..."
+                    onChange={(e) => handleFieldChange("theme", e.target.value)}
+                    className="bg-transparent text-white placeholder:text-white/60 text-xs font-semibold outline-none w-28 sm:w-36"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* VIBE & PALETTE RIBBON (Directly Clickable & Customizable) */}
-          <div className="px-6 py-4 bg-[#fafafc] border-b border-[#ececf0] flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* ========================================================= */}
+          {/* 1. CORES SECTION (Collapsible on Mobile) */}
+          {/* ========================================================= */}
+          {/* Mobile Accordion Header for Cores */}
+          <button
+            type="button"
+            onClick={() => setIsMobileColorsOpen((prev) => !prev)}
+            className="w-full md:hidden px-4 py-3 bg-[#fafafc] border-b border-[#ececf0] flex items-center justify-between text-left transition hover:bg-[#f2f2f5] cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Palette className="w-4 h-4 text-[#8e8e93]" />
+              <span className="text-xs font-bold text-[#111]">Cores</span>
+              {/* Preview dots */}
+              <div className="flex items-center -space-x-1 ml-1.5">
+                {currentColors.slice(0, 5).map((hex, i) => (
+                  <span
+                    key={i}
+                    className="w-3.5 h-3.5 rounded-full border border-white shadow-2xs"
+                    style={{ backgroundColor: hex }}
+                  />
+                ))}
+                {currentColors.length > 5 && (
+                  <span className="text-[10px] text-[#8e8e93] font-bold pl-2">+{currentColors.length - 5}</span>
+                )}
+                {currentColors.length === 0 && (
+                  <span className="text-[11px] text-[#8e8e93] italic">(Vazio)</span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-[#8e8e93] font-medium">
+              <span className="text-[11px]">{isMobileColorsOpen ? "Recolher" : "Ver / Editar"}</span>
+              <ChevronDown
+                className={`w-4 h-4 transition-transform duration-200 ${
+                  isMobileColorsOpen ? "rotate-180" : ""
+                }`}
+              />
+            </div>
+          </button>
+
+          {/* Full Cores Content (Desktop always open, mobile collapsible) */}
+          <div
+            className={`${
+              isMobileColorsOpen ? "block" : "hidden"
+            } md:block px-6 py-4 bg-[#fafafc] border-b border-[#ececf0] transition`}
+          >
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-[#111]">
+              <div className="hidden md:flex items-center gap-1.5 text-xs font-bold text-[#111]">
                 <Palette className="w-4 h-4 text-[#8e8e93]" />
                 <span>Cores</span>
               </div>
@@ -3365,8 +3432,41 @@ export default function EventDetailView({
             </div>
           </div>
 
-          {/* TOP METRICS & FINANCIALS (Directly Editable Inline) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#ececf0] p-4 bg-white">
+          {/* ========================================================= */}
+          {/* 2. VALUES / METRICS SECTION (Collapsible on Mobile) */}
+          {/* ========================================================= */}
+          {/* Mobile Accordion Header for Values */}
+          <button
+            type="button"
+            onClick={() => setIsMobileValuesOpen((prev) => !prev)}
+            className="w-full md:hidden px-4 py-3 bg-white border-b border-[#ececf0] flex items-center justify-between text-left transition hover:bg-[#fafafc] cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-emerald-600" />
+              <span className="text-xs font-bold text-[#111]">Valores & Orçamento</span>
+              {/* Quick preview */}
+              <div className="flex items-center gap-1.5 ml-1 text-[11px]">
+                <span className="font-bold text-[#111]">€{(event.customerPrice || 0).toLocaleString("pt-PT")}</span>
+                <span className="text-[#8e8e93]">·</span>
+                <span className="text-[#8e8e93]">Custo: €{(event.totalBudget || 0).toLocaleString("pt-PT")}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-[#8e8e93] font-medium">
+              <span className="text-[11px]">{isMobileValuesOpen ? "Recolher" : "Detalhes"}</span>
+              <ChevronDown
+                className={`w-4 h-4 transition-transform duration-200 ${
+                  isMobileValuesOpen ? "rotate-180" : ""
+                }`}
+              />
+            </div>
+          </button>
+
+          {/* Full Values Content (Desktop always open, mobile collapsible) */}
+          <div
+            className={`${
+              isMobileValuesOpen ? "grid" : "hidden"
+            } md:grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#ececf0] p-4 bg-white border-b border-[#ececf0]`}
+          >
             {/* 1. Customer Price (Directly Editable) */}
             <div className="p-3 space-y-1">
               <div className="text-[#8e8e93] text-xs font-medium">Valor Festa</div>
@@ -3490,21 +3590,50 @@ export default function EventDetailView({
             </div>
           </div>
 
-          {/* ================================================================= */}
-          {/* SELETOR DE HORÁRIO OPERACIONAL (Integrado no cartão de detalhes)   */}
-          {/* ================================================================= */}
-          <TimeWindowSlider
-            embedded
-            date={operationalSchedule.date}
-            onDateChange={(newDate) => handleScheduleChange({ date: newDate })}
-            prepStart={operationalSchedule.prepStart}
-            prepEnd={operationalSchedule.prepEnd}
-            eventStart={operationalSchedule.eventStart}
-            eventEnd={operationalSchedule.eventEnd}
-            teardownStart={operationalSchedule.teardownStart}
-            teardownEnd={operationalSchedule.teardownEnd}
-            onChange={(ranges) => handleScheduleChange(ranges)}
-          />
+          {/* ========================================================= */}
+          {/* 3. TIME WINDOW / SCHEDULE SECTION (Collapsible on Mobile) */}
+          {/* ========================================================= */}
+          {/* Mobile Accordion Header for Time Window */}
+          <button
+            type="button"
+            onClick={() => setIsMobileTimeWindowOpen((prev) => !prev)}
+            className="w-full md:hidden px-4 py-3 bg-[#fafafc] flex items-center justify-between text-left transition hover:bg-[#f2f2f5] cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-[#007aff]" />
+              <span className="text-xs font-bold text-[#111]">Horário Operacional</span>
+              {/* Quick preview */}
+              <div className="flex items-center gap-1.5 ml-1 text-[11px] text-[#636366]">
+                <span className="font-semibold">{formattedScheduleDate}</span>
+                <span>·</span>
+                <span>{operationalSchedule.eventStart || "14:00"} - {operationalSchedule.eventEnd || "20:00"}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-[#8e8e93] font-medium">
+              <span className="text-[11px]">{isMobileTimeWindowOpen ? "Recolher" : "Ajustar"}</span>
+              <ChevronDown
+                className={`w-4 h-4 transition-transform duration-200 ${
+                  isMobileTimeWindowOpen ? "rotate-180" : ""
+                }`}
+              />
+            </div>
+          </button>
+
+          {/* Full Time Window Content (Desktop always open, mobile collapsible) */}
+          <div className={`${isMobileTimeWindowOpen ? "block" : "hidden"} md:block`}>
+            <TimeWindowSlider
+              embedded
+              date={operationalSchedule.date}
+              onDateChange={(newDate) => handleScheduleChange({ date: newDate })}
+              prepStart={operationalSchedule.prepStart}
+              prepEnd={operationalSchedule.prepEnd}
+              eventStart={operationalSchedule.eventStart}
+              eventEnd={operationalSchedule.eventEnd}
+              teardownStart={operationalSchedule.teardownStart}
+              teardownEnd={operationalSchedule.teardownEnd}
+              onChange={(ranges) => handleScheduleChange(ranges)}
+            />
+          </div>
         </section>
 
 
