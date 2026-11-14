@@ -2356,23 +2356,38 @@ export default function EventFlowApp({
                         }}
                       />
 
-                      {/* Vertical diagonal lines on the right side showing the colour themes */}
+                      {/* Vertical diagonal stripes on the right side showing the colour themes (seamless, wider, fully covering top/bottom and corner) */}
                       <div
-                        className="absolute right-0 top-0 bottom-0 pointer-events-none overflow-hidden flex items-stretch justify-end pr-3 sm:pr-5 z-0"
+                        className="absolute right-0 top-0 bottom-0 pointer-events-none overflow-hidden z-0 flex justify-end"
                         aria-hidden="true"
+                        style={{
+                          width: `${Math.max(colors.length * 28 + 90, 160)}px`,
+                        }}
                       >
                         <div
-                          className="flex h-full gap-1.5 sm:gap-2 origin-center"
-                          style={{ transform: "skewX(-20deg)" }}
+                          className="flex h-full origin-bottom-right"
+                          style={{
+                            transform: "skewX(-20deg)",
+                            transformOrigin: "bottom right",
+                            marginRight: "-70px",
+                          }}
                         >
                           {colors.map((color, i) => (
                             <div
                               key={i}
-                              className="w-2.5 sm:w-3.5 h-[170%] -mt-[35%] shadow-[0_2px_10px_rgba(0,0,0,0.5)] border border-white/20 transition-transform duration-300 group-hover:scale-y-105"
-                              style={{ backgroundColor: color }}
+                              className="h-[220%] -mt-[60%] w-7 sm:w-9 flex-shrink-0 transition-transform duration-300"
+                              style={{
+                                backgroundColor: color,
+                                boxShadow: i === 0 ? "-6px 0 16px rgba(0,0,0,0.45)" : undefined,
+                              }}
                               title={`Cor do tema: ${color}`}
                             />
                           ))}
+                          {/* Solid rightmost fill to ensure the entire right corner and edge are 100% covered with no image showing underneath */}
+                          <div
+                            className="h-[220%] -mt-[60%] w-28 sm:w-36 flex-shrink-0"
+                            style={{ backgroundColor: colors[colors.length - 1] }}
+                          />
                         </div>
                       </div>
 
