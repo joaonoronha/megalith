@@ -90,6 +90,7 @@ import {
   updateEventMeetingAction,
   unlinkEventMeetingAction,
   deleteEventMeetingAction,
+  uploadEventCoverAction,
 } from "@/app/actions";
 
 export interface EventMeeting {
@@ -1932,6 +1933,9 @@ export default function EventDetailView({
   // Modals for adding items
   const [showAddAllocationModal, setShowAddAllocationModal] = useState(false);
   const [showCoverPicker, setShowCoverPicker] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [coverUploadError, setCoverUploadError] = useState<string | null>(null);
+  const coverFileInputRef = useRef<HTMLInputElement | null>(null);
   const [showAuditModal, setShowAuditModal] = useState(false);
 
   // Mobile Collapsible sections for Hero details
@@ -2128,6 +2132,37 @@ export default function EventDetailView({
       saveTimeoutRef.current = setTimeout(() => {
         savePatch({ [field]: value });
       }, 500);
+    }
+  };
+
+  // Upload back splash / cover photo
+  const handleCoverFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingCover(true);
+    setCoverUploadError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("eventId", event.id);
+
+      const res = await uploadEventCoverAction(formData);
+      if (res && res.success && res.url) {
+        handleFieldChange("coverImageUrl", res.url, true);
+        setShowCoverPicker(false);
+      } else {
+        setCoverUploadError(res?.error || "Erro ao carregar a fotografia de capa.");
+      }
+    } catch (err: any) {
+      console.error("Erro no upload de capa:", err);
+      setCoverUploadError(err?.message || "Erro inesperado ao carregar a imagem.");
+    } finally {
+      setIsUploadingCover(false);
+      if (coverFileInputRef.current) {
+        coverFileInputRef.current.value = "";
+      }
     }
   };
 
@@ -3237,16 +3272,72 @@ export default function EventDetailView({
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setShowCoverPicker(!showCoverPicker)}
+                    onClick={() => {
+                      setShowCoverPicker(!showCoverPicker);
+                      setCoverUploadError(null);
+                    }}
                     className="px-2.5 sm:px-3 py-1 rounded-full text-xs font-medium bg-black/40 hover:bg-black/60 backdrop-blur-md text-white/95 border border-white/20 transition flex items-center gap-1.5 shadow-xs cursor-pointer"
                   >
                     <Camera className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Alterar Imagem</span>
                   </button>
 
+                  {/* Hidden file input for uploading event back splash */}
+                  <input
+                    ref={coverFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleCoverFileUpload}
+                  />
+
                   {showCoverPicker && (
-                    <div className="absolute right-0 top-9 w-72 bg-white rounded-[16px] shadow-xl border border-[#ececf0] p-3 text-xs text-[#111] z-20 space-y-2">
-                      <div className="font-bold text-xs">Foto de Capa do Evento</div>
+                    <div className="absolute right-0 top-9 w-72 sm:w-80 bg-white rounded-[18px] shadow-2xl border border-[#ececf0] p-3.5 text-xs text-[#111] z-30 space-y-3">
+                      <div className="flex items-center justify-between pb-1 border-b border-[#f2f2f5]">
+                        <div className="font-bold text-xs text-[#111]">Foto de Capa do Evento</div>
+                        <button
+                          type="button"
+                          onClick={() => setShowCoverPicker(false)}
+                          className="w-5 h-5 rounded-full hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] hover:text-[#111] transition"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Upload Photo Button */}
+                      <div>
+                        <button
+                          type="button"
+                          disabled={isUploadingCover}
+                          onClick={() => coverFileInputRef.current?.click()}
+                          className="w-full py-2.5 px-3 rounded-[12px] bg-[#007aff] hover:bg-[#0062cc] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition cursor-pointer disabled:opacity-60"
+                        >
+                          {isUploadingCover ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>A carregar fotografia...</span>
+                            </>
+                          ) : (
+                            <>
+                              <UploadCloud className="w-4 h-4" />
+                              <span>Carregar Foto do Dispositivo</span>
+                            </>
+                          )}
+                        </button>
+                        {coverUploadError && (
+                          <p className="text-[11px] text-rose-600 mt-1 font-medium">{coverUploadError}</p>
+                        )}
+                      </div>
+
+                      <div className="relative flex items-center justify-center">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-[#f2f2f5]" />
+                        </div>
+                        <span className="relative px-2 bg-white text-[10px] font-bold text-[#8e8e93] uppercase tracking-wider">
+                          Ou escolher sugestão
+                        </span>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-1.5">
                         {PRESET_COVERS.map((preset, idx) => (
                           <button
@@ -3256,14 +3347,15 @@ export default function EventDetailView({
                               handleFieldChange("coverImageUrl", preset.url, true);
                               setShowCoverPicker(false);
                             }}
-                            className="p-1.5 text-left rounded-lg bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[11px] font-medium truncate cursor-pointer"
+                            className="p-1.5 text-left rounded-lg bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[11px] font-medium truncate cursor-pointer transition"
                           >
                             {preset.label}
                           </button>
                         ))}
                       </div>
-                      <div>
-                        <label className="block text-[10px] text-[#8e8e93] font-bold uppercase mb-1">Ou URL personalizado:</label>
+
+                      <div className="pt-1">
+                        <label className="block text-[10px] text-[#8e8e93] font-bold uppercase mb-1">Ou link direto de imagem:</label>
                         <input
                           type="url"
                           placeholder="https://images.unsplash.com/..."
@@ -3274,7 +3366,7 @@ export default function EventDetailView({
                               setShowCoverPicker(false);
                             }
                           }}
-                          className="w-full px-2 py-1 text-xs border border-[#ececf0] rounded-md outline-none focus:ring-1 focus:ring-[#007aff]"
+                          className="w-full px-2.5 py-1.5 text-xs bg-[#fafafc] border border-[#ececf0] rounded-[10px] outline-none focus:ring-1 focus:ring-[#007aff] focus:bg-white transition"
                         />
                       </div>
                     </div>
