@@ -158,6 +158,14 @@ function getStatusStyle(status: string) {
         text: "text-[#636366]",
         label: "Concluído",
       };
+    case "cancelado":
+    case "cancelada":
+    case "cancelled":
+      return {
+        bg: "bg-[#fdf2f2]",
+        text: "text-[#c81e1e]",
+        label: "Cancelado",
+      };
     default:
       return {
         bg: "bg-[#f2f2f4]",
@@ -698,6 +706,10 @@ export default function EventFlowApp({
   // Copied link feedback
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
+  // Events Filtering State (default: all statuses except cancelled)
+  const [eventStatusFilter, setEventStatusFilter] = useState<string>("non_cancelled");
+  const [eventSearch, setEventSearch] = useState<string>("");
+
   // Inventory Filtering & Listing State
   const [inventorySearch, setInventorySearch] = useState<string>("");
   const [inventoryCategoryFilter, setInventoryCategoryFilter] = useState<string>("all");
@@ -956,16 +968,77 @@ export default function EventFlowApp({
     setShowTriageModal(false);
   };
 
-  // Filtered Events
-  const filteredEvents = eventsList.filter((e) => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      e.name?.toLowerCase().includes(term) ||
-      e.venue?.toLowerCase().includes(term) ||
-      e.status?.toLowerCase().includes(term)
-    );
-  });
+  // Event Status Counts
+  const eventCounts = useMemo(() => {
+    let nonCancelled = 0;
+    let confirmado = 0;
+    let preparacao = 0;
+    let planeamento = 0;
+    let orcamento = 0;
+    let concluido = 0;
+    let cancelado = 0;
+
+    eventsList.forEach((e) => {
+      const st = (e.status || "").toLowerCase().trim();
+      const isCancelled = isCancelledEvent(e) || st === "cancelado" || st === "cancelada" || st === "cancelled";
+      if (isCancelled) {
+        cancelado++;
+      } else {
+        nonCancelled++;
+      }
+
+      if (st === "confirmado") confirmado++;
+      else if (st === "preparacao" || st === "preparação") preparacao++;
+      else if (st === "planeamento") planeamento++;
+      else if (st === "orcamento" || st === "orçamento") orcamento++;
+      else if (st === "concluido" || st === "concluído") concluido++;
+    });
+
+    return {
+      total: eventsList.length,
+      nonCancelled,
+      confirmado,
+      preparacao,
+      planeamento,
+      orcamento,
+      concluido,
+      cancelado,
+    };
+  }, [eventsList]);
+
+  // Filtered Events for the Events tab (status filter + search term)
+  const filteredEvents = useMemo(() => {
+    return eventsList.filter((e) => {
+      const st = (e.status || "").toLowerCase().trim();
+      const isCancelled = isCancelledEvent(e) || st === "cancelado" || st === "cancelada" || st === "cancelled";
+
+      // 1. Status Filter: by default all statuses are included apart from cancelled ("non_cancelled")
+      if (eventStatusFilter === "non_cancelled") {
+        if (isCancelled) return false;
+      } else if (eventStatusFilter === "cancelado") {
+        if (!isCancelled) return false;
+      } else if (eventStatusFilter === "preparacao") {
+        if (st !== "preparacao" && st !== "preparação") return false;
+      } else if (eventStatusFilter === "orcamento") {
+        if (st !== "orcamento" && st !== "orçamento") return false;
+      } else if (eventStatusFilter === "concluido") {
+        if (st !== "concluido" && st !== "concluído") return false;
+      } else if (eventStatusFilter !== "all") {
+        if (st !== eventStatusFilter) return false;
+      }
+
+      // 2. Search query (filter by event name, category, or venue)
+      if (eventSearch.trim()) {
+        const term = eventSearch.toLowerCase().trim();
+        const matchName = e.name?.toLowerCase().includes(term);
+        const matchCategory = e.category?.toLowerCase().includes(term);
+        const matchVenue = e.venue?.toLowerCase().includes(term);
+        if (!matchName && !matchCategory && !matchVenue) return false;
+      }
+
+      return true;
+    });
+  }, [eventsList, eventStatusFilter, eventSearch]);
 
   // Upcoming Events for Overview (from today onwards, excluding cancelled and completed)
   const upcomingEvents = useMemo(() => {
@@ -2116,182 +2189,217 @@ export default function EventFlowApp({
         {/* ========================================================= */}
         {/* TAB 3: EVENTS */}
         {/* ========================================================= */}
-        {activeTab === "events" && (
-          <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h2 className="text-[22px] font-bold text-[#111111]">
-                  Gestão de Eventos
-                </h2>
-                <p className="text-xs text-[#8e8e93]">
-                  Acompanhamento de orçamento, cronograma e estado de produção
-                </p>
+        {activeTab === "events" && (() => {
+          const statusFilters = [
+            { id: "non_cancelled", label: "Todos (sem cancelados)", count: eventCounts.nonCancelled },
+            { id: "confirmado", label: "Confirmados", count: eventCounts.confirmado },
+            { id: "preparacao", label: "Preparação", count: eventCounts.preparacao },
+            { id: "planeamento", label: "Planeamento", count: eventCounts.planeamento },
+            { id: "orcamento", label: "Orçamento", count: eventCounts.orcamento },
+            { id: "concluido", label: "Concluídos", count: eventCounts.concluido },
+            { id: "cancelado", label: "Cancelados", count: eventCounts.cancelado },
+            { id: "all", label: "Todos (com cancelados)", count: eventCounts.total },
+          ];
+
+          return (
+            <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs space-y-4">
+              {/* Header: Title + Improved Add Event Button Placement */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[#ececf0]">
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-[22px] font-bold text-[#111111]">
+                      Gestão de Eventos
+                    </h2>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#f2f2f5] text-[#48484a]">
+                      {filteredEvents.length} {filteredEvents.length === 1 ? "evento" : "eventos"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#8e8e93] mt-0.5">
+                    Acompanhamento de estado, categorias e datas dos eventos CFM
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowEventWizard(true)}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-[12px] bg-[#111111] hover:bg-black text-white text-xs font-bold transition shadow-xs hover:shadow active:scale-[0.98] cursor-pointer self-start sm:self-auto flex-shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Novo Evento</span>
+                </button>
               </div>
-              <button
-                onClick={() => setShowEventWizard(true)}
-                className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition self-start sm:self-auto"
-              >
-                <span>＋</span>
-                <span>Novo evento</span>
-              </button>
-            </div>
 
-            <div className="grid grid-cols-1 gap-3.5">
-              {eventsList.map((e) => {
-                const statusObj = getStatusStyle(e.status);
-                const dayBadge = String(
-                  new Date(e.startDate).getDate()
-                ).padStart(2, "0");
-
-                return (
-                  <div
-                    key={e.id}
-                    onClick={() => router.push(`/eventos/${e.id}`)}
-                    className="p-5 rounded-[18px] border border-[#ececf0] bg-[#fafafa] hover:bg-white hover:border-[#d2d2d7] transition flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer group"
-                  >
-                    <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-                      <div
-                        className="w-[64px] h-[64px] rounded-[14px] bg-cover bg-center relative overflow-hidden flex-shrink-0 border border-black/5"
-                        style={{
-                          backgroundImage: `url("${
-                            e.coverImageUrl ||
-                            "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=600&q=80"
-                          }")`,
-                        }}
+              {/* Status Filter Toolbar: Search + Filter Pills */}
+              <div className="bg-[#fafafa] border border-[#ececf0] rounded-[16px] p-3 space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+                  {/* Search Input */}
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-[#8e8e93] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={eventSearch}
+                      onChange={(e) => setEventSearch(e.target.value)}
+                      placeholder="Pesquisar evento por nome ou categoria..."
+                      className="w-full pl-9 pr-8 py-2 text-xs bg-white border border-[#ececf0] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#007aff] transition"
+                    />
+                    {eventSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setEventSearch("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8e8e93] hover:text-[#111] p-0.5"
                       >
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-                        <span className="absolute left-2 bottom-1.5 text-white text-[13px] font-extrabold">
-                          {dayBadge}
-                        </span>
-                      </div>
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
 
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Link
-                            href={`/eventos/${e.id}`}
-                            prefetch={false}
-                            className="font-bold text-[16px] text-[#111] hover:text-[#007aff] transition"
-                          >
+                  {/* Status Dropdown on Small Screens */}
+                  <div className="sm:hidden relative">
+                    <select
+                      value={eventStatusFilter}
+                      onChange={(e) => setEventStatusFilter(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[10px] font-semibold text-[#111] outline-none cursor-pointer"
+                    >
+                      {statusFilters.map((tab) => (
+                        <option key={tab.id} value={tab.id}>
+                          {tab.label} ({tab.count})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Status Filter Pills (Desktop and Tablet) */}
+                <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-none">
+                  {statusFilters.map((tab) => {
+                    const isActive = eventStatusFilter === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setEventStatusFilter(tab.id)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                          isActive
+                            ? "bg-[#111111] text-white shadow-xs"
+                            : "bg-white text-[#636366] hover:bg-[#f2f2f5] hover:text-[#111] border border-[#ececf0]"
+                        }`}
+                      >
+                        <span>{tab.label}</span>
+                        <span
+                          className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                            isActive
+                              ? "bg-white/20 text-white"
+                              : "bg-[#f2f2f5] text-[#48484a]"
+                          }`}
+                        >
+                          {tab.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Slim Event Cards Grid */}
+              <div className="grid grid-cols-1 gap-2.5">
+                {filteredEvents.map((e) => {
+                  const statusObj = getStatusStyle(e.status);
+
+                  return (
+                    <div
+                      key={e.id}
+                      onClick={() => router.push(`/eventos/${e.id}`)}
+                      className="px-4 py-3 sm:py-3.5 rounded-[14px] border border-[#ececf0] bg-[#fafafa] hover:bg-white hover:border-[#007aff]/35 hover:shadow-xs transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group"
+                    >
+                      {/* Left: Event Name, Category, Date, Last Updated */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                          <h3 className="font-bold text-[15px] sm:text-[16px] text-[#111111] group-hover:text-[#007aff] transition truncate">
                             {e.name}
-                          </Link>
+                          </h3>
                           {e.category && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f2f2f5] text-[#48484a]">
+                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#f2f2f5] text-[#48484a] flex-shrink-0">
                               {e.category}
                             </span>
                           )}
-                          {e.theme && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#fef7e0] text-[#b06000] border border-[#feefc3] flex items-center gap-1">
-                              <Sparkles className="w-2.5 h-2.5 text-[#b06000]" />
-                              <span>{e.theme}</span>
-                            </span>
-                          )}
                         </div>
 
-                        <div className="text-xs text-[#8e8e93] mt-1 flex flex-wrap items-center gap-2">
-                          <span>{formatEventByline(e.startDate, e.venue)}</span>
-                          {/* Vibe color preview dots */}
-                          {e.vibeColors && (() => {
-                            try {
-                              const colors = JSON.parse(e.vibeColors);
-                              if (Array.isArray(colors) && colors.length > 0) {
-                                return (
-                                  <div className="flex items-center gap-1 ml-1" title="Vibe & Paleta do Evento">
-                                    {colors.map((c: string, ci: number) => (
-                                      <span
-                                        key={ci}
-                                        className="w-2.5 h-2.5 rounded-full border border-black/15 shadow-2xs"
-                                        style={{ backgroundColor: c }}
-                                      />
-                                    ))}
-                                  </div>
-                                );
-                              }
-                            } catch {}
-                            return null;
-                          })()}
-                        </div>
-
-                        <div className="text-xs font-semibold text-[#111] mt-1.5 flex flex-wrap items-center gap-3">
-                          {e.customerPrice && e.customerPrice > 0 ? (
-                            <span className="text-[#137333] font-bold">
-                              A Pagar (Cliente): €{e.customerPrice.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
-                            </span>
-                          ) : null}
-                          <span className="text-[#8e8e93]">
-                            Orçamento: €{(e.totalBudget || 0).toLocaleString("pt-PT")}
+                        <div className="flex items-center gap-2 text-xs text-[#8e8e93] mt-1 flex-wrap">
+                          <span className="flex items-center gap-1.5 text-[#636366]">
+                            <CalendarIcon className="w-3.5 h-3.5 text-[#8e8e93] flex-shrink-0" />
+                            <span>{formatEventByline(e.startDate, e.venue)}</span>
                           </span>
-                        </div>
-
-                        <div className="flex items-center gap-2 text-[11px] text-[#8e8e93] mt-2">
-                          <span>
-                            Last updated by <strong className="text-[#3a3a3c] font-semibold">{e.lastUpdatedByName || "Administrador CFM"}</strong> {formatRelativeTime(e.updatedAt, "en")}
+                          <span className="text-[#c7c7cc]">·</span>
+                          <span className="flex items-center gap-1 text-[#8e8e93]">
+                            <Clock className="w-3.5 h-3.5 text-[#8e8e93] flex-shrink-0" />
+                            <span>
+                              Atualizado {formatRelativeTime(e.updatedAt, "pt")}
+                              {e.lastUpdatedByName ? ` por ${e.lastUpdatedByName}` : ""}
+                            </span>
                           </span>
-                          <button
-                            type="button"
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              setAuditModal({
-                                isOpen: true,
-                                entityType: "event",
-                                entityId: e.id,
-                                entityTitle: e.name,
-                              });
-                            }}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-[#ececf0] hover:bg-[#f2f2f5] text-[#007aff] transition cursor-pointer text-[10px] font-semibold shadow-2xs"
-                            title="Ver histórico de alterações"
-                          >
-                            <History className="w-3 h-3" />
-                            <span>Histórico de Alterações</span>
-                          </button>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      {/* Direct Link to Dedicated Event Page */}
-                      <Link
-                        href={`/eventos/${e.id}`}
-                        prefetch={false}
-                        className="px-3.5 py-1.5 rounded-[10px] bg-[#111] hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 shadow-2xs transition"
+                      {/* Right: Interactive Status Dropdown (Stops Click Propagation) */}
+                      <div
+                        className="flex items-center gap-2.5 self-end sm:self-center flex-shrink-0"
+                        onClick={(ev) => ev.stopPropagation()}
+                        onMouseDown={(ev) => ev.stopPropagation()}
                       >
-                        <span>Gerir Evento & Inventário</span>
-                        <span>→</span>
-                      </Link>
-
-                      {/* Interactive Status Selector */}
-                      <select
-                        value={e.status}
-                        onChange={(evt) =>
-                          handleStatusChange(e.id, evt.target.value)
-                        }
-                        className={`text-xs font-semibold px-3 py-1.5 rounded-full border border-black/5 outline-none cursor-pointer ${statusObj.bg} ${statusObj.text}`}
-                      >
-                        <option value="confirmado">Confirmado</option>
-                        <option value="preparacao">Preparação</option>
-                        <option value="planeamento">Planeamento</option>
-                        <option value="orcamento">Orçamento</option>
-                        <option value="concluido">Concluído</option>
-                        <option value="cancelado">Cancelado</option>
-                      </select>
-
-                      {!isCalendlyMeeting(e) && (
-                        <Link
-                          href={`/eventos/${e.id}?action=novo-orcamento`}
-                          prefetch={false}
+                        <select
+                          value={e.status}
                           onClick={(ev) => ev.stopPropagation()}
-                          className="px-3 py-1.5 rounded-lg bg-white border border-[#ececf0] text-xs font-semibold text-[#111] hover:bg-[#f2f2f5] transition flex items-center gap-1 shadow-2xs"
-                          title="Abrir configuração do evento para gerar orçamento"
+                          onMouseDown={(ev) => ev.stopPropagation()}
+                          onChange={(evt) => {
+                            evt.stopPropagation();
+                            handleStatusChange(e.id, evt.target.value);
+                          }}
+                          className={`text-xs font-semibold px-3 py-1.5 rounded-full border border-black/5 outline-none cursor-pointer transition ${statusObj.bg} ${statusObj.text}`}
                         >
-                          <span>+ Gerar Orçamento</span>
-                        </Link>
-                      )}
+                          <option value="confirmado">Confirmado</option>
+                          <option value="preparacao">Preparação</option>
+                          <option value="planeamento">Planeamento</option>
+                          <option value="orcamento">Orçamento</option>
+                          <option value="concluido">Concluído</option>
+                          <option value="cancelado">Cancelado</option>
+                        </select>
+
+                        <ChevronRight className="w-4 h-4 text-[#c7c7cc] group-hover:text-[#007aff] group-hover:translate-x-0.5 transition hidden sm:block" />
+                      </div>
                     </div>
+                  );
+                })}
+
+                {/* Empty State */}
+                {filteredEvents.length === 0 && (
+                  <div className="py-12 px-4 text-center rounded-[16px] border border-dashed border-[#ececf0] bg-[#fafafa]">
+                    <CalendarIcon className="w-8 h-8 text-[#8e8e93] mx-auto mb-2 opacity-40" />
+                    <p className="text-sm font-semibold text-[#111111]">
+                      Nenhum evento encontrado
+                    </p>
+                    <p className="text-xs text-[#8e8e93] mt-1">
+                      {eventStatusFilter !== "non_cancelled" || eventSearch
+                        ? "Tente ajustar o filtro de estado ou termo de pesquisa."
+                        : "Não existem eventos registados."}
+                    </p>
+                    {(eventStatusFilter !== "non_cancelled" || eventSearch) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEventStatusFilter("non_cancelled");
+                          setEventSearch("");
+                        }}
+                        className="mt-3 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-[#007aff] hover:bg-[#f2f2f5] transition cursor-pointer"
+                      >
+                        Limpar filtros
+                      </button>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
+                )}
+              </div>
+            </section>
+          );
+        })()}
 
         {/* ========================================================= */}
         {/* TAB 4: INVENTORY */}
@@ -2832,6 +2940,7 @@ export default function EventFlowApp({
             }}
             onOpenItemWizard={() => setShowItemWizard(true)}
             onOpenMovementModal={() => setShowMovementModal(true)}
+            onNavigateToEvents={() => handleTabSwitch("events", "/eventos")}
           />
         )}
 
