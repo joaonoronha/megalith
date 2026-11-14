@@ -160,6 +160,7 @@ interface InventoryItem {
   inMaintenanceQuantity: number | null;
   isConsumable?: boolean;
   packageUnits?: number | null;
+  deletedAt?: Date | string | null;
 }
 
 interface Allocation {
@@ -1966,7 +1967,8 @@ export default function EventDetailView({
   const [newTaskPriority, setNewTaskPriority] = useState<"baixa" | "media" | "alta" | "urgente">("media");
 
   // Add allocation state
-  const [selectedItemId, setSelectedItemId] = useState(allItems[0]?.id || "");
+  const activeItems = useMemo(() => allItems.filter((i) => !i.deletedAt), [allItems]);
+  const [selectedItemId, setSelectedItemId] = useState(activeItems[0]?.id || "");
   const [allocationQty, setAllocationQty] = useState(1);
   const [allocationNotes, setAllocationNotes] = useState("");
   const [itemSearchQuery, setItemSearchQuery] = useState("");
@@ -2315,7 +2317,7 @@ export default function EventDetailView({
 
   const handleAddAllocation = async (e: React.FormEvent) => {
     e.preventDefault();
-    const targetItem = allItems.find((i) => i.id === selectedItemId);
+    const targetItem = activeItems.find((i) => i.id === selectedItemId);
     if (!targetItem) return;
 
     const tempId = `alc-temp-${Date.now()}`;
@@ -4844,7 +4846,7 @@ export default function EventDetailView({
           client={client}
           allocations={allocations}
           customItems={customItems}
-          allItems={allItems}
+          allItems={activeItems}
           onClose={() => setShowQuoteWizard(false)}
           onCreated={(newQuote) => {
             setQuotesList((prev) => [newQuote, ...prev]);
@@ -4939,11 +4941,11 @@ export default function EventDetailView({
                 />
 
                 <select
-                  value={selectedItemId || allItems[0]?.id || ""}
+                  value={selectedItemId || activeItems[0]?.id || ""}
                   onChange={(e) => setSelectedItemId(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-white border border-[#ececf0] rounded-[12px] text-xs font-semibold"
                 >
-                  {allItems
+                  {activeItems
                     .filter(
                       (item) =>
                         item.name.toLowerCase().includes(itemSearchQuery.toLowerCase()) ||
@@ -4959,8 +4961,8 @@ export default function EventDetailView({
 
               {/* Consumable Caution Banner & Cross-Event Stock Breakdown */}
               {(() => {
-                const targetId = selectedItemId || allItems[0]?.id;
-                const curItem = allItems.find((i) => i.id === targetId);
+                const targetId = selectedItemId || activeItems[0]?.id;
+                const curItem = activeItems.find((i) => i.id === targetId);
                 if (!curItem || !curItem.isConsumable) return null;
 
                 const packageUnits = curItem.packageUnits && curItem.packageUnits > 0 ? curItem.packageUnits : 1;

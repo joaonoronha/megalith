@@ -906,6 +906,11 @@ export async function deleteInventoryItemAction(itemId: string) {
       })
       .where(eq(inventoryItems.id, itemId));
 
+    // Remove automatic stock acquisition financial movements / expenses associated with this item
+    await db
+      .delete(financialMovements)
+      .where(sql`${financialMovements.notes} LIKE ${'%(' + itemId + ')%'}`);
+
     // Record audit log
     await recordAuditLog({
       entityType: "inventory",
@@ -920,6 +925,8 @@ export async function deleteInventoryItemAction(itemId: string) {
     revalidatePath("/inventory");
     revalidatePath(`/inventario/${itemId}`);
     revalidatePath(`/inventory/${itemId}`);
+    revalidatePath("/financas");
+    revalidatePath("/finance");
     revalidatePath("/");
 
     return { success: true };

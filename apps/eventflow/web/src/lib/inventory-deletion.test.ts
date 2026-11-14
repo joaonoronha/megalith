@@ -73,4 +73,57 @@ describe("CFM Events: Inventory Soft-Delete & Upcoming Events Caution", () => {
     assert.ok(softDeletedItem.deletedAt !== null);
     assert.equal(pastEventAllocation.itemId, softDeletedItem.id);
   });
+
+  it("excludes soft-deleted items from being selectable in new event allocations and quotes", () => {
+    const items = [
+      { id: "itm-1", name: "Cadeira Chiavari", sku: "CHA-01", deletedAt: null },
+      { id: "itm-2", name: "Sofá Vintage", sku: "SOF-02", deletedAt: new Date() },
+      { id: "itm-3", name: "Mesa Redonda", sku: "MES-03", deletedAt: null },
+    ];
+
+    const activeItems = items.filter((item) => !item.deletedAt);
+    assert.equal(activeItems.length, 2);
+    assert.ok(!activeItems.some((i) => i.id === "itm-2"));
+  });
+
+  it("excludes automatic stock purchase movements of deleted items from finance", () => {
+    const deletedItemId = "itm-deleted-99";
+    const movements = [
+      {
+        id: "mov-1",
+        type: "saida",
+        category: "Material / Stock",
+        amount: 250,
+        notes: `Despesa gerada automaticamente na compra/criação do artigo ART-99 (${deletedItemId})`,
+      },
+      {
+        id: "mov-2",
+        type: "saida",
+        category: "Material / Stock",
+        amount: 100,
+        notes: "Despesa gerada automaticamente na compra/criação do artigo ART-100 (itm-active-100)",
+      },
+      {
+        id: "mov-3",
+        type: "entrada",
+        category: "Evento",
+        amount: 1500,
+        notes: "Pagamento 50% adjudicação",
+      },
+    ];
+
+    const deletedItemIds = new Set([deletedItemId]);
+    const activeMovements = movements.filter((m) => {
+      if (!m.notes) return true;
+      for (const id of deletedItemIds) {
+        if (m.notes.includes(`(${id})`)) return false;
+      }
+      return true;
+    });
+
+    assert.equal(activeMovements.length, 2);
+    assert.ok(!activeMovements.some((m) => m.id === "mov-1"));
+    assert.ok(activeMovements.some((m) => m.id === "mov-2"));
+    assert.ok(activeMovements.some((m) => m.id === "mov-3"));
+  });
 });

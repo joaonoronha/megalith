@@ -1,5 +1,6 @@
 import { db } from "@/db/client";
 import { inventoryItems, storageLocations } from "@/db/schema";
+import { isNull } from "drizzle-orm";
 import { generateId, generateReferenceCode } from "@/lib/id";
 
 export interface ExtractedReceiptLine {
@@ -253,7 +254,9 @@ export async function reconcileReceiptWithInventory(
   receipt: ExtractedReceipt
 ): Promise<ParseReceiptResult> {
   const [existingItems, locations] = await Promise.all([
-    db.query.inventoryItems.findMany(),
+    db.query.inventoryItems.findMany({
+      where: isNull(inventoryItems.deletedAt),
+    }),
     db.query.storageLocations.findMany(),
   ]);
 

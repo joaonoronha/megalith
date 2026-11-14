@@ -70,7 +70,18 @@ export default function FinanceView({
     return (events || []).filter((e) => countsForFinance(e) && !isCancelledEvent(e));
   }, [events]);
 
-  const activeMovements = useMemo(() => movements || [], [movements]);
+  const activeMovements = useMemo(() => {
+    const deletedItemIds = new Set(
+      (items || []).filter((i) => i.deletedAt).map((i) => i.id)
+    );
+    return (movements || []).filter((m) => {
+      if (!m.notes) return true;
+      for (const id of deletedItemIds) {
+        if (m.notes.includes(`(${id})`)) return false;
+      }
+      return true;
+    });
+  }, [movements, items]);
 
   // Date filtering helper
   const now = useMemo(() => new Date(), []);
