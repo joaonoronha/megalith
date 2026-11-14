@@ -3172,30 +3172,34 @@ export default function EventDetailView({
         {/* ================================================================= */}
         {/* HERO / EVENT VIBE & THEME HEADER */}
         {/* ================================================================= */}
-        <section className="bg-white border border-[#ececf0] rounded-[24px] overflow-hidden shadow-xs">
+        <section className={`bg-white border border-[#ececf0] rounded-[24px] shadow-xs relative ${
+          showCoverPicker ? "z-[99999] overflow-visible" : "overflow-hidden"
+        }`}>
           {/* Cover / Vibe Banner */}
-          <div className="relative min-h-[240px] md:min-h-[280px] w-full overflow-hidden bg-neutral-900 flex flex-col justify-between p-6">
+          <div className={`relative min-h-[240px] md:min-h-[280px] w-full bg-neutral-900 flex flex-col justify-between p-6 rounded-t-[24px] ${
+            showCoverPicker ? "z-[99999] overflow-visible" : "overflow-hidden"
+          }`}>
             <img
               src={
                 event.coverImageUrl ||
                 "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80"
               }
               alt={event.name}
-              className="absolute inset-0 w-full h-full object-cover object-center opacity-75 pointer-events-none"
+              className="absolute inset-0 w-full h-full object-cover object-center opacity-75 pointer-events-none rounded-t-[24px]"
             />
             {/* Chromatic overlay gradient inspired by vibe colors */}
             <div
-              className="absolute inset-0 opacity-40 mix-blend-multiply pointer-events-none"
+              className="absolute inset-0 opacity-40 mix-blend-multiply pointer-events-none rounded-t-[24px]"
               style={{
                 background: `linear-gradient(135deg, ${currentColors[0] || "#111"} 0%, ${
                   currentColors[1] || currentColors[0] || "#333"
                 } 100%)`,
               }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/30 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/30 pointer-events-none rounded-t-[24px]" />
 
             {/* Top Badges over image */}
-            <div className="relative z-10 flex items-center justify-between gap-2">
+            <div className={`relative ${showCoverPicker ? "z-[99999]" : "z-10"} flex items-center justify-between gap-2`}>
               <div className="flex items-center gap-2 flex-wrap">
                 {/* Category Inline Selector */}
                 <select
@@ -3269,7 +3273,7 @@ export default function EventDetailView({
                 </button>
 
                 {/* Cover Image Quick Switcher */}
-                <div className="relative">
+                <div className={`relative ${showCoverPicker ? "z-[99999]" : ""}`}>
                   <button
                     type="button"
                     onClick={() => {
@@ -3292,7 +3296,13 @@ export default function EventDetailView({
                   />
 
                   {showCoverPicker && (
-                    <div className="absolute right-0 top-9 w-72 sm:w-80 bg-white rounded-[18px] shadow-2xl border border-[#ececf0] p-3.5 text-xs text-[#111] z-30 space-y-3">
+                    <>
+                      {/* Fixed backdrop click-catcher so clicking anywhere outside dismisses popup */}
+                      <div
+                        className="fixed inset-0 z-[99998]"
+                        onClick={() => setShowCoverPicker(false)}
+                      />
+                      <div className="absolute right-0 top-9 w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-white rounded-[18px] shadow-2xl border border-[#ececf0] p-3.5 text-xs text-[#111] z-[99999] space-y-3">
                       <div className="flex items-center justify-between pb-1 border-b border-[#f2f2f5]">
                         <div className="font-bold text-xs text-[#111]">Foto de Capa do Evento</div>
                         <button
@@ -3370,6 +3380,7 @@ export default function EventDetailView({
                         />
                       </div>
                     </div>
+                    </>
                   )}
                 </div>
               </div>
