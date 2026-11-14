@@ -30,6 +30,7 @@ import {
   Share2,
   Trash2,
   Upload,
+  Pencil,
 } from "lucide-react";
 import AuditLogModal from "@/components/AuditLogModal";
 import StorageLocationsModal, { StorageLocation, TeamUser } from "@/components/StorageLocationsModal";
@@ -778,7 +779,7 @@ export default function InventoryDetailView({
                 className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
               >
                 <Wrench className="w-3.5 h-3.5" />
-                <span>Gestão de Triagem</span>
+                <span>Reportar danos</span>
               </button>
             </div>
           </div>
