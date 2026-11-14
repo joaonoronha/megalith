@@ -3933,7 +3933,7 @@ export default function EventDetailView({
                           </div>
 
                           <div className="flex items-center gap-3 text-xs text-[#8e8e93] mt-1 flex-wrap">
-                            {a.itemSku && <span>SKU: {a.itemSku}</span>}
+                            {a.itemSku && <span>Código: {a.itemSku}</span>}
                             {a.itemCategory && <span>{a.itemCategory}</span>}
                             <span className="font-semibold text-[#111]">
                               €{(a.itemUnitPrice || item?.unitPrice || 0).toFixed(2)} / un
@@ -4863,7 +4863,7 @@ export default function EventDetailView({
                 <label className="block font-bold text-[#111] mb-1">Pesquisar ou Selecionar Artigo</label>
                 <input
                   type="text"
-                  placeholder="Filtrar por nome ou SKU..."
+                  placeholder="Filtrar por nome ou código..."
                   value={itemSearchQuery}
                   onChange={(e) => setItemSearchQuery(e.target.value)}
                   className="w-full px-3 py-1.5 bg-[#fafafc] border border-[#ececf0] rounded-[10px] text-xs mb-2"
@@ -6326,7 +6326,6 @@ function CreateClientModal({
   onCreated: (client: Client) => void;
 }) {
   const [name, setName] = useState("");
-  const [customId, setCustomId] = useState("");
   const [contactName, setContactName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -6344,7 +6343,6 @@ function CreateClientModal({
     try {
       const formData = new FormData();
       formData.set("name", name);
-      if (customId.trim()) formData.set("customId", customId.trim());
       formData.set("contactName", contactName);
       formData.set("email", email);
       formData.set("phone", phone);
@@ -6416,19 +6414,6 @@ function CreateClientModal({
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex: Mastercard Portugal ou Marta Silva"
               className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-            />
-          </div>
-
-          <div>
-            <label className="block font-bold text-[#111] mb-1">
-              ID Personalizado (Opcional)
-            </label>
-            <input
-              type="text"
-              value={customId}
-              onChange={(e) => setCustomId(e.target.value)}
-              placeholder="Ex: cli-mastercard (vazio = automático cli_...)"
-              className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
             />
           </div>
 

@@ -4604,7 +4604,7 @@ function ItemWizardModal({
               >
                 {locations.map((loc) => (
                   <option key={loc.id} value={loc.id}>
-                    {loc.name} {loc.managerName ? `— Gestor: ${loc.managerName}` : ""}
+                    {loc.name}
                   </option>
                 ))}
               </select>
@@ -4655,7 +4655,6 @@ function ClientWizardModal({
   onCreated: (client: any) => void;
 }) {
   const [name, setName] = useState("");
-  const [customId, setCustomId] = useState("");
   const [contactName, setContactName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -4672,7 +4671,6 @@ function ClientWizardModal({
     try {
       const formData = new FormData();
       formData.set("name", name);
-      if (customId.trim()) formData.set("customId", customId.trim());
       formData.set("contactName", contactName);
       formData.set("email", email);
       formData.set("phone", phone);
@@ -4726,19 +4724,6 @@ function ClientWizardModal({
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex: Santander Portugal ou Marta Silva"
               className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-            />
-          </div>
-
-          <div>
-            <label className="block font-bold text-[#3a3a3c] mb-1">
-              ID Único Personalizado (Opcional)
-            </label>
-            <input
-              type="text"
-              value={customId}
-              onChange={(e) => setCustomId(e.target.value)}
-              placeholder="Ex: cli-santander (vazio = automático cli_...)"
-              className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
             />
           </div>
 

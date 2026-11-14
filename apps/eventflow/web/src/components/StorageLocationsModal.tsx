@@ -684,7 +684,6 @@ export default function StorageLocationsModal({
               </div>
 
               <form onSubmit={handleCreateLocation} className="space-y-3.5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-bold text-[#3a3a3c] mb-1">
                       Nome do Local de Armazenamento *
@@ -698,19 +697,6 @@ export default function StorageLocationsModal({
                       className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
                     />
                   </div>
-                  <div>
-                    <label className="block font-bold text-[#3a3a3c] mb-1">
-                      Código / Abreviatura (Opcional)
-                    </label>
-                    <input
-                      type="text"
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      placeholder="Ex: ARM-C (auto se vazio)"
-                      className="w-full px-3 py-2 text-xs font-mono uppercase bg-white border border-[#ececf0] rounded-[10px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-                    />
-                  </div>
-                </div>
 
                 <div>
                   <label className="block font-bold text-[#3a3a3c] mb-1">

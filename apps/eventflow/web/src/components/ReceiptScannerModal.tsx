@@ -627,7 +627,7 @@ export default function ReceiptScannerModal({
                                 className="w-full px-2.5 py-1.5 bg-white border border-[#d1d1d6] rounded-[8px] font-semibold text-[#1c1c1e] focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                               <p className="text-[10px] text-emerald-700 font-medium mt-1">
-                                SKU Proposto: <strong>{item.sku}</strong>
+                                Código atribuído: <strong>{item.sku}</strong>
                               </p>
                             </div>
                           )}

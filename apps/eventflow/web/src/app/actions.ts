@@ -707,8 +707,14 @@ export async function updateItemPatchAction(
   };
 
   if (patch.name !== undefined) updateData.name = patch.name;
-  if (patch.sku !== undefined) updateData.sku = patch.sku;
   if (patch.category !== undefined) updateData.category = patch.category;
+  if (patch.sku !== undefined) {
+    const cleanSku = patch.sku.trim();
+    updateData.sku = cleanSku;
+    if (patch.barcode === undefined && /^\d{8,14}$/.test(cleanSku)) {
+      updateData.barcode = cleanSku;
+    }
+  }
   if (patch.totalQuantity !== undefined) updateData.totalQuantity = Math.max(0, patch.totalQuantity);
   if (patch.minStock !== undefined) updateData.minStock = patch.minStock === null ? null : Math.max(0, patch.minStock);
   if (patch.warehouseLocation !== undefined) updateData.warehouseLocation = patch.warehouseLocation || "Armazém Principal";

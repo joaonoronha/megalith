@@ -613,16 +613,13 @@ export default function UserDetailView({
                       <div className="flex flex-wrap items-center gap-2 text-xs text-[#8e8e93] mt-1">
                         <span>No evento:</span>
                         {t.eventId ? (
-                          <>
-                            <Link
-                              href={`/eventos/${t.eventId}`}
-                              className="font-semibold text-[#111] hover:text-[#007aff] transition flex items-center gap-1"
-                            >
-                              <span>{t.eventName || "Evento"}</span>
-                              <ExternalLink className="w-3 h-3 opacity-50" />
-                            </Link>
-                            <span className="font-mono text-[10px]">#{t.eventId}</span>
-                          </>
+                          <Link
+                            href={`/eventos/${t.eventId}`}
+                            className="font-semibold text-[#111] hover:text-[#007aff] transition flex items-center gap-1"
+                          >
+                            <span>{t.eventName || "Evento"}</span>
+                            <ExternalLink className="w-3 h-3 opacity-50" />
+                          </Link>
                         ) : (
                           <span className="font-semibold text-[#111]">{t.eventName || "Ação geral"}</span>
                         )}
@@ -769,16 +766,6 @@ function EditUserModal({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
-          <div>
-            <label className="block font-bold text-[#3a3a3c] mb-1">ID do Utilizador</label>
-            <input
-              type="text"
-              value={user.id}
-              disabled
-              className="w-full px-3 py-2 bg-[#f2f2f7] text-[#8e8e93] font-mono border border-[#ececf0] rounded-[10px] cursor-not-allowed select-all"
-            />
-          </div>
-
           <div>
             <label className="block font-bold text-[#3a3a3c] mb-1">Nome Completo *</label>
             <input

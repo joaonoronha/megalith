@@ -593,22 +593,22 @@ export default function InventoryDetailView({
                     )}
                   </button>
 
-                  {/* SKU Input */}
+                  {/* Unified Item Code Input */}
                   <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#fafafc] border border-[#ececf0] text-xs font-mono">
-                    <span className="text-[#8e8e93] font-bold">SKU:</span>
+                    <span className="text-[#8e8e93] font-bold">Código:</span>
                     <input
                       type="text"
                       value={item.sku}
                       onChange={(e) => handleFieldChange("sku", e.target.value.toUpperCase())}
-                      placeholder="SKU-001"
+                      placeholder="Código / Barcode"
                       className="min-w-[120px] max-w-[220px] w-auto bg-transparent font-bold text-[#111] focus:outline-none uppercase"
-                      title="Edite o SKU ou código de barras"
+                      title="Código de referência ou código de barras"
                     />
                     <button
                       type="button"
                       onClick={handleCopySku}
                       className="text-[#8e8e93] hover:text-[#111] ml-0.5 cursor-pointer"
-                      title="Copiar SKU"
+                      title="Copiar código"
                     >
                       {copiedSku ? (
                         <Check className="w-3 h-3 text-emerald-600" />
@@ -644,12 +644,12 @@ export default function InventoryDetailView({
                     >
                       {!selectedLocationId && (
                         <option value="" disabled className="text-[#8e8e93]">
-                          {item.warehouseLocation ? `${item.warehouseLocation} (Local não registado)` : "Selecionar local..."}
+                          {item.warehouseLocation || "Selecionar local..."}
                         </option>
                       )}
                       {locationsList.map((loc) => (
                         <option key={loc.id} value={loc.id} className="text-[#111]">
-                          {loc.name}{loc.code ? ` (${loc.code})` : ""}{loc.managerName ? ` · Gestor: ${loc.managerName}` : ""}
+                          {loc.name}
                         </option>
                       ))}
                     </select>
@@ -783,8 +783,8 @@ export default function InventoryDetailView({
             </div>
           </div>
 
-          {/* Purchase Status Banner & Actions */}
-          {item.purchaseStatus === "not_bought" ? (
+          {/* Purchase Status Banner & Actions (Shown only when pending purchase) */}
+          {item.purchaseStatus === "not_bought" && (
             <div className="p-4 rounded-[18px] bg-amber-50/80 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-start gap-2.5">
                 <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-800 shrink-0 mt-0.5">
@@ -821,25 +821,6 @@ export default function InventoryDetailView({
               >
                 <Check className="w-3.5 h-3.5" />
                 <span>Marcar como Comprado & Lançar Despesa</span>
-              </button>
-            </div>
-          ) : (
-            <div className="px-4 py-2.5 rounded-[14px] bg-emerald-50/70 border border-emerald-100 flex items-center justify-between text-xs text-emerald-900">
-              <div className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>
-                  <strong>Artigo Comprado & Contabilizado:</strong> Despesa de aquisição registada nas contas de Finanças da CFM Events (€{(Number(item.purchaseCost) > 0 ? Number(item.purchaseCost) : (Number(item.replacementCost) || 0) * (Number(item.totalQuantity) || 1)).toFixed(2)}).
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setItem((prev) => ({ ...prev, purchaseStatus: "not_bought" }));
-                  savePatch({ purchaseStatus: "not_bought" });
-                }}
-                className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 underline ml-2 cursor-pointer whitespace-nowrap"
-              >
-                Alterar para Não Comprado
               </button>
             </div>
           )}
@@ -1007,15 +988,6 @@ export default function InventoryDetailView({
                           <ExternalLink className="w-3.5 h-3.5 opacity-50" />
                         </Link>
 
-                        {/* Event Unique ID Badge */}
-                        <Link
-                          href={`/eventos/${a.eventId}`}
-                          prefetch={false}
-                          className="font-mono text-[10px] text-[#8e8e93] bg-[#fafafc] hover:bg-[#f2f2f5] px-1.5 py-0.5 rounded border border-[#ececf0] transition"
-                        >
-                          #{a.eventId}
-                        </Link>
-
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#f2f2f5] text-[#636366] capitalize">
                           {a.eventStatus}
                         </span>
@@ -1101,7 +1073,7 @@ export default function InventoryDetailView({
                 <div className="min-w-0">
                   <h3 className="text-sm font-bold text-white truncate">{item.name}</h3>
                   <div className="flex items-center gap-2 text-[11px] text-[#a1a1a6]">
-                    <span>SKU: {item.sku}</span>
+                    <span>Código: {item.sku}</span>
                     <span>·</span>
                     <span>{item.category}</span>
                   </div>

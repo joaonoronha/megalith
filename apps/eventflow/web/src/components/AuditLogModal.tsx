@@ -119,10 +119,7 @@ export default function AuditLogModal({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-bold text-[#007aff] uppercase tracking-wider">
-                  Auditing Log · {entityTypeLabels[entityType] || entityType}
-                </span>
-                <span className="font-mono text-[10px] text-[#8e8e93] bg-[#f5f5f7] px-1.5 py-0.5 rounded border border-[#ececf0]">
-                  #{entityId}
+                  Histórico · {entityTypeLabels[entityType] || entityType}
                 </span>
               </div>
               <h2 className="text-[17px] font-bold text-[#111111] truncate max-w-sm sm:max-w-md">
@@ -228,10 +225,6 @@ export default function AuditLogModal({
                               </span>
                             )}
                           </div>
-
-                          <span className="text-[10px] text-[#8e8e93] font-mono">
-                            #{log.id.slice(-6)}
-                          </span>
                         </div>
                       </div>
                     </div>

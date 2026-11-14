@@ -846,26 +846,13 @@ export default function BarcodeScannerModal({
                   />
                 </div>
 
-                {/* Código / SKU */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-[11px] font-bold text-[#636366]">
-                      Código / SKU
-                    </label>
-                    {activeBarcode && (
-                      <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-full">
-                        Código de barras lido
-                      </span>
-                    )}
+                {/* Código do artigo (automático a partir da leitura) */}
+                {activeBarcode && (
+                  <div className="flex items-center justify-between px-3 py-2 bg-[#f9f9fb] border border-[#ececf0] rounded-xl text-xs">
+                    <span className="text-[#8e8e93] font-medium">Código detetado</span>
+                    <span className="font-mono font-bold text-[#111]">{activeBarcode}</span>
                   </div>
-                  <input
-                    type="text"
-                    value={newItemSku}
-                    onChange={(e) => setNewItemSku(e.target.value)}
-                    placeholder={activeBarcode || "Ex: 5601234567890 ou SKU"}
-                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#007aff] font-mono text-[#111]"
-                  />
-                </div>
+                )}
 
                 {/* Categoria & Quantidade Inicial */}
                 <div className="grid grid-cols-2 gap-2.5">
