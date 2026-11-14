@@ -4902,7 +4902,6 @@ function NewUserModal({
   onCreated: (user: any) => void;
 }) {
   const [name, setName] = useState("");
-  const [customId, setCustomId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("admin");
@@ -4917,7 +4916,6 @@ function NewUserModal({
     try {
       const formData = new FormData();
       formData.set("name", name);
-      if (customId.trim()) formData.set("customId", customId.trim());
       formData.set("email", email);
       formData.set("password", password);
       formData.set("role", role);
@@ -4972,19 +4970,6 @@ function NewUserModal({
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex: Sofia Ribeiro"
               className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
-            />
-          </div>
-
-          <div>
-            <label className="block font-bold text-[#3a3a3c] mb-1">
-              ID de Utilizador (Opcional)
-            </label>
-            <input
-              type="text"
-              value={customId}
-              onChange={(e) => setCustomId(e.target.value)}
-              placeholder="Ex: usr-sofia (vazio = automático usr_...)"
-              className="w-full px-3 py-2 text-xs font-mono bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
             />
           </div>
 
