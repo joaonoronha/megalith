@@ -13,7 +13,7 @@ import {
   quotes,
   users,
 } from "@/db/schema";
-import { eq, ne, desc, asc } from "drizzle-orm";
+import { eq, ne, desc, asc, isNull } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import EventDetailView from "@/components/EventDetailView";
 import { isMeetingEvent } from "@/lib/events";
@@ -83,7 +83,7 @@ export default async function EventPage({ params }: PageProps) {
       .catch(() => []),
     getCurrentUser().catch(() => null),
     db.query.clients.findMany({ orderBy: [clients.name] }).catch(() => []),
-    db.query.inventoryItems.findMany({ orderBy: [inventoryItems.name] }).catch(() => []),
+    db.query.inventoryItems.findMany({ where: isNull(inventoryItems.deletedAt), orderBy: [inventoryItems.name] }).catch(() => []),
     db
       .select({
         id: eventAllocations.id,

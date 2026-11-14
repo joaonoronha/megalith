@@ -13,7 +13,7 @@ import {
   eventMeetings,
   alerts,
 } from "@/db/schema";
-import { desc, asc, isNull } from "drizzle-orm";
+import { desc, asc, isNull, isNotNull } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 
 export async function getAppInitialData() {
@@ -121,6 +121,11 @@ export async function getAppInitialData() {
         console.error("getAppInitialData: error loading currentUser", e);
         return null;
       }),
+      db
+        .select({ id: inventoryItems.id })
+        .from(inventoryItems)
+        .where(isNotNull(inventoryItems.deletedAt))
+        .catch(() => []),
     ]);
 
     allEvents = (results[0] || []).filter(
@@ -138,6 +143,18 @@ export async function getAppInitialData() {
     allCustomItems = results[10] || [];
     allAlerts = results[11] || [];
     currentUser = results[12] || null;
+
+    const deletedItemRows = results[13] || [];
+    if (deletedItemRows.length > 0) {
+      const deletedSet = new Set(deletedItemRows.map((d: any) => d.id));
+      allMovements = (allMovements || []).filter((m: any) => {
+        if (!m.notes) return true;
+        for (const id of deletedSet) {
+          if (m.notes.includes(`(${id})`)) return false;
+        }
+        return true;
+      });
+    }
   } catch (err) {
     console.error("getAppInitialData: bulk query error", err);
   }

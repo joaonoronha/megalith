@@ -7,7 +7,7 @@ import {
   quotes,
   financialMovements,
 } from "@/db/schema";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, isNull } from "drizzle-orm";
 import { generateId } from "@/lib/id";
 import { isCancelledEvent } from "@/lib/events";
 
@@ -34,7 +34,9 @@ export async function evaluateAndSyncAlerts() {
     movements,
     existingAlertsList,
   ] = await Promise.all([
-    db.query.inventoryItems.findMany(),
+    db.query.inventoryItems.findMany({
+      where: isNull(inventoryItems.deletedAt),
+    }),
     db.query.events.findMany(),
     db.query.eventTasks.findMany(),
     db.query.quotes.findMany(),

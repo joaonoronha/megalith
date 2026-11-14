@@ -217,6 +217,21 @@ export async function ensureDbMigrated(): Promise<void> {
       // Best effort
     }
 
+    // 11. Clean up any orphan financial movements from soft-deleted inventory items
+    try {
+      await client.execute(`
+        DELETE FROM financial_movements
+        WHERE id IN (
+          SELECT fm.id
+          FROM financial_movements fm
+          JOIN inventory_items ii ON fm.notes LIKE '%' || '(' || ii.id || ')' || '%'
+          WHERE ii.deleted_at IS NOT NULL
+        )
+      `);
+    } catch {
+      // Best effort
+    }
+
     isMigrated = true;
   })();
 

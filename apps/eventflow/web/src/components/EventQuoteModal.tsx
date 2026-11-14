@@ -33,6 +33,7 @@ interface InventoryItem {
   name: string;
   unitPrice: number;
   totalQuantity: number;
+  deletedAt?: Date | string | null;
 }
 
 interface ClientData {
@@ -84,6 +85,8 @@ export default function EventQuoteModal({
   onClose,
   onCreated,
 }: EventQuoteModalProps) {
+  const activeItems = (allItems || []).filter((it) => !it.deletedAt);
+
   // Pre-fill lines: If event already has material allocations or custom event items, import them as initial quote lines
   const initialLines: LineItem[] = [];
 
@@ -111,10 +114,10 @@ export default function EventQuoteModal({
   if (initialLines.length === 0) {
     initialLines.push(
       {
-        itemId: allItems[0]?.id,
-        description: allItems[0]?.name || "Cadeiras Chiavari Douradas",
+        itemId: activeItems[0]?.id,
+        description: activeItems[0]?.name || "Cadeiras Chiavari Douradas",
         quantity: 50,
-        unitPrice: allItems[0]?.unitPrice || 6.0,
+        unitPrice: activeItems[0]?.unitPrice || 6.0,
       },
       {
         description: "Produção de Evento & Montagem Técnica CFM",
@@ -149,10 +152,10 @@ export default function EventQuoteModal({
     setLines((prev) => [
       ...prev,
       {
-        itemId: allItems[0]?.id,
-        description: allItems[0]?.name || "Artigo / Serviço",
+        itemId: activeItems[0]?.id,
+        description: activeItems[0]?.name || "Artigo / Serviço",
         quantity: 1,
-        unitPrice: allItems[0]?.unitPrice || 10.0,
+        unitPrice: activeItems[0]?.unitPrice || 10.0,
       },
     ]);
   };
@@ -195,7 +198,7 @@ export default function EventQuoteModal({
       prev.map((l, i) => {
         if (i !== idx) return l;
         if (field === "itemId") {
-          const selectedItem = allItems.find((it) => it.id === val);
+          const selectedItem = activeItems.find((it) => it.id === val);
           return {
             ...l,
             itemId: val,
@@ -459,14 +462,14 @@ export default function EventQuoteModal({
                       placeholder="Descrição do artigo ou serviço"
                       className="w-full px-2.5 py-1.5 bg-white border border-[#ececf0] rounded-lg text-xs font-medium"
                     />
-                    {allItems.length > 0 && (
+                    {activeItems.length > 0 && (
                       <select
                         value={line.itemId || ""}
                         onChange={(e) => handleUpdateLine(idx, "itemId", e.target.value || undefined)}
                         className="w-full text-[11px] text-[#8e8e93] bg-white border border-[#ececf0] rounded-md px-2 py-0.5"
                       >
                         <option value="">Artigo personalizado / serviço técnico...</option>
-                        {allItems.map((it) => (
+                        {activeItems.map((it) => (
                           <option key={it.id} value={it.id}>
                             {it.name} ({it.sku}) — €{it.unitPrice.toFixed(2)}/un
                           </option>

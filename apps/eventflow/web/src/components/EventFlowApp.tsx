@@ -672,9 +672,11 @@ export default function EventFlowApp({
     if (!deleteItemModal.item) return;
     setIsDeletingItem(true);
     try {
-      const res = await deleteInventoryItemAction(deleteItemModal.item.id);
+      const deletedId = deleteItemModal.item.id;
+      const res = await deleteInventoryItemAction(deletedId);
       if (res.success) {
-        setItemsList((prev) => prev.filter((i) => i.id !== deleteItemModal.item.id));
+        setItemsList((prev) => prev.filter((i) => i.id !== deletedId));
+        setMovementsList((prev) => prev.filter((m) => !m.notes?.includes(`(${deletedId})`)));
         setDeleteItemModal({ isOpen: false, item: null, upcomingAllocations: [] });
       } else {
         alert(res.error || "Erro ao eliminar artigo.");
@@ -5676,13 +5678,14 @@ function QuoteWizardModal({
   };
 
   const addLine = () => {
+    const activeInv = (inventory || []).filter((i: any) => !i.deletedAt);
     setLines((prev) => [
       ...prev,
       {
-        itemId: inventory[0]?.id,
-        description: inventory[0]?.name || "Artigo",
+        itemId: activeInv[0]?.id,
+        description: activeInv[0]?.name || "Artigo",
         quantity: 10,
-        unitPrice: inventory[0]?.unitPrice || 5.0,
+        unitPrice: activeInv[0]?.unitPrice || 5.0,
       },
     ]);
   };
