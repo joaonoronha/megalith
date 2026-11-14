@@ -2334,7 +2334,7 @@ export default function EventFlowApp({
                     <div
                       key={e.id}
                       onClick={() => router.push(`/eventos/${e.id}`)}
-                      className="relative overflow-hidden rounded-[16px] border border-black/10 border-r-0 bg-neutral-900 shadow-xs hover:shadow-md hover:border-black/20 transition-all duration-300 px-4 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group"
+                      className="relative overflow-hidden rounded-[16px] border border-black/10 bg-neutral-900 shadow-xs hover:shadow-md hover:border-black/20 transition-all duration-300 px-4 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group"
                     >
                       {/* Backsplash image background */}
                       <img
@@ -2355,41 +2355,6 @@ export default function EventFlowApp({
                           } 100%)`,
                         }}
                       />
-
-                      {/* Vertical diagonal stripes on the right side showing the colour themes (seamless, extra wide, shifted towards right corner) */}
-                      <div
-                        className="absolute -right-2 top-0 bottom-0 pointer-events-none overflow-hidden z-0 flex justify-end"
-                        aria-hidden="true"
-                        style={{
-                          width: `${Math.max(colors.length * 44 + 80, 200)}px`,
-                        }}
-                      >
-                        <div
-                          className="flex h-full origin-bottom-right"
-                          style={{
-                            transform: "skewX(-20deg)",
-                            transformOrigin: "bottom right",
-                            marginRight: "-100px",
-                          }}
-                        >
-                          {colors.map((color, i) => (
-                            <div
-                              key={i}
-                              className="h-[240%] -mt-[70%] w-11 sm:w-14 flex-shrink-0 transition-transform duration-300"
-                              style={{
-                                backgroundColor: color,
-                                boxShadow: i === 0 ? "-6px 0 16px rgba(0,0,0,0.45)" : undefined,
-                              }}
-                              title={`Cor do tema: ${color}`}
-                            />
-                          ))}
-                          {/* Seamless solid rightmost fill covering the right corner completely */}
-                          <div
-                            className="h-[240%] -mt-[70%] w-36 sm:w-48 flex-shrink-0"
-                            style={{ backgroundColor: colors[colors.length - 1] }}
-                          />
-                        </div>
-                      </div>
 
                       {/* Left: Event Name, Category, Theme, Date, Last Updated */}
                       <div className="relative z-10 min-w-0 flex-1">
@@ -2426,9 +2391,9 @@ export default function EventFlowApp({
                         </div>
                       </div>
 
-                      {/* Right: Interactive Status Dropdown (Stops Click Propagation) */}
+                      {/* Right: Interactive Status Dropdown & Action Controls */}
                       <div
-                        className="relative z-10 flex items-center gap-2.5 self-start sm:self-center flex-shrink-0 sm:mr-16 md:mr-20"
+                        className="relative z-10 flex items-center gap-2.5 self-start sm:self-center flex-shrink-0"
                         onClick={(ev) => ev.stopPropagation()}
                         onMouseDown={(ev) => ev.stopPropagation()}
                       >
@@ -2452,6 +2417,22 @@ export default function EventFlowApp({
 
                         <ChevronRight className="w-4 h-4 text-white/70 group-hover:text-white group-hover:translate-x-0.5 transition hidden sm:block" />
                       </div>
+
+                      {/* Theme color dots displayed on the bottom right */}
+                      {colors.length > 0 && (
+                        <div
+                          className="absolute right-3 bottom-2.5 z-10 flex items-center gap-1.5 pointer-events-none px-2 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/15 shadow-2xs"
+                          title="Cores do tema do evento"
+                        >
+                          {colors.map((color, i) => (
+                            <span
+                              key={i}
+                              className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border border-white/40 shadow-xs flex-shrink-0"
+                              style={{ backgroundColor: color }}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
