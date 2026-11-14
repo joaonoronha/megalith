@@ -76,6 +76,7 @@ import {
   updateEventCustomItemAction,
   deleteEventCustomItemAction,
   addEventTaskAction,
+  updateEventTaskAssigneeAction,
   toggleEventTaskAction,
   deleteEventTaskAction,
   addEventMediaAction,
@@ -1481,7 +1482,7 @@ interface Props {
   initialMedia?: EventMediaItem[];
   initialMeetings?: EventMeeting[];
   availableMeetingsToLink?: AvailableMeetingToLink[];
-  teamUsers?: Array<{ id: string; name: string; email: string; role: string }>;
+  teamUsers?: Array<{ id: string; name: string; email: string; role: string; avatarUrl?: string | null }>;
   quotes: Quote[];
   currentUser: any;
 }
@@ -1965,6 +1966,7 @@ export default function EventDetailView({
   // New task inline state
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState<"baixa" | "media" | "alta" | "urgente">("media");
+  const [newTaskAssignee, setNewTaskAssignee] = useState("");
 
   // Add allocation state
   const activeItems = useMemo(() => allItems.filter((i) => !i.deletedAt), [allItems]);
@@ -2251,6 +2253,7 @@ export default function EventDetailView({
     if (!newTaskTitle.trim()) return;
 
     const tempId = `tsk-temp-${Date.now()}`;
+    const assigneeToAdd = newTaskAssignee.trim() || null;
     const newTask: Task = {
       id: tempId,
       eventId: event.id,
@@ -2258,7 +2261,7 @@ export default function EventDetailView({
       completed: false,
       dueDate: null,
       priority: newTaskPriority,
-      assignedTo: null,
+      assignedTo: assigneeToAdd,
       orderIndex: Date.now(),
     };
 
@@ -2266,14 +2269,31 @@ export default function EventDetailView({
     const titleToAdd = newTaskTitle.trim();
     const priorityToAdd = newTaskPriority;
     setNewTaskTitle("");
+    setNewTaskAssignee("");
 
     startTransition(async () => {
-      const res = await addEventTaskAction(event.id, titleToAdd, priorityToAdd);
+      const res = await addEventTaskAction(
+        event.id,
+        titleToAdd,
+        priorityToAdd,
+        undefined,
+        assigneeToAdd || undefined
+      );
       if (res.success && res.id) {
         setTasks((prev) =>
           prev.map((t) => (t.id === tempId ? { ...t, id: res.id! } : t))
         );
       }
+    });
+  };
+
+  const handleAssignTask = async (taskId: string, newAssignee: string) => {
+    const cleanAssignee = newAssignee.trim() || null;
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, assignedTo: cleanAssignee } : t))
+    );
+    startTransition(async () => {
+      await updateEventTaskAssigneeAction(taskId, cleanAssignee, event.id);
     });
   };
 
@@ -3768,8 +3788,8 @@ export default function EventDetailView({
                 </div>
               </div>
 
-              {/* Add task inline form (Sem seletor de prioridade) */}
-              <form onSubmit={handleAddTask} className="flex items-center gap-2 mb-4">
+              {/* Add task inline form with assignee selector */}
+              <form onSubmit={handleAddTask} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-4">
                 <input
                   type="text"
                   placeholder="Adicionar nova ação ou tarefa... (ex: Confirmar bolo e balões Winnie the Pooh)"
@@ -3777,17 +3797,37 @@ export default function EventDetailView({
                   onChange={(e) => setNewTaskTitle(e.target.value)}
                   className="flex-1 px-3.5 py-2 text-xs bg-[#fafafc] border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff] transition"
                 />
+
+                {/* Optional Assignee on Create */}
+                <div className="relative inline-flex items-center shrink-0">
+                  <User className="w-3.5 h-3.5 text-[#8e8e93] absolute left-3 pointer-events-none" />
+                  <select
+                    value={newTaskAssignee}
+                    onChange={(e) => setNewTaskAssignee(e.target.value)}
+                    className="w-full sm:w-auto appearance-none pl-8 pr-7 py-2 text-xs font-semibold bg-[#fafafc] border border-[#ececf0] hover:border-[#d2d2d7] rounded-[12px] text-[#111] focus:outline-none focus:ring-2 focus:ring-[#007aff] cursor-pointer transition"
+                    title="Atribuir a um membro da equipa (opcional)"
+                  >
+                    <option value="">Sem responsável</option>
+                    {teamUsers.map((u) => (
+                      <option key={u.id} value={u.name}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-3.5 h-3.5 text-[#8e8e93] absolute right-2.5 pointer-events-none" />
+                </div>
+
                 <button
                   type="submit"
                   disabled={!newTaskTitle.trim()}
-                  className="px-4 py-2 bg-[#111] hover:bg-black disabled:opacity-50 text-white rounded-[12px] text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0"
+                  className="px-4 py-2 bg-[#111] hover:bg-black disabled:opacity-50 text-white rounded-[12px] text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer shrink-0 shadow-2xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Adicionar</span>
                 </button>
               </form>
 
-              {/* Task list (Sem tags de prioridade) */}
+              {/* Task list with user assignment badge/dropdown */}
               {tasks.length === 0 ? (
                 <div className="text-center py-6 text-xs text-[#8e8e93]">
                   Nenhuma tarefa adicionada ainda. Escreva acima para criar o checklist deste evento.
@@ -3797,13 +3837,13 @@ export default function EventDetailView({
                   {tasks.map((t) => (
                     <div
                       key={t.id}
-                      className={`p-3.5 rounded-[14px] border transition flex items-center justify-between gap-3 ${
+                      className={`p-3 sm:p-3.5 rounded-[16px] border transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 ${
                         t.completed
                           ? "bg-[#fafafc] border-[#f2f2f5] opacity-75"
                           : "bg-white border-[#ececf0] hover:border-[#d2d2d7]"
                       }`}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <button
                           type="button"
                           onClick={() => handleToggleTask(t.id, t.completed)}
@@ -3816,9 +3856,9 @@ export default function EventDetailView({
                           )}
                         </button>
 
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <span
-                            className={`text-xs font-medium block truncate ${
+                            className={`text-xs font-semibold block truncate ${
                               t.completed ? "line-through text-[#8e8e93]" : "text-[#111]"
                             }`}
                           >
@@ -3827,14 +3867,50 @@ export default function EventDetailView({
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteTask(t.id)}
-                        className="p-1 text-[#8e8e93] hover:text-rose-600 rounded-md transition cursor-pointer shrink-0"
-                        title="Eliminar tarefa"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0 pl-8 sm:pl-0">
+                        {/* Assignee Selector Dropdown for this Task */}
+                        <div className="relative inline-flex items-center">
+                          <div
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition ${
+                              t.assignedTo
+                                ? "bg-[#f0f7ff] text-[#0066cc] border-[#d6e7ff] hover:border-[#007aff]"
+                                : "bg-[#fafafc] text-[#8e8e93] border-[#ececf0] hover:border-[#c7c7cc] hover:text-[#111]"
+                            }`}
+                          >
+                            <User className={`w-3.5 h-3.5 shrink-0 ${t.assignedTo ? "text-[#007aff]" : "text-[#8e8e93]"}`} />
+                            <select
+                              value={t.assignedTo || ""}
+                              onChange={(e) => handleAssignTask(t.id, e.target.value)}
+                              className="bg-transparent text-xs font-semibold focus:outline-none cursor-pointer pr-1 appearance-none max-w-[140px] sm:max-w-[180px] truncate"
+                              title={`Atribuir utilizador à tarefa "${t.title}"`}
+                            >
+                              <option value="" className="text-[#8e8e93]">
+                                Sem responsável
+                              </option>
+                              {teamUsers.map((u) => (
+                                <option key={u.id} value={u.name} className="text-[#111]">
+                                  {u.name}
+                                </option>
+                              ))}
+                              {t.assignedTo && !teamUsers.some((u) => u.name === t.assignedTo) && (
+                                <option value={t.assignedTo} className="text-[#111]">
+                                  {t.assignedTo}
+                                </option>
+                              )}
+                            </select>
+                            <ChevronDown className="w-3 h-3 shrink-0 pointer-events-none opacity-60 ml-0.5" />
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTask(t.id)}
+                          className="p-1.5 text-[#8e8e93] hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer shrink-0"
+                          title="Eliminar tarefa"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
