@@ -1394,20 +1394,12 @@ export default function EventFlowApp({
                             </span>
                           </div>
 
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="text-[14px] font-bold text-[#111111] group-hover:text-[#007aff] transition truncate"
-                              >
-                                {evt.name}
-                              </span>
-                              {evt.theme && (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#fef7e0] text-[#b06000] border border-[#feefc3] flex items-center gap-1 flex-shrink-0">
-                                  <Sparkles className="w-2.5 h-2.5" />
-                                  <span>{evt.theme}</span>
-                                </span>
-                              )}
-                            </div>
+                          <div className="min-w-0 flex-1">
+                            <span
+                              className="text-[14px] font-bold text-[#111111] group-hover:text-[#007aff] transition truncate block"
+                            >
+                              {evt.name}
+                            </span>
                             <div className="text-[12px] text-[#8e8e93] mt-0.5 truncate">
                               {formatEventByline(evt.startDate, evt.venue)}
                             </div>
