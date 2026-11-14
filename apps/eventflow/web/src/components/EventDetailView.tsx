@@ -75,7 +75,6 @@ import {
   addEventCustomItemAction,
   updateEventCustomItemAction,
   deleteEventCustomItemAction,
-  convertEventCustomItemToInventoryAction,
   addEventTaskAction,
   toggleEventTaskAction,
   deleteEventTaskAction,
@@ -1952,7 +1951,6 @@ export default function EventDetailView({
   const [customItemIsConsumable, setCustomItemIsConsumable] = useState(false);
   const [customItemAddToQuota, setCustomItemAddToQuota] = useState(true);
   const [isSubmittingCustomItem, setIsSubmittingCustomItem] = useState(false);
-  const [convertingCustomItemId, setConvertingCustomItemId] = useState<string | null>(null);
 
   // New task inline state
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -2436,62 +2434,6 @@ export default function EventDetailView({
     }
   };
 
-  const handleConvertCustomItemToInventory = async (item: EventCustomItem) => {
-    if (item.boughtStatus === "bought") return;
-    const confirmBuy = window.confirm(
-      `Confirmar a aquisição do artigo "${item.name}"?\n\n• Será registado no inventário permanente da CFM Events.\n• Será registada despesa financeira automática no valor de €${((item.quantity || 1) * (item.unitCost || 0)).toFixed(2)}.\n• Ficará alocado como material deste evento.`
-    );
-    if (!confirmBuy) return;
-
-    setConvertingCustomItemId(item.id);
-    try {
-      const res = await convertEventCustomItemToInventoryAction({
-        customItemId: item.id,
-        eventId: event.id,
-      });
-
-      if (res.success && res.itemId) {
-        // Update local custom items state
-        setCustomItems((prev) =>
-          prev.map((c) =>
-            c.id === item.id
-              ? { ...c, boughtStatus: "bought", convertedItemId: res.itemId }
-              : c
-          )
-        );
-
-        // Add newly created item to allocations so it's immediately visible in Stock
-        const newlyCreatedAllocation: Allocation = {
-          id: res.allocationId || `alc-${Date.now()}`,
-          eventId: event.id,
-          itemId: res.itemId,
-          quantity: item.quantity || 1,
-          status: "reservado",
-          notes: `Item adquirido para o evento (anteriormente exclusivo). Fornecedor: ${item.supplier || "N/A"}`,
-          itemName: item.name,
-          itemSku: res.sku || "ITM-NOVO",
-          itemCategory: item.category || "Personalizado",
-          itemUnitPrice: item.unitPrice,
-          itemReplacementCost: item.unitCost,
-          itemWarehouseLocation: "Armazém Principal",
-          itemImageUrl: "https://images.unsplash.com/photo-1549497538-303791108f95?auto=format&fit=crop&w=400&q=80",
-          itemTotalQuantity: item.quantity || 1,
-          itemIsConsumable: item.isConsumable,
-          itemPackageUnits: 1,
-        };
-        setAllocations((prev) => [...prev, newlyCreatedAllocation]);
-
-        alert(`Artigo "${item.name}" adicionado com sucesso ao inventário (SKU: ${res.sku}) e despesa de €${((item.quantity || 1) * (item.unitCost || 0)).toFixed(2)} registada em Finanças!`);
-      } else {
-        alert(res.error || "Não foi possível converter o artigo para o inventário.");
-      }
-    } catch (err: any) {
-      console.error("Erro ao converter artigo:", err);
-      alert("Erro ao registar compra do artigo.");
-    } finally {
-      setConvertingCustomItemId(null);
-    }
-  };
 
   const handleDeleteCustomItem = async (item: EventCustomItem) => {
     const confirmDelete = window.confirm(
@@ -3954,23 +3896,6 @@ export default function EventDetailView({
                           <div className="text-[10px] text-[#8e8e93]">subtotal venda</div>
                         </div>
 
-                        {/* Comprado button if not bought */}
-                        {item.boughtStatus !== "bought" && (
-                          <button
-                            type="button"
-                            onClick={() => handleConvertCustomItemToInventory(item)}
-                            disabled={convertingCustomItemId === item.id}
-                            className="px-2.5 py-1 rounded-[10px] bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer shadow-xs disabled:opacity-50"
-                            title="Lançar no inventário e despesa"
-                          >
-                            {convertingCustomItemId === item.id ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <ShoppingCart className="w-3 h-3" />
-                            )}
-                            <span>Comprado</span>
-                          </button>
-                        )}
 
                         {/* Edit & Delete */}
                         <div className="flex items-center gap-1">

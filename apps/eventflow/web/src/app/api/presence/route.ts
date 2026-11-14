@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, ensureDbMigrated } from "@/db/client";
 import { userPresence, users } from "@/db/schema";
 import { eq, lt, gte, sql } from "drizzle-orm";
+import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -45,36 +46,46 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     await ensureDbMigrated();
+
+    // Verify session from cookie to prevent spoofing
+    const sessionToken = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const session = sessionToken ? await verifySessionToken(sessionToken) : null;
+
     const body = await req.json().catch(() => ({}));
     const {
-      userId,
-      userName,
-      userEmail,
-      userRole,
-      avatarUrl,
+      userId: requestedUserId,
       editing,
       action,
     } = body;
 
-    if (!userId) {
+    const targetUserId = session ? session.userId : requestedUserId;
+    if (!targetUserId) {
       return NextResponse.json({ success: false, error: "userId obrigatório" }, { status: 400 });
     }
 
     if (action === "offline") {
       // User explicitly disconnected (tab closed / unmounted / beforeunload)
-      await db.delete(userPresence).where(eq(userPresence.userId, userId));
+      await db.delete(userPresence).where(eq(userPresence.userId, targetUserId));
       const online = await getOnlineUsers();
       return NextResponse.json({ success: true, onlineUsers: online });
     }
 
-    // Lookup avatarUrl if not provided
-    let resolvedAvatar = avatarUrl;
-    if (resolvedAvatar === undefined) {
+    // Resolve user details from authenticated session or DB
+    let userName = session?.name || body.userName || "Membro da Equipa";
+    let userEmail = session?.email || body.userEmail || null;
+    let userRole = session?.role || body.userRole || "admin";
+    let resolvedAvatar = session?.avatarUrl || body.avatarUrl || null;
+
+    if (!session) {
       const u = await db.query.users.findFirst({
-        where: eq(users.id, userId),
-        columns: { avatarUrl: true },
+        where: eq(users.id, targetUserId),
       });
-      resolvedAvatar = u?.avatarUrl || null;
+      if (u) {
+        userName = u.name;
+        userEmail = u.email;
+        userRole = u.role;
+        resolvedAvatar = u.avatarUrl || null;
+      }
     }
 
     const now = new Date();
@@ -83,7 +94,7 @@ export async function POST(req: NextRequest) {
     await db
       .insert(userPresence)
       .values({
-        userId,
+        userId: targetUserId,
         userName: userName || "Membro da Equipa",
         userEmail: userEmail || null,
         userRole: userRole || "admin",

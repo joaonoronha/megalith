@@ -64,7 +64,7 @@ export function computeCompletedEventsProfit(
     const customerPrice = Number(e.customerPrice) || 0;
     const budget = Number(e.totalBudget) || 0;
 
-    const revenue = entradas > 0 ? entradas : customerPrice;
+    const revenue = Math.max(entradas, customerPrice);
     const costs = saidas > 0 ? saidas : budget;
     const profit = revenue - costs;
     const margin = revenue > 0 ? (profit / revenue) * 100 : 0;

@@ -29,11 +29,15 @@ async function approveQuoteAction(formData: FormData) {
     })
     .where(eq(quotes.id, quote.id));
 
-  // 2. Lock event status to "confirmado"
+  // 2. Lock event status to "confirmado" and sync customerPrice
   if (quote.eventId) {
     await db
       .update(events)
-      .set({ status: "confirmado" })
+      .set({
+        status: "confirmado",
+        customerPrice: quote.total,
+        updatedAt: new Date(),
+      })
       .where(eq(events.id, quote.eventId));
   }
 

@@ -30,6 +30,15 @@ import { recordAuditLog, getAuditLogsForEntity, getRecentAuditLogs } from "@/lib
 import fs from "fs/promises";
 import path from "path";
 import { isMeetingEvent } from "@/lib/events";
+import { getCurrentUser } from "@/lib/auth";
+
+async function requireAuth() {
+  const user = await getCurrentUser();
+  if (!user) {
+    throw new Error("Não tem sessão iniciada ou a sessão expirou.");
+  }
+  return user;
+}
 
 function invalidateAllCaches() {
   try {
@@ -53,6 +62,7 @@ function safeRevalidate(path: string) {
 
 // 1. Create Event
 export async function createEventAction(formData: FormData) {
+  await requireAuth();
   const name = formData.get("name") as string;
   const clientId = (formData.get("clientId") as string) || null;
   const venue = (formData.get("venue") as string) || "";
@@ -207,12 +217,20 @@ export async function createQuoteAction(formData: FormData) {
   });
 
   if (eventId) {
+    await db
+      .update(events)
+      .set({
+        customerPrice: total,
+        updatedAt: new Date(),
+      })
+      .where(eq(events.id, eventId));
+
     await recordAuditLog({
       entityType: "event",
       entityId: eventId,
       action: "orcamento",
       title: "Orçamento associado",
-      details: `Associado orçamento ${quoteNumber} com valor global de €${total.toFixed(2)}`,
+      details: `Associado orçamento ${quoteNumber} com valor global de €${total.toFixed(2)} (PVP do evento atualizado para €${total.toFixed(2)})`,
     });
   }
 
@@ -222,6 +240,7 @@ export async function createQuoteAction(formData: FormData) {
 
 // 4. Create Financial Movement (Entrada, Saída, Investimento)
 export async function createMovementAction(formData: FormData) {
+  await requireAuth();
   const type = formData.get("type") as "entrada" | "saida" | "investimento";
   const category = (formData.get("category") as string) || "Geral";
   const description = formData.get("description") as string;
@@ -256,6 +275,7 @@ export async function createMovementAction(formData: FormData) {
 
 // 4.1 Delete Financial Movement / Expense
 export async function deleteMovementAction(id: string) {
+  await requireAuth();
   if (!id) {
     return { success: false, error: "ID do movimento é obrigatório." };
   }
@@ -284,6 +304,7 @@ export async function deleteMovementAction(id: string) {
 
 // 4.9 Storage Locations Management
 export async function createStorageLocationAction(formData: FormData) {
+  await requireAuth();
   const name = (formData.get("name") as string)?.trim();
   const code = (formData.get("code") as string)?.trim() || null;
   const address = (formData.get("address") as string)?.trim() || null;
@@ -330,6 +351,7 @@ export async function createStorageLocationAction(formData: FormData) {
 }
 
 export async function updateStorageLocationAction(formData: FormData) {
+  await requireAuth();
   const locationId = (formData.get("locationId") as string)?.trim();
   if (!locationId) return { success: false, error: "ID do local é obrigatório." };
 
@@ -372,6 +394,7 @@ export async function updateStorageLocationAction(formData: FormData) {
 }
 
 export async function deleteStorageLocationAction(locationId: string) {
+  await requireAuth();
   if (!locationId) return { success: false, error: "ID do local é obrigatório." };
 
   // Reassign items from this location to Armazém Principal if exists
@@ -407,6 +430,7 @@ export async function deleteStorageLocationAction(locationId: string) {
 
 // 5. Create Inventory Item
 export async function createItemAction(formData: FormData) {
+  await requireAuth();
   try {
     let sku = ((formData.get("sku") as string) || "").trim();
     const name = ((formData.get("name") as string) || "").trim();
@@ -860,6 +884,7 @@ export async function checkItemUpcomingEventsAction(itemId: string) {
 
 // 6.5 Soft-delete item from inventory (preserves event history and past allocations)
 export async function deleteInventoryItemAction(itemId: string) {
+  await requireAuth();
   if (!itemId) return { success: false, error: "ID do artigo é obrigatório." };
 
   try {
@@ -1539,6 +1564,7 @@ export async function updateAllocationQuantityAction(allocationId: string, quant
 
 // 12. Add Inventory Allocation to Event
 export async function addEventAllocationAction(formData: FormData) {
+  await requireAuth();
   const eventId = formData.get("eventId") as string;
   const itemId = formData.get("itemId") as string;
   const quantity = parseInt((formData.get("quantity") as string) || "1", 10);
@@ -1547,6 +1573,25 @@ export async function addEventAllocationAction(formData: FormData) {
 
   if (!eventId || !itemId || quantity <= 0) {
     return { success: false, error: "Dados de alocação inválidos." };
+  }
+
+  // Check temporal stock conflict
+  let conflictWarning: string | null = null;
+  try {
+    const targetEvt = await db.query.events.findFirst({
+      where: eq(events.id, eventId),
+    });
+    if (targetEvt && targetEvt.startDate) {
+      const { checkItemAvailability } = await import("@/lib/conflicts");
+      const start = targetEvt.prepDate ? new Date(targetEvt.prepDate) : new Date(targetEvt.startDate);
+      const end = targetEvt.returnDate ? new Date(targetEvt.returnDate) : targetEvt.endDate ? new Date(targetEvt.endDate) : new Date(targetEvt.startDate);
+      const stockCheck = await checkItemAvailability(itemId, quantity, start, end, eventId);
+      if (stockCheck.hasConflict) {
+        conflictWarning = `Atenção: Apenas ${stockCheck.availableQuantity} un. disponíveis neste período (${stockCheck.reservedInPeriod} un. já reservadas noutros eventos).`;
+      }
+    }
+  } catch (err) {
+    console.warn("Stock availability check notice:", err);
   }
 
   const id = generateId("alc");
@@ -1577,7 +1622,7 @@ export async function addEventAllocationAction(formData: FormData) {
 
   invalidateAllCaches();
   revalidatePath(`/eventos/${eventId}`);
-  return { success: true, id };
+  return { success: true, id, warning: conflictWarning };
 }
 
 // 13. Update Inventory Allocation Status
@@ -1833,135 +1878,6 @@ export async function updateEventCustomItemAction(params: {
   return { success: true };
 }
 
-// 14.25 Convert Event Custom Item to Inventory Item & Expense It Straight Away
-export async function convertEventCustomItemToInventoryAction(params: {
-  customItemId: string;
-  eventId: string;
-  warehouseLocation?: string;
-  customSku?: string;
-}) {
-  await ensureDbMigrated().catch(() => {});
-  const { customItemId, eventId, warehouseLocation = "Armazém Principal", customSku } = params;
-
-  if (!customItemId || !eventId) {
-    return { success: false, error: "ID do artigo e ID do evento são obrigatórios." };
-  }
-
-  const customItem = await db.query.eventCustomItems.findFirst({
-    where: eq(eventCustomItems.id, customItemId),
-  });
-
-  if (!customItem) {
-    return { success: false, error: "Artigo exclusivo não encontrado." };
-  }
-
-  if (customItem.boughtStatus === "bought" && customItem.convertedItemId) {
-    return { success: false, error: "Este artigo já foi adquirido e convertido para o inventário." };
-  }
-
-  const targetEvent = await db.query.events.findFirst({
-    where: eq(events.id, eventId),
-  });
-
-  const now = new Date();
-  const newItemId = generateId("itm");
-  const skuPrefix = customItem.isConsumable ? "CSM" : "EQP";
-  const sku = customSku?.trim() || `${skuPrefix}-${Math.floor(1000 + Math.random() * 9000)}`;
-
-  const totalCost = (customItem.quantity || 1) * (customItem.unitCost || 0);
-
-  // 1. Create item in inventory (marked as bought)
-  await db.insert(inventoryItems).values({
-    id: newItemId,
-    sku: sku.toUpperCase(),
-    name: customItem.name,
-    category: customItem.category || "Personalizado",
-    totalQuantity: customItem.quantity || 1,
-    minStock: 0,
-    warehouseLocation: warehouseLocation || "Armazém Principal",
-    dimensions: customItem.notes || null,
-    unitPrice: customItem.unitPrice || 0,
-    replacementCost: customItem.unitCost || 0,
-    purchaseStatus: "bought",
-    purchaseCost: totalCost,
-    isConsumable: Boolean(customItem.isConsumable),
-    packageUnits: 1,
-    imageUrl: "https://images.unsplash.com/photo-1549497538-303791108f95?auto=format&fit=crop&w=400&q=80",
-    damagedQuantity: 0,
-    inMaintenanceQuantity: 0,
-    createdAt: now,
-    updatedAt: now,
-  });
-
-  // 2. Automatically expense in finance (saída)
-  let createdMovement: any = null;
-  if (totalCost > 0) {
-    const movId = generateId("mov");
-    createdMovement = {
-      id: movId,
-      type: "saida" as const,
-      category: "Material / Stock",
-      description: `Aquisição de Material do Evento: ${customItem.name} (${customItem.quantity} un.)`,
-      amount: totalCost,
-      date: now,
-      eventId: eventId,
-      clientId: targetEvent?.clientId || null,
-      notes: `Despesa automática gerada ao comprar artigo exclusivo "${customItem.name}" para o evento "${targetEvent?.name || eventId}" e integrá-lo no inventário (${sku}).`,
-      createdAt: now,
-    };
-    await db.insert(financialMovements).values(createdMovement);
-  }
-
-  // 3. Create allocation linking the new inventory item to the event
-  const allocId = generateId("alc");
-  await db.insert(eventAllocations).values({
-    id: allocId,
-    eventId: eventId,
-    itemId: newItemId,
-    quantity: customItem.quantity || 1,
-    status: "reservado",
-    notes: `Item adquirido para o evento (anteriormente exclusivo). Fornecedor: ${customItem.supplier || "N/A"}`,
-  });
-
-  // 4. Mark custom item as bought and link to converted item
-  await db
-    .update(eventCustomItems)
-    .set({
-      boughtStatus: "bought",
-      convertedItemId: newItemId,
-      updatedAt: now,
-    })
-    .where(eq(eventCustomItems.id, customItemId));
-
-  // 5. Audit logs
-  await recordAuditLog({
-    entityType: "event",
-    entityId: eventId,
-    action: "material_comprado",
-    title: "Material comprado e adicionado ao inventário",
-    details: `Artigo "${customItem.name}" (${customItem.quantity} un.) marcado como comprado. Adicionado ao inventário com SKU ${sku} e registada despesa de €${totalCost.toFixed(2)}.`,
-  });
-
-  await recordAuditLog({
-    entityType: "inventory",
-    entityId: newItemId,
-    action: "criado_de_evento",
-    title: "Artigo criado a partir de evento",
-    details: `Artigo "${customItem.name}" comprado especificamente para o evento "${targetEvent?.name || eventId}" e integrado no stock permanente.`,
-  });
-
-  invalidateAllCaches();
-  safeRevalidate(`/eventos/${eventId}`);
-  safeRevalidate(`/inventario/${newItemId}`);
-
-  return {
-    success: true,
-    itemId: newItemId,
-    sku,
-    allocationId: allocId,
-    movementId: createdMovement?.id || null,
-  };
-}
 
 // 14.3 Delete Custom Item Specific to Event (deduct from quota)
 export async function deleteEventCustomItemAction(params: {
@@ -3792,6 +3708,7 @@ export async function searchBarcodeAction(rawBarcode: string): Promise<BarcodeSe
 
 // 36. Add stock to an existing item from barcode scan
 export async function addBarcodeStockAction(itemId: string, addQuantity: number) {
+  await requireAuth();
   if (!itemId) return { success: false, error: "ID do artigo é obrigatório." };
   if (!addQuantity || addQuantity <= 0) {
     return { success: false, error: "Quantidade deve ser superior a zero." };
