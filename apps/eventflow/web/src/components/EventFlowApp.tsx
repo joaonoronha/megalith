@@ -5186,9 +5186,40 @@ function EventWizardModal({
     "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=600&q=80"
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [nameError, setNameError] = useState(false);
+  const [startDateError, setStartDateError] = useState(false);
+
+  const handleNextStep = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (step === 1) {
+      if (!name.trim()) {
+        setNameError(true);
+        return;
+      }
+      setNameError(false);
+      setStep(2);
+      return;
+    }
+    if (step === 2) {
+      if (!startDate) {
+        setStartDateError(true);
+        return;
+      }
+      setStartDateError(false);
+      setStep(3);
+      return;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (step < 3) {
+      handleNextStep();
+      return;
+    }
     setIsSubmitting(true);
 
     try {
@@ -5271,10 +5302,20 @@ function EventWizardModal({
                   type="text"
                   required
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (nameError) setNameError(false);
+                  }}
                   placeholder="Ex: Aniversário Martim · Winnie the Pooh"
-                  className="w-full px-3 py-2 text-sm bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                  className={`w-full px-3 py-2 text-sm bg-white border ${
+                    nameError ? "border-rose-400 focus:ring-rose-400" : "border-[#ececf0] focus:ring-[#007aff]"
+                  } rounded-[12px] focus:outline-none focus:ring-2`}
                 />
+                {nameError && (
+                  <span className="text-[10px] text-rose-500 font-semibold mt-1 block">
+                    Por favor indique o nome do evento para avançar.
+                  </span>
+                )}
               </div>
 
               <div>
@@ -5381,9 +5422,19 @@ function EventWizardModal({
                     type="datetime-local"
                     required
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-white border border-[#ececf0] rounded-[12px] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      if (startDateError) setStartDateError(false);
+                    }}
+                    className={`w-full px-3 py-2 text-xs bg-white border ${
+                      startDateError ? "border-rose-400 focus:ring-rose-400" : "border-[#ececf0] focus:ring-[#007aff]"
+                    } rounded-[12px] focus:outline-none focus:ring-2`}
                   />
+                  {startDateError && (
+                    <span className="text-[10px] text-rose-500 font-semibold mt-1 block">
+                      A data de início do evento é obrigatória.
+                    </span>
+                  )}
                 </div>
                 <div>
                   <label className="block font-bold text-[#3a3a3c] mb-1">Fim do Evento</label>
@@ -5493,8 +5544,13 @@ function EventWizardModal({
           <div className="pt-4 border-t border-[#ececf0] flex items-center justify-between">
             {step > 1 ? (
               <button
+                key="wizard-prev-btn"
                 type="button"
-                onClick={() => setStep(step - 1)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setStep((prev) => Math.max(1, prev - 1));
+                }}
                 className="px-4 py-2 rounded-[12px] bg-white border border-[#ececf0] text-xs font-bold hover:bg-[#f2f2f5] cursor-pointer"
               >
                 Voltar
@@ -5505,17 +5561,19 @@ function EventWizardModal({
 
             {step < 3 ? (
               <button
+                key="wizard-next-btn"
                 type="button"
-                onClick={() => setStep(step + 1)}
+                onClick={handleNextStep}
                 className="px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold hover:bg-black cursor-pointer"
               >
                 Continuar
               </button>
             ) : (
               <button
+                key="wizard-submit-btn"
                 type="submit"
                 disabled={isSubmitting}
-                className="px-5 py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                className="px-5 py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-60"
               >
                 {isSubmitting ? "A criar evento..." : "Criar Evento"}
               </button>
@@ -5643,8 +5701,28 @@ function QuoteWizardModal({
   const vatAmount = subtotal * 0.23;
   const total = subtotal + vatAmount;
 
+  const handleNextStep = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (step === 1) {
+      if (!eventId) return;
+      setStep(2);
+      return;
+    }
+    if (step === 2) {
+      setStep(3);
+      return;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (step < 3) {
+      handleNextStep();
+      return;
+    }
     setIsSubmitting(true);
 
     try {
@@ -5856,8 +5934,13 @@ function QuoteWizardModal({
           <div className="pt-4 border-t border-[#ececf0] flex items-center justify-between">
             {step > 1 ? (
               <button
+                key="quote-prev-btn"
                 type="button"
-                onClick={() => setStep(step - 1)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setStep((prev) => Math.max(1, prev - 1));
+                }}
                 className="px-4 py-2 rounded-[12px] bg-white border border-[#ececf0] text-xs font-bold hover:bg-[#f2f2f5] cursor-pointer"
               >
                 Voltar
@@ -5868,17 +5951,19 @@ function QuoteWizardModal({
 
             {step < 3 ? (
               <button
+                key="quote-next-btn"
                 type="button"
-                onClick={() => setStep(step + 1)}
+                onClick={handleNextStep}
                 className="px-4 py-2 rounded-[12px] bg-[#111] text-white text-xs font-bold hover:bg-black cursor-pointer"
               >
                 Continuar
               </button>
             ) : (
               <button
+                key="quote-submit-btn"
                 type="submit"
                 disabled={isSubmitting}
-                className="px-5 py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                className="px-5 py-2.5 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-60"
               >
                 {isSubmitting ? "A gerar orçamento..." : "Gerar Orçamento & Link"}
               </button>
