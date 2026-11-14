@@ -2334,7 +2334,7 @@ export default function EventFlowApp({
                     <div
                       key={e.id}
                       onClick={() => router.push(`/eventos/${e.id}`)}
-                      className="relative overflow-hidden rounded-[16px] border border-black/10 bg-neutral-900 shadow-xs hover:shadow-md hover:border-black/20 transition-all duration-300 px-4 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group"
+                      className="relative overflow-hidden rounded-[16px] border border-black/10 border-r-0 bg-neutral-900 shadow-xs hover:shadow-md hover:border-black/20 transition-all duration-300 px-4 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group"
                     >
                       {/* Backsplash image background */}
                       <img
@@ -2356,12 +2356,12 @@ export default function EventFlowApp({
                         }}
                       />
 
-                      {/* Vertical diagonal stripes on the right side showing the colour themes (seamless, wider, fully covering top/bottom and corner) */}
+                      {/* Vertical diagonal stripes on the right side showing the colour themes (seamless, extra wide, shifted towards right corner) */}
                       <div
-                        className="absolute right-0 top-0 bottom-0 pointer-events-none overflow-hidden z-0 flex justify-end"
+                        className="absolute -right-2 top-0 bottom-0 pointer-events-none overflow-hidden z-0 flex justify-end"
                         aria-hidden="true"
                         style={{
-                          width: `${Math.max(colors.length * 28 + 90, 160)}px`,
+                          width: `${Math.max(colors.length * 44 + 80, 200)}px`,
                         }}
                       >
                         <div
@@ -2369,13 +2369,13 @@ export default function EventFlowApp({
                           style={{
                             transform: "skewX(-20deg)",
                             transformOrigin: "bottom right",
-                            marginRight: "-70px",
+                            marginRight: "-100px",
                           }}
                         >
                           {colors.map((color, i) => (
                             <div
                               key={i}
-                              className="h-[220%] -mt-[60%] w-7 sm:w-9 flex-shrink-0 transition-transform duration-300"
+                              className="h-[240%] -mt-[70%] w-11 sm:w-14 flex-shrink-0 transition-transform duration-300"
                               style={{
                                 backgroundColor: color,
                                 boxShadow: i === 0 ? "-6px 0 16px rgba(0,0,0,0.45)" : undefined,
@@ -2383,9 +2383,9 @@ export default function EventFlowApp({
                               title={`Cor do tema: ${color}`}
                             />
                           ))}
-                          {/* Solid rightmost fill to ensure the entire right corner and edge are 100% covered with no image showing underneath */}
+                          {/* Seamless solid rightmost fill covering the right corner completely */}
                           <div
-                            className="h-[220%] -mt-[60%] w-28 sm:w-36 flex-shrink-0"
+                            className="h-[240%] -mt-[70%] w-36 sm:w-48 flex-shrink-0"
                             style={{ backgroundColor: colors[colors.length - 1] }}
                           />
                         </div>
