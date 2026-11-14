@@ -117,3 +117,29 @@ export function getRandomEventCoverImage(category?: string | null): string {
   }
   return EVENT_COVER_IMAGES[Math.floor(Math.random() * EVENT_COVER_IMAGES.length)];
 }
+
+/**
+ * Parses and returns the color themes for an event.
+ * Falls back to category presets or brand palette if none provided.
+ */
+export function getEventThemeColors(vibeColors: string | null | undefined, category?: string | null): string[] {
+  try {
+    if (vibeColors) {
+      const parsed = typeof vibeColors === "string" ? JSON.parse(vibeColors) : vibeColors;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const valid = parsed.filter((c) => typeof c === "string" && (c.startsWith("#") || c.startsWith("rgb")));
+        if (valid.length > 0) return valid;
+      }
+    }
+  } catch {}
+
+  const cat = (category || "").toLowerCase().trim();
+  if (cat.includes("casamento")) return ["#C97A63", "#E3C9B8", "#687B65", "#FAF6F0"];
+  if (cat.includes("gala")) return ["#111111", "#D4AF37", "#2C3E50", "#E0E0E0"];
+  if (cat.includes("aniversário") || cat.includes("aniversario") || cat.includes("infantil")) {
+    return ["#F5A623", "#D32F2F", "#5C7658", "#FFF8DC"];
+  }
+  if (cat.includes("jantar") || cat.includes("marca")) return ["#B76E79", "#2E151B", "#E8D8D8", "#C0C0C0"];
+  if (cat.includes("batizado")) return ["#FFFFFF", "#EEDC82", "#A0C4DF"];
+  return ["#007AFF", "#5856D6", "#FF9500", "#34C759"];
+}

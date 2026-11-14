@@ -191,6 +191,25 @@ function formatMeetingTimeRange(start: any, end?: any) {
   return `${sh}:${sm} – ${eh}:${em}`;
 }
 
+function getEventThemeColors(vibeColors: string | null | undefined, category?: string | null): string[] {
+  try {
+    if (vibeColors) {
+      const parsed = typeof vibeColors === "string" ? JSON.parse(vibeColors) : vibeColors;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const valid = parsed.filter((c) => typeof c === "string" && (c.startsWith("#") || c.startsWith("rgb")));
+        if (valid.length > 0) return valid;
+      }
+    }
+  } catch {}
+
+  const cat = category?.toLowerCase() || "";
+  if (cat.includes("casamento")) return ["#C97A63", "#E3C9B8", "#687B65", "#FAF6F0"];
+  if (cat.includes("gala")) return ["#111111", "#D4AF37", "#2C3E50", "#E0E0E0"];
+  if (cat.includes("aniversário") || cat.includes("infantil")) return ["#F5A623", "#D32F2F", "#5C7658", "#FFF8DC"];
+  if (cat.includes("jantar") || cat.includes("marca")) return ["#B76E79", "#2E151B", "#E8D8D8", "#C0C0C0"];
+  if (cat.includes("batizado")) return ["#FFFFFF", "#EEDC82", "#A0C4DF"];
+  return ["#007AFF", "#5856D6", "#FF9500", "#34C759"];
+}
 
 export default function EventFlowApp({
   currentUser,
@@ -2306,34 +2325,84 @@ export default function EventFlowApp({
               <div className="grid grid-cols-1 gap-2.5">
                 {filteredEvents.map((e) => {
                   const statusObj = getStatusStyle(e.status);
+                  const colors = getEventThemeColors(e.vibeColors, e.category);
+                  const coverImage =
+                    e.coverImageUrl ||
+                    "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=80";
 
                   return (
                     <div
                       key={e.id}
                       onClick={() => router.push(`/eventos/${e.id}`)}
-                      className="px-4 py-3 sm:py-3.5 rounded-[14px] border border-[#ececf0] bg-[#fafafa] hover:bg-white hover:border-[#007aff]/35 hover:shadow-xs transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group"
+                      className="relative overflow-hidden rounded-[16px] border border-black/10 bg-neutral-900 shadow-xs hover:shadow-md hover:border-black/20 transition-all duration-300 px-4 py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer group"
                     >
-                      {/* Left: Event Name, Category, Date, Last Updated */}
-                      <div className="min-w-0 flex-1">
+                      {/* Backsplash image background */}
+                      <img
+                        src={coverImage}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none group-hover:scale-105 transition-transform duration-700 ease-out"
+                      />
+
+                      {/* Gradient dark overlay for high contrast & readable text */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/75 to-black/55 pointer-events-none" />
+
+                      {/* Subtle chromatic overlay from event primary color */}
+                      <div
+                        className="absolute inset-0 opacity-20 mix-blend-color pointer-events-none"
+                        style={{
+                          background: `linear-gradient(135deg, ${colors[0]} 0%, ${
+                            colors[1] || colors[0]
+                          } 100%)`,
+                        }}
+                      />
+
+                      {/* Vertical diagonal lines on the right side showing the colour themes */}
+                      <div
+                        className="absolute right-0 top-0 bottom-0 pointer-events-none overflow-hidden flex items-stretch justify-end pr-3 sm:pr-5 z-0"
+                        aria-hidden="true"
+                      >
+                        <div
+                          className="flex h-full gap-1.5 sm:gap-2 origin-center"
+                          style={{ transform: "skewX(-20deg)" }}
+                        >
+                          {colors.map((color, i) => (
+                            <div
+                              key={i}
+                              className="w-2.5 sm:w-3.5 h-[170%] -mt-[35%] shadow-[0_2px_10px_rgba(0,0,0,0.5)] border border-white/20 transition-transform duration-300 group-hover:scale-y-105"
+                              style={{ backgroundColor: color }}
+                              title={`Cor do tema: ${color}`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Left: Event Name, Category, Theme, Date, Last Updated */}
+                      <div className="relative z-10 min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap min-w-0">
-                          <h3 className="font-bold text-[15px] sm:text-[16px] text-[#111111] group-hover:text-[#007aff] transition truncate">
+                          <h3 className="font-bold text-[15px] sm:text-[16px] text-white drop-shadow-sm group-hover:text-white transition truncate">
                             {e.name}
                           </h3>
                           {e.category && (
-                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#f2f2f5] text-[#48484a] flex-shrink-0">
+                            <span className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-white/95 border border-white/25 flex-shrink-0">
                               {e.category}
+                            </span>
+                          )}
+                          {e.theme && (
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/20 backdrop-blur-md text-amber-200 border border-amber-400/30 flex items-center gap-1 flex-shrink-0">
+                              <Sparkles className="w-2.5 h-2.5 text-amber-300" />
+                              <span className="truncate max-w-[140px]">{e.theme}</span>
                             </span>
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2 text-xs text-[#8e8e93] mt-1 flex-wrap">
-                          <span className="flex items-center gap-1.5 text-[#636366]">
-                            <CalendarIcon className="w-3.5 h-3.5 text-[#8e8e93] flex-shrink-0" />
+                        <div className="flex items-center gap-2 text-xs text-white/80 mt-1 flex-wrap">
+                          <span className="flex items-center gap-1.5 text-white/90">
+                            <CalendarIcon className="w-3.5 h-3.5 text-white/70 flex-shrink-0" />
                             <span>{formatEventByline(e.startDate, e.venue)}</span>
                           </span>
-                          <span className="text-[#c7c7cc]">·</span>
-                          <span className="flex items-center gap-1 text-[#8e8e93]">
-                            <Clock className="w-3.5 h-3.5 text-[#8e8e93] flex-shrink-0" />
+                          <span className="text-white/40">·</span>
+                          <span className="flex items-center gap-1 text-white/70">
+                            <Clock className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />
                             <span>
                               Atualizado {formatRelativeTime(e.updatedAt, "pt")}
                               {e.lastUpdatedByName ? ` por ${e.lastUpdatedByName}` : ""}
@@ -2344,7 +2413,7 @@ export default function EventFlowApp({
 
                       {/* Right: Interactive Status Dropdown (Stops Click Propagation) */}
                       <div
-                        className="flex items-center gap-2.5 self-end sm:self-center flex-shrink-0"
+                        className="relative z-10 flex items-center gap-2.5 self-start sm:self-center flex-shrink-0 sm:mr-16 md:mr-20"
                         onClick={(ev) => ev.stopPropagation()}
                         onMouseDown={(ev) => ev.stopPropagation()}
                       >
@@ -2356,7 +2425,7 @@ export default function EventFlowApp({
                             evt.stopPropagation();
                             handleStatusChange(e.id, evt.target.value);
                           }}
-                          className={`text-xs font-semibold px-3 py-1.5 rounded-full border border-black/5 outline-none cursor-pointer transition ${statusObj.bg} ${statusObj.text}`}
+                          className={`text-xs font-semibold px-3 py-1.5 rounded-full border border-white/20 shadow-xs outline-none cursor-pointer transition ${statusObj.bg} ${statusObj.text}`}
                         >
                           <option value="confirmado">Confirmado</option>
                           <option value="preparacao">Preparação</option>
@@ -2366,7 +2435,7 @@ export default function EventFlowApp({
                           <option value="cancelado">Cancelado</option>
                         </select>
 
-                        <ChevronRight className="w-4 h-4 text-[#c7c7cc] group-hover:text-[#007aff] group-hover:translate-x-0.5 transition hidden sm:block" />
+                        <ChevronRight className="w-4 h-4 text-white/70 group-hover:text-white group-hover:translate-x-0.5 transition hidden sm:block" />
                       </div>
                     </div>
                   );

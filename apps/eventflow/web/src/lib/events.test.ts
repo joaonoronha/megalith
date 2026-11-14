@@ -1,6 +1,14 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { isMeetingEvent, canEventReceiveQuote, isCancelledEvent, countsForFinance, getRandomEventCoverImage, EVENT_COVER_IMAGES } from "./events.js";
+import {
+  isMeetingEvent,
+  canEventReceiveQuote,
+  isCancelledEvent,
+  countsForFinance,
+  getRandomEventCoverImage,
+  EVENT_COVER_IMAGES,
+  getEventThemeColors,
+} from "./events.js";
 
 describe("CFM Events: Meeting and Quota Business Rules", () => {
   test("identifies Calendly meetings by URI", () => {
@@ -221,6 +229,27 @@ describe("CFM Events: Meeting and Quota Business Rules", () => {
     // Default with undefined/null
     const fallbackImg = getRandomEventCoverImage(null);
     assert.ok(typeof fallbackImg === "string" && fallbackImg.startsWith("https://images.unsplash.com/"));
+  });
+
+  test("resolves event color themes for vertical diagonal lines display", () => {
+    // 1. Valid JSON array of hex codes
+    const customColors = JSON.stringify(["#F5A623", "#D32F2F", "#5C7658", "#FFF8DC"]);
+    const parsed = getEventThemeColors(customColors, "Aniversário Infantil");
+    assert.deepEqual(parsed, ["#F5A623", "#D32F2F", "#5C7658", "#FFF8DC"]);
+
+    // 2. Category presets when vibeColors is null/empty
+    const weddingColors = getEventThemeColors(null, "Casamento");
+    assert.deepEqual(weddingColors, ["#C97A63", "#E3C9B8", "#687B65", "#FAF6F0"]);
+
+    const galaColors = getEventThemeColors(undefined, "Gala Corporativa");
+    assert.deepEqual(galaColors, ["#111111", "#D4AF37", "#2C3E50", "#E0E0E0"]);
+
+    const birthdayColors = getEventThemeColors("", "Aniversário Infantil");
+    assert.deepEqual(birthdayColors, ["#F5A623", "#D32F2F", "#5C7658", "#FFF8DC"]);
+
+    // 3. Brand fallback for general or unknown categories
+    const defaultColors = getEventThemeColors(null, "Geral");
+    assert.deepEqual(defaultColors, ["#007AFF", "#5856D6", "#FF9500", "#34C759"]);
   });
 });
 
