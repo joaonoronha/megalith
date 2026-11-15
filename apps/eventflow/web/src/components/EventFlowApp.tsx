@@ -1820,81 +1820,63 @@ export default function EventFlowApp({
         {/* TAB 2: CALENDAR */}
         {/* ========================================================= */}
         {activeTab === "calendar" && (
-          <section className="bg-white border border-[#ececf0] rounded-[22px] p-6 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-3">
-                  <h2 className="text-[24px] font-bold text-[#111111]">
-                    {currentMonthName} {currentCalendarYear}
-                  </h2>
-                  <div className="flex items-center gap-1 bg-[#f2f2f5] p-1 rounded-xl">
-                    <button
-                      onClick={handlePrevMonth}
-                      className="p-1 rounded-lg hover:bg-white text-[#636366] hover:text-[#111] transition cursor-pointer"
-                      title="Mês anterior"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={handleTodayMonth}
-                      className="px-2 py-0.5 rounded-lg hover:bg-white text-[11px] font-bold text-[#636366] hover:text-[#111] transition cursor-pointer"
-                      title="Ir para o mês atual"
-                    >
-                      Hoje
-                    </button>
-                    <button
-                      onClick={handleNextMonth}
-                      className="p-1 rounded-lg hover:bg-white text-[#636366] hover:text-[#111] transition cursor-pointer"
-                      title="Mês seguinte"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
+          <section className="bg-white border border-[#ececf0] rounded-[22px] p-3.5 sm:p-6 shadow-xs space-y-4 sm:space-y-6">
+            {/* Header: Month Title & Navigation + Subtle Top-Right Refresh Button */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
+                <h2 className="text-xl sm:text-[24px] font-bold text-[#111111] capitalize truncate">
+                  {currentMonthName} {currentCalendarYear}
+                </h2>
+                <div className="flex items-center gap-0.5 sm:gap-1 bg-[#f2f2f5] p-0.5 sm:p-1 rounded-xl shrink-0">
+                  <button
+                    onClick={handlePrevMonth}
+                    className="p-1 rounded-lg hover:bg-white text-[#636366] hover:text-[#111] transition cursor-pointer"
+                    title="Mês anterior"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={handleTodayMonth}
+                    className="px-2 py-0.5 rounded-lg hover:bg-white text-[11px] font-bold text-[#636366] hover:text-[#111] transition cursor-pointer"
+                    title="Ir para o mês atual"
+                  >
+                    Hoje
+                  </button>
+                  <button
+                    onClick={handleNextMonth}
+                    className="p-1 rounded-lg hover:bg-white text-[#636366] hover:text-[#111] transition cursor-pointer"
+                    title="Mês seguinte"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
-                <p className="text-xs text-[#8e8e93] mt-1">
-                  Reuniões agendadas por clientes via Calendly e produções de eventos CFM em agenda única.
-                </p>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => handleSyncCalendly()}
-                  disabled={isSyncingCalendly}
-                  className="px-3.5 py-2 rounded-[12px] bg-[#eeeffe] hover:bg-[#e0e3ff] text-[#4338ca] text-xs font-bold border border-indigo-200/80 flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-60"
-                  title="Puxar reuniões agendadas pelos clientes no Calendly"
-                >
-                  <RefreshCw
-                    className={`w-3.5 h-3.5 text-[#6366f1] ${
-                      isSyncingCalendly ? "animate-spin" : ""
-                    }`}
-                  />
-                  <span>
-                    {isSyncingCalendly ? "A sincronizar..." : "Sincronizar Calendly"}
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setEventWizardInitialDate(null);
-                    setShowEventWizard(true);
-                  }}
-                  className="px-4 py-2 rounded-[12px] bg-[#111] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-                >
-                  <span>＋</span>
-                  <span>Novo evento</span>
-                </button>
-              </div>
+              {/* Subtle Sync Calendly Refresh Icon Button (Top Right) */}
+              <button
+                type="button"
+                onClick={() => handleSyncCalendly()}
+                disabled={isSyncingCalendly}
+                className="w-9 h-9 shrink-0 rounded-xl bg-[#fafafc] hover:bg-[#f2f2f5] active:bg-[#e5e5ea] border border-[#ececf0] hover:border-[#d2d2d7] text-[#636366] hover:text-[#111] transition flex items-center justify-center cursor-pointer shadow-2xs disabled:opacity-50"
+                title={isSyncingCalendly ? "A sincronizar Calendly..." : "Sincronizar Calendly"}
+                aria-label="Sincronizar Calendly"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${
+                    isSyncingCalendly ? "animate-spin text-[#6366f1]" : ""
+                  }`}
+                />
+              </button>
             </div>
 
             {/* Filter Pills & Color Legend */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1 pb-1 border-y border-[#ececf0]">
-              {/* Filter Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 pt-1 pb-1 border-y border-[#ececf0]">
+              {/* Filter Pills: exactly "Todos", "Reuniões", "Eventos" with respective counts */}
+              <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
                 <button
                   type="button"
                   onClick={() => setCalendarFilter("all")}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer shrink-0 ${
                     calendarFilter === "all"
                       ? "bg-[#111] text-white shadow-xs"
                       : "bg-[#f2f2f5] text-[#636366] hover:bg-[#e5e5ea]"
@@ -1905,33 +1887,32 @@ export default function EventFlowApp({
                 <button
                   type="button"
                   onClick={() => setCalendarFilter("meetings")}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer shrink-0 ${
                     calendarFilter === "meetings"
                       ? "bg-[#6366f1] text-white shadow-xs"
                       : "bg-[#eeeffe] text-[#4338ca] hover:bg-[#e0e3ff] border border-indigo-200/60"
                   }`}
                 >
-                  <Video className="w-3 h-3 text-indigo-400" />
-                  <span>Reuniões Calendly ({calendlyMeetingsCount})</span>
+                  Reuniões ({calendlyMeetingsCount})
                 </button>
                 <button
                   type="button"
                   onClick={() => setCalendarFilter("events")}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer shrink-0 ${
                     calendarFilter === "events"
                       ? "bg-[#111] text-white shadow-xs"
                       : "bg-[#f2f2f5] text-[#636366] hover:bg-[#e5e5ea]"
                   }`}
                 >
-                  Produções CFM ({productionEventsCount})
+                  Eventos ({productionEventsCount})
                 </button>
               </div>
 
-              {/* Visual Legend */}
-              <div className="flex items-center gap-3 text-[11px] text-[#636366] flex-wrap">
-                <span className="flex items-center gap-1.5 font-bold text-[#4338ca]">
+              {/* Visual Legend with clean labels */}
+              <div className="flex items-center gap-2.5 sm:gap-3 text-[11px] text-[#636366] flex-wrap">
+                <span className="flex items-center gap-1.5 font-semibold text-[#4338ca]">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#6366f1] shadow-xs ring-2 ring-indigo-200" />
-                  <span>Reunião Calendly</span>
+                  <span>Reunião</span>
                 </span>
                 <span className="flex items-center gap-1.5 font-medium">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#24793a]" />
@@ -1939,7 +1920,7 @@ export default function EventFlowApp({
                 </span>
                 <span className="flex items-center gap-1.5 font-medium">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#9a5b00]" />
-                  <span>Preparação / Orçamento</span>
+                  <span>Preparação</span>
                 </span>
               </div>
             </div>
@@ -1994,9 +1975,9 @@ export default function EventFlowApp({
                           : "bg-white/80 hover:bg-white"
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-1 min-w-0">
+                      <div className="flex items-center justify-center sm:justify-between gap-1 min-w-0">
                         <span
-                          className={`w-5 h-5 sm:w-6 sm:h-6 shrink-0 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold transition ${
+                          className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold transition ${
                             isSelected
                               ? "bg-[#111] text-white shadow-xs"
                               : isToday
@@ -2012,7 +1993,7 @@ export default function EventFlowApp({
                         </span>
 
                         {hasEvents && (
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="hidden sm:flex items-center gap-1 shrink-0">
                             <span
                               className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap flex items-center gap-1 ${
                                 hasCalendlyInDay
@@ -2070,19 +2051,23 @@ export default function EventFlowApp({
                         )}
                       </div>
 
-                      {/* Event dots preview on Mobile */}
+                      {/* Event dots preview on Mobile (color coded matching legend) */}
                       {hasEvents && (
-                        <div className="sm:hidden flex items-center justify-center gap-0.5 sm:gap-1 mt-1">
-                          {dayEvents.slice(0, 3).map((evt) => (
-                            <span
-                              key={evt.id}
-                              className={`w-1.5 h-1.5 rounded-full ${
-                                (evt.isMeeting || isCalendlyMeeting(evt))
-                                  ? "bg-[#6366f1] ring-1 ring-white"
-                                  : "bg-[#007aff]"
-                              }`}
-                            />
-                          ))}
+                        <div className="sm:hidden flex items-center justify-center gap-1 mt-1">
+                          {dayEvents.slice(0, 3).map((evt) => {
+                            const isM = Boolean(evt.isMeeting || isCalendlyMeeting(evt));
+                            const dotColor = isM
+                              ? "bg-[#6366f1]"
+                              : evt.status === "confirmado"
+                              ? "bg-[#24793a]"
+                              : "bg-[#9a5b00]";
+                            return (
+                              <span
+                                key={evt.id}
+                                className={`w-1.5 h-1.5 rounded-full ${dotColor}`}
+                              />
+                            );
+                          })}
                           {dayEvents.length > 3 && (
                             <span className="text-[8px] font-bold text-[#8e8e93] leading-none">+</span>
                           )}
@@ -2134,15 +2119,15 @@ export default function EventFlowApp({
                       <div
                         key={e.id}
                         onClick={() => navigateTo(e.detailUrl || (isMeeting ? `/reunioes/${e.id}` : `/eventos/${e.id}`), e.id)}
-                        className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition cursor-pointer group ${
+                        className={`p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition cursor-pointer group ${
                           isMeeting
                             ? "bg-[#faf9ff] hover:bg-[#f3f0ff]"
                             : "bg-white hover:bg-[#fafafa]"
                         }`}
                       >
-                        <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
                           <div
-                            className={`w-12 h-12 rounded-[12px] border flex flex-col items-center justify-center flex-shrink-0 transition duration-200 ${
+                            className={`w-11 h-11 sm:w-12 sm:h-12 rounded-[12px] border flex flex-col items-center justify-center flex-shrink-0 transition duration-200 ${
                               isMeeting
                                 ? "bg-gradient-to-b from-[#eeeffe] to-[#e0e3ff] border-indigo-200 text-[#4338ca] group-hover:bg-[#4338ca] group-hover:text-white"
                                 : "bg-[#f2f2f7] border-black/5 group-hover:bg-[#111] group-hover:text-white"
@@ -2173,7 +2158,7 @@ export default function EventFlowApp({
                               {isMeeting && (
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#6366f1] text-white flex items-center gap-1 shadow-2xs">
                                   <Video className="w-2.5 h-2.5" />
-                                  <span>Reunião Calendly</span>
+                                  <span>Reunião</span>
                                 </span>
                               )}
                               <span className="font-bold text-sm text-[#111] group-hover:text-[#007aff] transition truncate">
@@ -2202,10 +2187,10 @@ export default function EventFlowApp({
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 pl-14 sm:pl-0">
                           {isMeeting ? (
                             <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#eeeffe] text-[#4338ca] border border-indigo-200">
-                              Briefing Marcado
+                              Reunião
                             </span>
                           ) : (
                             <span
@@ -6135,7 +6120,7 @@ function CalendarDayPopupModal({
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-[#6366f1] to-[#4338ca] text-white flex items-center gap-1.5 shadow-2xs">
                             <Video className="w-3 h-3" />
-                            <span>Reunião Calendly · Briefing de Cliente</span>
+                            <span>Reunião · Briefing de Cliente</span>
                           </span>
                           <span className="text-xs font-bold text-[#4338ca] bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-md flex items-center gap-1">
                             <Clock className="w-3 h-3 text-[#6366f1]" />
