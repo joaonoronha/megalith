@@ -351,10 +351,18 @@ export default function EventFlowApp({
     };
   }, [user]);
 
-  // Dynamic Alerts Computation (New vs Active vs Snoozed)
+  // Dynamic Alerts Computation (New vs Active vs Snoozed, filtered per user)
   const nowMs = Date.now();
-  const activeAlerts = useMemo(() => {
+  const userVisibleAlerts = useMemo(() => {
     return alertsList.filter((a) => {
+      // If alert has a target userId, only display it to that specific user
+      if (a.userId && user?.id && a.userId !== user.id) return false;
+      return true;
+    });
+  }, [alertsList, user]);
+
+  const activeAlerts = useMemo(() => {
+    return userVisibleAlerts.filter((a) => {
       if (a.status === "resolved") return false;
       if (a.status === "snoozed") {
         if (a.snoozedUntil && new Date(a.snoozedUntil).getTime() > nowMs) {
@@ -363,17 +371,17 @@ export default function EventFlowApp({
       }
       return true;
     });
-  }, [alertsList, nowMs]);
+  }, [userVisibleAlerts, nowMs]);
 
   const snoozedAlerts = useMemo(() => {
-    return alertsList.filter((a) => {
+    return userVisibleAlerts.filter((a) => {
       return (
         a.status === "snoozed" &&
         a.snoozedUntil &&
         new Date(a.snoozedUntil).getTime() > nowMs
       );
     });
-  }, [alertsList, nowMs]);
+  }, [userVisibleAlerts, nowMs]);
 
   const newAlerts = useMemo(() => {
     return activeAlerts.filter((a) => !a.acknowledgedAt);
@@ -3619,7 +3627,7 @@ export default function EventFlowApp({
       <AlertsDrawerModal
         isOpen={showAlertsDrawer}
         onClose={() => setShowAlertsDrawer(false)}
-        alerts={alertsList}
+        alerts={userVisibleAlerts}
         onSnooze={handleSnoozeAlert}
         onAcknowledge={handleAcknowledgeAlert}
         onDismiss={handleDismissAlert}

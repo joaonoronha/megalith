@@ -8,6 +8,7 @@ import {
   eventTasks,
   eventMedia,
   moodboardComments,
+  moodboardWatchers,
   eventMeetings,
   quotes,
   quoteLines,
@@ -32,6 +33,7 @@ import fs from "fs/promises";
 import path from "path";
 import { isMeetingEvent, getRandomEventCoverImage } from "@/lib/events";
 import { getCurrentUser } from "@/lib/auth";
+import { computeCommentNotificationPlan, resolveUserWatchingState } from "@/lib/moodboard-watchers";
 
 async function requireAuth() {
   const user = await getCurrentUser();
@@ -2216,10 +2218,25 @@ export async function addEventMediaAction(formData: FormData) {
     tag: tag || null,
     orderIndex: Date.now(),
     uploadedByName: authorName,
+    createdByUserId: user?.id || null,
     createdAt: new Date(),
   };
 
   await db.insert(eventMedia).values(newMedia);
+
+  if (user?.id) {
+    try {
+      await db.insert(moodboardWatchers).values({
+        id: generateId("mbw"),
+        mediaId: id,
+        userId: user.id,
+        isWatching: true,
+        source: "owner",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }).catch(() => {});
+    } catch {}
+  }
 
   await recordAuditLog({
     entityType: "event",
@@ -2411,10 +2428,25 @@ export async function addBatchEventMediaAction(formData: FormData) {
       tag: defaultTag,
       orderIndex: Date.now(),
       uploadedByName: authorName,
+      createdByUserId: user?.id || null,
       createdAt: new Date(),
     };
 
     await db.insert(eventMedia).values(mediaRecord);
+
+    if (user?.id) {
+      try {
+        await db.insert(moodboardWatchers).values({
+          id: generateId("mbw"),
+          mediaId,
+          userId: user.id,
+          isWatching: true,
+          source: "owner",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }).catch(() => {});
+      } catch {}
+    }
 
     // 5. Record Audit Log for the single board created
     const actionLabel = type === "idea_board" ? "painel_ideias" : "resultado_final";
@@ -2643,39 +2675,132 @@ export async function addMoodboardCommentAction(formData: FormData) {
       .where(eq(eventMedia.id, mediaId));
   }
 
-  // 3. Create Alert Notification of type info for the moodboard comment
-  const alertId = generateId("alt");
+  // 3. Process Moodboard Watchers & Mentions Notifications
   const boardTitle = board?.title || "Moodboard";
   const commentSnippet = content.length > 70 ? `${content.slice(0, 67)}...` : content;
-  const alertMessage = `${authorName} comentou em "${boardTitle}": "${commentSnippet}"${photoLabel ? ` (${photoLabel})` : ""}`;
 
   try {
-    await db.insert(alerts).values({
-      id: alertId,
-      fingerprint: `moodboard_comment:${mediaId}:${commentId}`,
-      type: "moodboard_comment",
-      entityType: "event",
-      entityId: eventId,
-      title: "Novo comentário no Moodboard",
-      message: alertMessage,
-      severity: "info",
-      status: "active",
-      metadata: JSON.stringify({
-        mediaId,
-        commentId,
-        authorName,
-        boardTitle,
-        photoLabel,
-      }),
-      snoozedUntil: null,
-      lastTriggeredAt: now,
-      acknowledgedAt: null,
-      acknowledgedByUserId: null,
-      createdAt: now,
-      updatedAt: now,
+    const allUsers = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        avatarUrl: users.avatarUrl,
+      })
+      .from(users);
+
+    const existingComments = await db
+      .select({
+        id: moodboardComments.id,
+        userId: moodboardComments.userId,
+        authorName: moodboardComments.authorName,
+        content: moodboardComments.content,
+      })
+      .from(moodboardComments)
+      .where(eq(moodboardComments.mediaId, mediaId));
+
+    const existingWatcherRecords = await db
+      .select({
+        mediaId: moodboardWatchers.mediaId,
+        userId: moodboardWatchers.userId,
+        isWatching: moodboardWatchers.isWatching,
+        source: moodboardWatchers.source,
+        updatedAt: moodboardWatchers.updatedAt,
+      })
+      .from(moodboardWatchers)
+      .where(eq(moodboardWatchers.mediaId, mediaId));
+
+    const plan = computeCommentNotificationPlan({
+      board: {
+        id: mediaId,
+        title: boardTitle,
+        uploadedByName: board?.uploadedByName,
+        createdByUserId: (board as any)?.createdByUserId,
+      },
+      commentAuthor: {
+        userId,
+        name: authorName,
+      },
+      content,
+      allUsers,
+      existingComments,
+      existingWatcherRecords,
     });
+
+    // 3.1 Update/Upsert watcher records (Author comments -> watches; Mentioned users -> watch)
+    for (const update of plan.watcherUpdates) {
+      const existing = existingWatcherRecords.find((r) => r.userId === update.userId);
+      if (existing) {
+        await db
+          .update(moodboardWatchers)
+          .set({
+            isWatching: update.isWatching,
+            source: update.source,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(moodboardWatchers.mediaId, mediaId),
+              eq(moodboardWatchers.userId, update.userId)
+            )
+          );
+      } else {
+        await db
+          .insert(moodboardWatchers)
+          .values({
+            id: generateId("mbw"),
+            mediaId,
+            userId: update.userId,
+            isWatching: update.isWatching,
+            source: update.source,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .catch(() => {});
+      }
+    }
+
+    // 3.2 Create targeted info alerts for each watcher recipient
+    for (const recipient of plan.recipients) {
+      const alertId = generateId("alt");
+      const isMentioned = recipient.isMentioned;
+      const alertTitle = isMentioned
+        ? "Mencionou-te no Moodboard"
+        : "Novo comentário no Moodboard";
+      const alertMessage = isMentioned
+        ? `${authorName} mencionou-te em "${boardTitle}": "${commentSnippet}"${photoLabel ? ` (${photoLabel})` : ""}`
+        : `${authorName} comentou em "${boardTitle}": "${commentSnippet}"${photoLabel ? ` (${photoLabel})` : ""}`;
+
+      await db.insert(alerts).values({
+        id: alertId,
+        fingerprint: `moodboard_comment:${mediaId}:${commentId}:${recipient.user.id}`,
+        type: "moodboard_comment",
+        entityType: "event",
+        entityId: eventId,
+        userId: recipient.user.id,
+        title: alertTitle,
+        message: alertMessage,
+        severity: "info",
+        status: "active",
+        metadata: JSON.stringify({
+          mediaId,
+          commentId,
+          authorName,
+          boardTitle,
+          photoLabel,
+          isMentioned,
+        }),
+        snoozedUntil: null,
+        lastTriggeredAt: now,
+        acknowledgedAt: null,
+        acknowledgedByUserId: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
   } catch (err) {
-    console.error("Erro ao criar alerta de comentário no moodboard:", err);
+    console.error("Erro ao processar notificações do moodboard:", err);
   }
 
   // 4. Record Audit Log
@@ -2705,8 +2830,9 @@ export async function deleteMoodboardCommentAction(commentId: string, mediaId: s
   // Delete from relational table
   await db.delete(moodboardComments).where(eq(moodboardComments.id, commentId));
 
-  // Clean up any alert created for this comment
+  // Clean up any alerts created for this comment (both legacy single alert and multi-user alerts)
   try {
+    await db.delete(alerts).where(sql`${alerts.fingerprint} LIKE ${`moodboard_comment:${mediaId}:${commentId}:%`}`);
     await db.delete(alerts).where(eq(alerts.fingerprint, `moodboard_comment:${mediaId}:${commentId}`));
   } catch {}
 
@@ -2732,6 +2858,84 @@ export async function deleteMoodboardCommentAction(commentId: string, mediaId: s
   safeRevalidate(`/events/${eventId}`);
 
   return { success: true, commentId };
+}
+
+// 20.3 Toggle Moodboard Watch State
+export async function toggleMoodboardWatchAction(mediaId: string) {
+  await ensureDbMigrated();
+  const { getCurrentUser } = await import("@/lib/auth");
+  const user = await getCurrentUser();
+  if (!user?.id) {
+    return { success: false, error: "Utilizador não autenticado." };
+  }
+
+  const [board] = await db.select().from(eventMedia).where(eq(eventMedia.id, mediaId));
+  if (!board) {
+    return { success: false, error: "Moodboard não encontrado." };
+  }
+
+  const [existingRecord] = await db
+    .select()
+    .from(moodboardWatchers)
+    .where(
+      and(
+        eq(moodboardWatchers.mediaId, mediaId),
+        eq(moodboardWatchers.userId, user.id)
+      )
+    );
+
+  let newIsWatching: boolean;
+  const now = new Date();
+
+  if (existingRecord) {
+    newIsWatching = !existingRecord.isWatching;
+    await db
+      .update(moodboardWatchers)
+      .set({
+        isWatching: newIsWatching,
+        source: "manual",
+        updatedAt: now,
+      })
+      .where(eq(moodboardWatchers.id, existingRecord.id));
+  } else {
+    // If no record exists, compute default state and invert it
+    const comments = await db
+      .select({
+        userId: moodboardComments.userId,
+        authorName: moodboardComments.authorName,
+      })
+      .from(moodboardComments)
+      .where(eq(moodboardComments.mediaId, mediaId));
+
+    const defaultWatching = resolveUserWatchingState({
+      userId: user.id,
+      userName: user.name,
+      board: {
+        id: mediaId,
+        uploadedByName: board.uploadedByName,
+        createdByUserId: (board as any).createdByUserId,
+      },
+      comments: comments as any,
+    });
+
+    newIsWatching = !defaultWatching;
+
+    await db.insert(moodboardWatchers).values({
+      id: generateId("mbw"),
+      mediaId,
+      userId: user.id,
+      isWatching: newIsWatching,
+      source: "manual",
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  invalidateAllCaches();
+  safeRevalidate(`/eventos/${board.eventId}`);
+  safeRevalidate(`/events/${board.eventId}`);
+
+  return { success: true, isWatching: newIsWatching };
 }
 
 // 21. Alert Actions (Snooze, Acknowledge, Dismiss, Sync)

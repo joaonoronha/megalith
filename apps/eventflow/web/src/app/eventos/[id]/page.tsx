@@ -9,6 +9,7 @@ import {
   eventTasks,
   eventMedia,
   moodboardComments,
+  moodboardWatchers,
   eventMeetings,
   quotes,
   users,
@@ -17,6 +18,7 @@ import { eq, ne, desc, asc, isNull } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import EventDetailView from "@/components/EventDetailView";
 import { isMeetingEvent } from "@/lib/events";
+import { resolveUserWatchingState } from "@/lib/moodboard-watchers";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +69,7 @@ export default async function EventPage({ params }: PageProps) {
     otherMeetings,
     calMeetings,
     customItems,
+    watchers,
   ] = await Promise.all([
     clientId
       ? db.query.clients.findFirst({ where: eq(clients.id, clientId) }).catch(() => null)
@@ -157,6 +160,7 @@ export default async function EventPage({ params }: PageProps) {
       where: eq(eventCustomItems.eventId, id),
       orderBy: [asc(eventCustomItems.createdAt)],
     }).catch(() => []),
+    db.select().from(moodboardWatchers).catch(() => []),
   ]);
 
   const media = (rawMedia || []).map((m: any) => {
@@ -178,9 +182,27 @@ export default async function EventPage({ params }: PageProps) {
       })
     );
 
+    const mergedComments = Array.from(commentMap.values());
+    const explicitWatcherRecord = (watchers || []).find(
+      (w: any) => w.mediaId === m.id && w.userId === currentUser?.id
+    );
+
+    const isWatching = resolveUserWatchingState({
+      userId: currentUser?.id,
+      userName: currentUser?.name,
+      board: {
+        id: m.id,
+        uploadedByName: m.uploadedByName,
+        createdByUserId: m.createdByUserId,
+      },
+      comments: mergedComments,
+      explicitRecord: explicitWatcherRecord,
+    });
+
     return {
       ...m,
-      comments: Array.from(commentMap.values()),
+      isWatching,
+      comments: mergedComments,
     };
   });
 

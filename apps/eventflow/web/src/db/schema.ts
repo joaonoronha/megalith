@@ -138,6 +138,7 @@ export const eventMedia = sqliteTable("event_media", {
   tag: text("tag"), // e.g. "Mesa de Honra", "Iluminação", "Flores", "Mobiliário", "Lounge"
   orderIndex: integer("order_index").default(0),
   uploadedByName: text("uploaded_by_name").default("Administrador CFM"),
+  createdByUserId: text("created_by_user_id").references(() => users.id),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
 });
 
@@ -155,6 +156,17 @@ export const moodboardComments = sqliteTable("moodboard_comments", {
   photoUrl: text("photo_url"),
   imageUrl: text("image_url"),
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+});
+
+// 4.4 Moodboard Watchers (Followers receiving notifications on comments and mentions)
+export const moodboardWatchers = sqliteTable("moodboard_watchers", {
+  id: text("id").primaryKey(),
+  mediaId: text("media_id").references(() => eventMedia.id, { onDelete: "cascade" }).notNull(),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  isWatching: integer("is_watching", { mode: "boolean" }).default(true).notNull(),
+  source: text("source"), // 'owner' | 'comment' | 'mention' | 'manual'
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).$defaultFn(() => new Date()).notNull(),
 });
 
 // 5. Temporal Stock Reservations (Prevents Double-Booking)
@@ -294,6 +306,7 @@ export const alerts = sqliteTable("alerts", {
     enum: ["inventory", "event", "quote", "client"] 
   }).notNull(),
   entityId: text("entity_id").notNull(),
+  userId: text("user_id").references(() => users.id),
   title: text("title").notNull(),
   message: text("message").notNull(),
   severity: text("severity", { 

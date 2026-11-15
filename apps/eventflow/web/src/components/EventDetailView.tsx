@@ -57,6 +57,8 @@ import {
   ShoppingCart,
   AlertTriangle,
   CheckCircle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AuditLogModal from "@/components/AuditLogModal";
@@ -93,8 +95,11 @@ import {
   deleteEventMeetingAction,
   uploadEventCoverAction,
   deleteClientAction,
+  toggleMoodboardWatchAction,
 } from "@/app/actions";
 import { formatClientDeletionWarning } from "@/lib/customer-deletion";
+import { parseCommentSegments, type TeamUserItem } from "@/lib/moodboard-watchers";
+import MentionCommentInput from "@/components/MentionCommentInput";
 
 export interface EventMeeting {
   id: string;
@@ -265,6 +270,8 @@ export interface EventMediaItem {
   tag: string | null;
   orderIndex: number | null;
   uploadedByName: string | null;
+  createdByUserId?: string | null;
+  isWatching?: boolean;
   createdAt: Date | string | null;
 }
 
@@ -308,6 +315,8 @@ export function parseMediaComments(item: EventMediaItem): MoodboardCommentItem[]
 function MoodboardCard({
   board,
   currentUser,
+  teamUsers = [],
+  onToggleWatch,
   onOpenLightbox,
   onAddMorePhotos,
   onDeleteImage,
@@ -317,6 +326,8 @@ function MoodboardCard({
 }: {
   board: EventMediaItem;
   currentUser?: any;
+  teamUsers?: TeamUserItem[];
+  onToggleWatch?: (mediaId: string) => Promise<void>;
   onOpenLightbox: (board: EventMediaItem, index: number) => void;
   onAddMorePhotos: (board: EventMediaItem) => void;
   onDeleteImage: (boardId: string, imageId: string) => void;
@@ -484,9 +495,33 @@ function MoodboardCard({
           )}
         </div>
 
-        {/* Slide Counter Badge (Top Right) */}
+        {/* Slide Counter Badge & Watcher Eye (Top Right) */}
         <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10 pointer-events-none">
-          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-black/70 backdrop-blur-md text-white shadow-xs flex items-center gap-1">
+          {onToggleWatch && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleWatch(board.id);
+              }}
+              title={
+                board.isWatching
+                  ? "A seguir este moodboard (recebe alertas de notas). Clique para deixar de seguir."
+                  : "Não está a seguir este moodboard. Clique para seguir e receber alertas de notas."
+              }
+              aria-label={board.isWatching ? "Deixar de seguir moodboard" : "Seguir moodboard"}
+              className={`px-2 py-1 rounded-full text-[11px] font-bold backdrop-blur-md transition-all cursor-pointer shadow-xs flex items-center gap-1 pointer-events-auto ${
+                board.isWatching
+                  ? "bg-[#007aff] text-white hover:bg-[#0062cc]"
+                  : "bg-black/60 hover:bg-black text-white/80 hover:text-white"
+              }`}
+            >
+              {board.isWatching ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+              <span className="text-[10px] hidden sm:inline">{board.isWatching ? "A seguir" : "Seguir"}</span>
+            </button>
+          )}
+
+          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-black/70 backdrop-blur-md text-white shadow-xs flex items-center gap-1 pointer-events-none">
             <ImageIcon className="w-3 h-3" />
             <span>
               {activeIndex + 1} / {images.length}
@@ -815,10 +850,21 @@ function MoodboardCard({
                         </div>
                       )}
 
-                      {/* Comment text */}
+                      {/* Comment text with @mention badges */}
                       {comment.content && (
                         <p className="text-xs text-[#2c2c2e] leading-relaxed whitespace-pre-line break-words">
-                          {comment.content}
+                          {parseCommentSegments(comment.content, teamUsers).map((segment, sIdx) =>
+                            segment.type === "mention" ? (
+                              <span
+                                key={sIdx}
+                                className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-semibold bg-[#007aff]/10 text-[#007aff] mr-0.5"
+                              >
+                                @{segment.text}
+                              </span>
+                            ) : (
+                              <React.Fragment key={sIdx}>{segment.text}</React.Fragment>
+                            )
+                          )}
                         </p>
                       )}
 
@@ -969,26 +1015,25 @@ function MoodboardCard({
                 </div>
               )}
 
-              {/* Textarea + Submit button */}
+              {/* Mention Input + Submit button */}
               <div className="flex items-end gap-1.5 min-w-0">
-                <textarea
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSubmitComment();
-                    }
-                  }}
-                  placeholder="Escreva uma sugestão ou nota..."
-                  rows={2}
-                  className="w-full min-w-0 flex-1 bg-white text-xs px-2.5 py-1.5 rounded-xl border border-[#d1d1d6] focus:outline-hidden focus:ring-2 focus:ring-[#007aff] resize-none"
-                />
+                <div className="flex-1 min-w-0">
+                  <MentionCommentInput
+                    value={commentText}
+                    onChange={setCommentText}
+                    onSubmit={() => handleSubmitComment()}
+                    placeholder="Escreva uma sugestão ou nota... Use @ para mencionar alguém"
+                    teamUsers={teamUsers}
+                    theme="light"
+                    rows={2}
+                    className="w-full min-w-0 bg-white text-xs px-2.5 py-1.5 rounded-xl border border-[#d1d1d6] focus:outline-hidden focus:ring-2 focus:ring-[#007aff] resize-none"
+                  />
+                </div>
 
                 <button
                   type="submit"
                   disabled={isSubmitting || (!commentText.trim() && !commentImageFile && !commentUrlInput.trim())}
-                  className="p-2 rounded-xl bg-[#007aff] hover:bg-[#0062cc] disabled:opacity-40 disabled:hover:bg-[#007aff] text-white transition cursor-pointer shadow-xs shrink-0 flex items-center justify-center"
+                  className="p-2 rounded-xl bg-[#007aff] hover:bg-[#0062cc] disabled:opacity-40 disabled:hover:bg-[#007aff] text-white transition cursor-pointer shadow-xs shrink-0 flex items-center justify-center h-[38px] w-[38px]"
                   title="Enviar nota"
                   aria-label="Enviar nota"
                 >
@@ -1058,6 +1103,8 @@ function LightboxCommentsDrawer({
   activeIdx,
   activeImg,
   currentUser,
+  teamUsers = [],
+  onToggleWatch,
   onAddComment,
   onDeleteComment,
   onSelectPhoto,
@@ -1067,6 +1114,8 @@ function LightboxCommentsDrawer({
   activeIdx: number;
   activeImg: MediaImageItem;
   currentUser?: any;
+  teamUsers?: TeamUserItem[];
+  onToggleWatch?: (mediaId: string) => Promise<void>;
   onAddComment: (args: {
     mediaId: string;
     content: string;
@@ -1168,13 +1217,35 @@ function LightboxCommentsDrawer({
           <MessageSquare className="w-4 h-4 text-[#007aff]" />
           <span className="text-xs font-bold text-white">Notas & Ideias ({comments.length})</span>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-1 rounded-md text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          {onToggleWatch && (
+            <button
+              type="button"
+              onClick={() => onToggleWatch(board.id)}
+              title={
+                board.isWatching
+                  ? "A seguir este moodboard (recebe alertas de notas). Clique para deixar de seguir."
+                  : "Não está a seguir este moodboard. Clique para seguir e receber alertas de notas."
+              }
+              aria-label={board.isWatching ? "Deixar de seguir moodboard" : "Seguir moodboard"}
+              className={`px-2 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer flex items-center gap-1 ${
+                board.isWatching
+                  ? "bg-[#007aff] text-white hover:bg-[#0062cc]"
+                  : "bg-white/10 hover:bg-white/20 text-white/80"
+              }`}
+            >
+              {board.isWatching ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+              <span className="text-[10px]">{board.isWatching ? "A seguir" : "Seguir"}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-md text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Filter Tabs */}
@@ -1258,7 +1329,21 @@ function LightboxCommentsDrawer({
                   </button>
                 )}
 
-                <p className="text-xs text-white/90 leading-relaxed whitespace-pre-line">{c.content}</p>
+                {/* Comment content with @mentions */}
+                <p className="text-xs text-white/90 leading-relaxed whitespace-pre-line break-words">
+                  {parseCommentSegments(c.content, teamUsers).map((segment, sIdx) =>
+                    segment.type === "mention" ? (
+                      <span
+                        key={sIdx}
+                        className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-semibold bg-[#007aff]/30 text-[#60a5fa] mr-0.5"
+                      >
+                        @{segment.text}
+                      </span>
+                    ) : (
+                      <React.Fragment key={sIdx}>{segment.text}</React.Fragment>
+                    )
+                  )}
+                </p>
 
                 {c.imageUrl && (
                   <div className="mt-1 rounded-lg overflow-hidden border border-white/15 max-w-[200px]">
@@ -1352,26 +1437,25 @@ function LightboxCommentsDrawer({
         )}
 
         <div className="flex items-end gap-1.5">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit();
-              }
-            }}
-            placeholder="Escreva uma ideia... (Enter para enviar)"
-            rows={2}
-            className="flex-1 bg-white/10 text-white text-xs px-2.5 py-1.5 rounded-xl border border-white/20 focus:outline-hidden focus:border-[#007aff] resize-none placeholder:text-white/40"
-          />
+          <div className="flex-1 min-w-0">
+            <MentionCommentInput
+              value={text}
+              onChange={setText}
+              onSubmit={() => handleSubmit()}
+              placeholder="Escreva uma ideia... Use @ para mencionar alguém"
+              teamUsers={teamUsers}
+              theme="dark"
+              rows={2}
+              className="w-full min-w-0 bg-white/10 text-white text-xs px-2.5 py-1.5 rounded-xl border border-white/20 focus:outline-hidden focus:border-[#007aff] resize-none placeholder:text-white/40"
+            />
+          </div>
 
           <input type="file" ref={fileInputRef} onChange={handleFile} accept="image/*" className="hidden" />
 
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition cursor-pointer h-[38px] w-[38px] flex items-center justify-center shrink-0"
             title="Anexar imagem"
           >
             <Paperclip className="w-3.5 h-3.5 text-[#007aff]" />
@@ -1380,7 +1464,7 @@ function LightboxCommentsDrawer({
           <button
             type="submit"
             disabled={isSubmitting || (!text.trim() && !imageFile && !urlInput.trim())}
-            className="p-2 rounded-xl bg-[#007aff] hover:bg-[#0062cc] disabled:opacity-40 text-white transition cursor-pointer"
+            className="p-2 rounded-xl bg-[#007aff] hover:bg-[#0062cc] disabled:opacity-40 text-white transition cursor-pointer h-[38px] w-[38px] flex items-center justify-center shrink-0"
             title="Enviar"
           >
             {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
@@ -2927,6 +3011,57 @@ export default function EventDetailView({
     });
   };
 
+  const handleToggleWatch = async (mediaId: string) => {
+    // Optimistic toggle
+    setMediaList((prev) =>
+      prev.map((m) => {
+        if (m.id !== mediaId) return m;
+        const current = m.isWatching ?? false;
+        return { ...m, isWatching: !current };
+      })
+    );
+    setLightboxState((prev) => {
+      if (!prev || prev.board.id !== mediaId) return prev;
+      const current = prev.board.isWatching ?? false;
+      return {
+        ...prev,
+        board: { ...prev.board, isWatching: !current },
+      };
+    });
+
+    try {
+      const res = await toggleMoodboardWatchAction(mediaId);
+      if (res.success && typeof res.isWatching === "boolean") {
+        setMediaList((prev) =>
+          prev.map((m) => (m.id === mediaId ? { ...m, isWatching: res.isWatching } : m))
+        );
+        setLightboxState((prev) => {
+          if (!prev || prev.board.id !== mediaId) return prev;
+          return {
+            ...prev,
+            board: { ...prev.board, isWatching: res.isWatching },
+          };
+        });
+      }
+    } catch (err) {
+      console.error("Erro ao alternar seguir moodboard:", err);
+      // Revert if error
+      setMediaList((prev) =>
+        prev.map((m) => {
+          if (m.id !== mediaId) return m;
+          return { ...m, isWatching: !m.isWatching };
+        })
+      );
+      setLightboxState((prev) => {
+        if (!prev || prev.board.id !== mediaId) return prev;
+        return {
+          ...prev,
+          board: { ...prev.board, isWatching: !prev.board.isWatching },
+        };
+      });
+    }
+  };
+
   const handleAddMoodboardComment = async ({
     mediaId,
     content,
@@ -2967,6 +3102,7 @@ export default function EventDetailView({
         const existing = parseMediaComments(m);
         return {
           ...m,
+          isWatching: true,
           comments: [...existing, optimisticComment],
         };
       })
@@ -2979,6 +3115,7 @@ export default function EventDetailView({
         ...prev,
         board: {
           ...prev.board,
+          isWatching: true,
           comments: [...existing, optimisticComment],
         },
       };
@@ -3810,6 +3947,8 @@ export default function EventDetailView({
                       key={item.id}
                       board={item}
                       currentUser={currentUserState}
+                      teamUsers={teamUsers}
+                      onToggleWatch={handleToggleWatch}
                       onOpenLightbox={(board, idx) => setLightboxState({ board, imageIndex: idx })}
                       onAddMorePhotos={(board) => handleOpenAddMediaModal(board)}
                       onDeleteImage={handleDeleteImage}
@@ -5421,6 +5560,25 @@ export default function EventDetailView({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => handleToggleWatch(board.id)}
+                    title={
+                      board.isWatching
+                        ? "A seguir este moodboard (recebe alertas de notas). Clique para deixar de seguir."
+                        : "Não está a seguir este moodboard. Clique para seguir e receber alertas de notas."
+                    }
+                    aria-label={board.isWatching ? "Deixar de seguir moodboard" : "Seguir moodboard"}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer ${
+                      board.isWatching
+                        ? "bg-[#007aff] text-white shadow-xs"
+                        : "bg-white/10 hover:bg-white/20 text-white"
+                    }`}
+                  >
+                    {board.isWatching ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                    <span>{board.isWatching ? "A seguir" : "Seguir"}</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setShowLightboxComments(!showLightboxComments)}
                     className={`px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 transition cursor-pointer ${
                       showLightboxComments
@@ -5494,6 +5652,8 @@ export default function EventDetailView({
                     activeIdx={activeIdx}
                     activeImg={activeImg}
                     currentUser={currentUserState}
+                    teamUsers={teamUsers}
+                    onToggleWatch={handleToggleWatch}
                     onAddComment={handleAddMoodboardComment}
                     onDeleteComment={handleDeleteMoodboardComment}
                     onSelectPhoto={(idx) => setLightboxState({ board, imageIndex: idx })}

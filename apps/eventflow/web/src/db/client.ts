@@ -139,6 +139,20 @@ export async function ensureDbMigrated(): Promise<void> {
         editing_entity_title TEXT,
         last_seen_at INTEGER NOT NULL
       )`,
+
+      // 10. Moodboard watchers & User-targeted Alerts
+      "ALTER TABLE alerts ADD COLUMN user_id TEXT",
+      "ALTER TABLE event_media ADD COLUMN created_by_user_id TEXT",
+      `CREATE TABLE IF NOT EXISTS moodboard_watchers (
+        id TEXT PRIMARY KEY,
+        media_id TEXT NOT NULL REFERENCES event_media(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        is_watching INTEGER NOT NULL DEFAULT 1,
+        source TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_mb_watchers_media_user ON moodboard_watchers (media_id, user_id)",
     ];
 
     for (const sql of migrationStatements) {
