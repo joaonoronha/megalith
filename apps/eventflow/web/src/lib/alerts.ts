@@ -11,9 +11,17 @@ import { eq, desc, inArray, isNull } from "drizzle-orm";
 import { generateId } from "@/lib/id";
 import { isCancelledEvent } from "@/lib/events";
 
+export const SYSTEM_RULE_TYPES = new Set([
+  "low_stock",
+  "damaged_stock",
+  "event_unprepared",
+  "payment_due",
+  "missing_completed_payment",
+]);
+
 export interface AlertCandidate {
   fingerprint: string;
-  type: "low_stock" | "damaged_stock" | "event_unprepared" | "payment_due" | "missing_completed_payment";
+  type: "low_stock" | "damaged_stock" | "event_unprepared" | "payment_due" | "missing_completed_payment" | "moodboard_comment";
   entityType: "inventory" | "event" | "quote" | "client";
   entityId: string;
   title: string;
@@ -323,9 +331,10 @@ export async function evaluateAndSyncAlerts() {
     }
   }
 
-  // 2. Auto-resolve alerts that are no longer triggering
+  // 2. Auto-resolve rule-based alerts that are no longer triggering
   for (const existing of existingAlertsList) {
     if (
+      SYSTEM_RULE_TYPES.has(existing.type) &&
       (existing.status === "active" || existing.status === "snoozed" || existing.status === "acknowledged") &&
       !candidateFingerprints.has(existing.fingerprint)
     ) {

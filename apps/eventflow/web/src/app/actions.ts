@@ -15,6 +15,7 @@ import {
   storageLocations,
   inventoryItems,
   financialMovements,
+  documents,
   quoteTemplates,
   users,
   userPresence,
@@ -1230,6 +1231,76 @@ export async function createClientAction(formData: FormData) {
   return { success: true, id, client };
 }
 
+// 7.1 Delete Client CRM
+export async function deleteClientAction(clientId: string) {
+  await requireAuth();
+  if (!clientId) {
+    return { success: false, error: "ID do cliente é obrigatório." };
+  }
+
+  const [client] = await db.select().from(clients).where(eq(clients.id, clientId)).limit(1);
+  if (!client) {
+    return { success: false, error: "Cliente não encontrado." };
+  }
+
+  // Find all events bound to this client
+  const boundEvents = await db
+    .select({ id: events.id, name: events.name })
+    .from(events)
+    .where(eq(events.clientId, clientId));
+
+  // Unlink events from this client
+  if (boundEvents.length > 0) {
+    await db
+      .update(events)
+      .set({ clientId: null, updatedAt: new Date() })
+      .where(eq(events.clientId, clientId));
+  }
+
+  // Unlink related quotes, financial movements, meetings, and documents
+  await db
+    .update(quotes)
+    .set({ clientId: null, updatedAt: new Date() })
+    .where(eq(quotes.clientId, clientId));
+
+  await db
+    .update(financialMovements)
+    .set({ clientId: null })
+    .where(eq(financialMovements.clientId, clientId));
+
+  await db
+    .update(eventMeetings)
+    .set({ clientId: null })
+    .where(eq(eventMeetings.clientId, clientId));
+
+  await db
+    .update(documents)
+    .set({ clientId: null })
+    .where(eq(documents.clientId, clientId));
+
+  // Delete the client
+  await db.delete(clients).where(eq(clients.id, clientId));
+
+  await recordAuditLog({
+    entityType: "client",
+    entityId: clientId,
+    action: "eliminado",
+    title: `Cliente "${client.name}" eliminado`,
+    details:
+      boundEvents.length > 0
+        ? `Desvinculado de ${boundEvents.length} evento(s): ${boundEvents.map((e) => e.name).join(", ")}`
+        : undefined,
+  });
+
+  invalidateAllCaches();
+  return {
+    success: true,
+    deletedClientId: clientId,
+    unlinkedEventsCount: boundEvents.length,
+    unlinkedEventNames: boundEvents.map((e) => e.name),
+  };
+}
+
 // 8. Auth Actions
 export async function loginAction(formData: FormData) {
   const { loginUser } = await import("@/lib/auth");
@@ -2435,6 +2506,10 @@ export async function deleteMediaImageAction(mediaId: string, imageId: string, e
 export async function deleteEventMediaAction(mediaId: string, eventId: string) {
   await db.delete(eventMedia).where(eq(eventMedia.id, mediaId));
 
+  try {
+    await db.delete(alerts).where(sql`${alerts.fingerprint} LIKE ${`moodboard_comment:${mediaId}:%`}`);
+  } catch {}
+
   await recordAuditLog({
     entityType: "event",
     entityId: eventId,
@@ -2568,7 +2643,42 @@ export async function addMoodboardCommentAction(formData: FormData) {
       .where(eq(eventMedia.id, mediaId));
   }
 
-  // 3. Record Audit Log
+  // 3. Create Alert Notification of type info for the moodboard comment
+  const alertId = generateId("alt");
+  const boardTitle = board?.title || "Moodboard";
+  const commentSnippet = content.length > 70 ? `${content.slice(0, 67)}...` : content;
+  const alertMessage = `${authorName} comentou em "${boardTitle}": "${commentSnippet}"${photoLabel ? ` (${photoLabel})` : ""}`;
+
+  try {
+    await db.insert(alerts).values({
+      id: alertId,
+      fingerprint: `moodboard_comment:${mediaId}:${commentId}`,
+      type: "moodboard_comment",
+      entityType: "event",
+      entityId: eventId,
+      title: "Novo comentário no Moodboard",
+      message: alertMessage,
+      severity: "info",
+      status: "active",
+      metadata: JSON.stringify({
+        mediaId,
+        commentId,
+        authorName,
+        boardTitle,
+        photoLabel,
+      }),
+      snoozedUntil: null,
+      lastTriggeredAt: now,
+      acknowledgedAt: null,
+      acknowledgedByUserId: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+  } catch (err) {
+    console.error("Erro ao criar alerta de comentário no moodboard:", err);
+  }
+
+  // 4. Record Audit Log
   await recordAuditLog({
     entityType: "event",
     entityId: eventId,
@@ -2594,6 +2704,11 @@ export async function addMoodboardCommentAction(formData: FormData) {
 export async function deleteMoodboardCommentAction(commentId: string, mediaId: string, eventId: string) {
   // Delete from relational table
   await db.delete(moodboardComments).where(eq(moodboardComments.id, commentId));
+
+  // Clean up any alert created for this comment
+  try {
+    await db.delete(alerts).where(eq(alerts.fingerprint, `moodboard_comment:${mediaId}:${commentId}`));
+  } catch {}
 
   // Sync eventMedia.comments JSON
   const [board] = await db.select().from(eventMedia).where(eq(eventMedia.id, mediaId));

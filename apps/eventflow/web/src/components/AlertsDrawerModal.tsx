@@ -14,12 +14,13 @@ import {
   Package,
   Calendar,
   CheckCheck,
+  MessageSquare,
 } from "lucide-react";
 
 interface AlertItem {
   id: string;
   fingerprint: string;
-  type: "low_stock" | "damaged_stock" | "event_unprepared" | "payment_due" | "missing_completed_payment";
+  type: "low_stock" | "damaged_stock" | "event_unprepared" | "payment_due" | "missing_completed_payment" | "moodboard_comment";
   entityType: "inventory" | "event" | "quote" | "client";
   entityId: string;
   title: string;
@@ -89,16 +90,18 @@ export default function AlertsDrawerModal({
   const getTypeIcon = (type: AlertItem["type"]) => {
     switch (type) {
       case "damaged_stock":
-        return <Wrench className="w-4 h-4 text-[#ff3b30]" />;
+        return <Wrench className="w-3.5 h-3.5 text-[#ff3b30]" />;
       case "low_stock":
-        return <Package className="w-4 h-4 text-[#ff9f0a]" />;
+        return <Package className="w-3.5 h-3.5 text-[#ff9f0a]" />;
       case "event_unprepared":
-        return <Calendar className="w-4 h-4 text-[#ff9f0a]" />;
+        return <Calendar className="w-3.5 h-3.5 text-[#ff9f0a]" />;
       case "payment_due":
       case "missing_completed_payment":
-        return <DollarSign className="w-4 h-4 text-[#ff3b30]" />;
+        return <DollarSign className="w-3.5 h-3.5 text-[#ff3b30]" />;
+      case "moodboard_comment":
+        return <MessageSquare className="w-3.5 h-3.5 text-[#007aff]" />;
       default:
-        return <AlertTriangle className="w-4 h-4 text-[#ff9f0a]" />;
+        return <AlertTriangle className="w-3.5 h-3.5 text-[#ff9f0a]" />;
     }
   };
 
@@ -114,6 +117,8 @@ export default function AlertsDrawerModal({
         return { label: "Sinal 5 Dias", color: "bg-[#ff3b30]/10 text-[#a62a24]" };
       case "missing_completed_payment":
         return { label: "Cobrança", color: "bg-[#ff3b30]/10 text-[#a62a24]" };
+      case "moodboard_comment":
+        return { label: "Moodboard", color: "bg-[#007aff]/10 text-[#007aff]" };
       default:
         return { label: "Alerta", color: "bg-black/5 text-[#555]" };
     }
@@ -130,6 +135,8 @@ export default function AlertsDrawerModal({
       case "payment_due":
       case "missing_completed_payment":
         return "Registar recebimento";
+      case "moodboard_comment":
+        return "Ver moodboard";
       default:
         return "Ver detalhes";
     }
@@ -259,9 +266,10 @@ export default function AlertsDrawerModal({
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span
-                        className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${typeMeta.color}`}
+                        className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1.5 ${typeMeta.color}`}
                       >
-                        {typeMeta.label}
+                        {getTypeIcon(alert.type)}
+                        <span>{typeMeta.label}</span>
                       </span>
                       {isNew && (
                         <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-[#007aff] text-white">

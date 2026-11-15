@@ -76,7 +76,9 @@ import {
   syncCalendlyMeetingsAction,
   deleteInventoryItemAction,
   uploadItemPhotoAction,
+  deleteClientAction,
 } from "@/app/actions";
+import { getClientBoundEvents, formatClientDeletionWarning } from "@/lib/customer-deletion";
 
 interface Props {
   currentUser: { id: string; name: string; email: string; role: string; avatarUrl?: string | null } | null;
@@ -439,7 +441,7 @@ export default function EventFlowApp({
       }
     } else if (alert.type === "low_stock") {
       router.push(`/inventario/${alert.entityId}`);
-    } else if (alert.type === "event_unprepared") {
+    } else if (alert.type === "event_unprepared" || alert.type === "moodboard_comment") {
       router.push(`/eventos/${alert.entityId}`);
     } else if (alert.type === "payment_due" || alert.type === "missing_completed_payment") {
       setShowMovementModal(true);
@@ -721,6 +723,51 @@ export default function EventFlowApp({
       alert(err?.message || "Erro ao eliminar artigo.");
     } finally {
       setIsDeletingItem(false);
+    }
+  };
+
+  const [deleteClientModal, setDeleteClientModal] = useState<{
+    isOpen: boolean;
+    client: any | null;
+    boundEvents: any[];
+  }>({
+    isOpen: false,
+    client: null,
+    boundEvents: [],
+  });
+  const [isDeletingClient, setIsDeletingClient] = useState(false);
+  const [deleteClientError, setDeleteClientError] = useState<string | null>(null);
+
+  const handleOpenDeleteClient = (client: any) => {
+    const bound = getClientBoundEvents(client.id, eventsList);
+    setDeleteClientModal({
+      isOpen: true,
+      client,
+      boundEvents: bound,
+    });
+    setDeleteClientError(null);
+  };
+
+  const handleConfirmDeleteClient = async () => {
+    if (!deleteClientModal.client) return;
+    setIsDeletingClient(true);
+    setDeleteClientError(null);
+    try {
+      const clientId = deleteClientModal.client.id;
+      const res = await deleteClientAction(clientId);
+      if (res.success) {
+        setClientsList((prev) => prev.filter((c) => c.id !== clientId));
+        setEventsList((prev) =>
+          prev.map((e) => (e.clientId === clientId ? { ...e, clientId: null } : e))
+        );
+        setDeleteClientModal({ isOpen: false, client: null, boundEvents: [] });
+      } else {
+        setDeleteClientError(res.error || "Erro ao eliminar cliente.");
+      }
+    } catch (err: any) {
+      setDeleteClientError(err?.message || "Erro inesperado ao eliminar cliente.");
+    } finally {
+      setIsDeletingClient(false);
     }
   };
 
@@ -1668,10 +1715,15 @@ export default function EventFlowApp({
                       const isNew = !alert.acknowledgedAt;
                       const isSnoozeOpen = openHomeSnoozeMenuId === alert.id;
 
+                      const isInfo =
+                        alert.severity === "info" ||
+                        alert.type === "moodboard_comment";
+
                       const isRed =
-                        alert.type === "damaged_stock" ||
-                        alert.type === "payment_due" ||
-                        alert.type === "missing_completed_payment";
+                        !isInfo &&
+                        (alert.type === "damaged_stock" ||
+                          alert.type === "payment_due" ||
+                          alert.type === "missing_completed_payment");
 
                       const categoryTag =
                         alert.type === "damaged_stock"
@@ -1682,13 +1734,19 @@ export default function EventFlowApp({
                           ? "Prep"
                           : alert.type === "payment_due"
                           ? "Sinal"
-                          : "Cobrança";
+                          : alert.type === "missing_completed_payment"
+                          ? "Cobrança"
+                          : alert.type === "moodboard_comment"
+                          ? "Moodboard"
+                          : "Alerta";
 
                       return (
                         <div
                           key={alert.id}
                           className={`relative rounded-[15px] p-3 border transition ${
-                            isRed
+                            isInfo
+                              ? "bg-[#007aff]/[0.08] border-[#007aff]/[0.18] text-[#0060c7]"
+                              : isRed
                               ? "bg-[#ff3b30]/[0.08] border-[#ff3b30]/[0.17] text-[#a62a24]"
                               : "bg-[#ff9f0a]/[0.11] border-[#ff9f0a]/[0.18] text-[#845000]"
                           }`}
@@ -1701,7 +1759,11 @@ export default function EventFlowApp({
                               <div className="flex items-center gap-2 mb-1">
                                 <span
                                   className={`w-[8px] h-[8px] rounded-full flex-shrink-0 ${
-                                    isRed ? "bg-[#ff3b30]" : "bg-[#ff9f0a]"
+                                    isInfo
+                                      ? "bg-[#007aff]"
+                                      : isRed
+                                      ? "bg-[#ff3b30]"
+                                      : "bg-[#ff9f0a]"
                                   }`}
                                 />
                                 <span className="text-[13px] font-bold truncate">
@@ -3176,28 +3238,45 @@ export default function EventFlowApp({
               </div>
 
               <div className="divide-y divide-[#ececf0] border border-[#ececf0] rounded-[16px] overflow-hidden">
-                {clientsList.map((client) => (
-                  <div
-                    key={client.id}
-                    className="p-3.5 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-[#111] truncate">{client.name}</span>
+                {clientsList.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-[#8e8e93]">
+                    Nenhum cliente registado.
+                  </div>
+                ) : (
+                  clientsList.map((client) => (
+                    <div
+                      key={client.id}
+                      className="p-3.5 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-[#111] truncate">{client.name}</span>
+                        </div>
+                        <div className="text-[11px] text-[#8e8e93] truncate">
+                          {client.contactName ? `${client.contactName} · ` : ""}
+                          {client.email || "Sem email"} · {client.phone || "Sem telefone"}
+                        </div>
                       </div>
-                      <div className="text-[11px] text-[#8e8e93] truncate">
-                        {client.contactName ? `${client.contactName} · ` : ""}
-                        {client.email || "Sem email"} · {client.phone || "Sem telefone"}
+
+                      <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                        {client.nif && (
+                          <span className="text-[11px] text-[#8e8e93] bg-[#f2f2f7] px-2 py-0.5 rounded">
+                            NIF {client.nif}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDeleteClient(client)}
+                          className="w-7 h-7 rounded-lg hover:bg-rose-50 text-[#8e8e93] hover:text-rose-600 flex items-center justify-center transition cursor-pointer"
+                          title="Eliminar cliente"
+                          aria-label={`Eliminar cliente ${client.name}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
-
-                    {client.nif && (
-                      <span className="text-[11px] text-[#8e8e93] bg-[#f2f2f7] px-2 py-0.5 rounded self-start sm:self-auto shrink-0">
-                        NIF {client.nif}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
@@ -3742,6 +3821,135 @@ export default function EventFlowApp({
           </div>
         </div>
       )}
+
+      {/* 5.0.2 DELETE CLIENT MODAL (WITH BOUND EVENTS WARNING) */}
+      {deleteClientModal.isOpen && deleteClientModal.client && (() => {
+        const warning = formatClientDeletionWarning(
+          deleteClientModal.client.name,
+          deleteClientModal.boundEvents
+        );
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-[24px] w-full max-w-lg border border-[#ececf0] shadow-2xl overflow-hidden p-6 text-xs space-y-4 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between border-b border-[#ececf0] pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-[#111]">Eliminar Cliente CRM</h3>
+                    <p className="text-[11px] text-[#8e8e93]">
+                      {deleteClientModal.client.name}
+                      {deleteClientModal.client.contactName ? ` (${deleteClientModal.client.contactName})` : ""}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDeleteClientModal({ isOpen: false, client: null, boundEvents: [] })}
+                  className="w-8 h-8 rounded-full hover:bg-[#f2f2f5] flex items-center justify-center text-[#8e8e93] cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {deleteClientError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+                  {deleteClientError}
+                </div>
+              )}
+
+              {/* Warning if client is assigned to any event */}
+              {warning.hasBoundEvents ? (
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-bold text-xs text-amber-900">
+                        {warning.headline}
+                      </h4>
+                      <p className="text-[11px] text-amber-800 mt-1">
+                        {warning.boundEventsCount === 1 ? (
+                          <>
+                            Este cliente está atualmente associado ao evento{" "}
+                            <strong className="text-amber-950 font-bold">
+                              "{warning.specificEventName}"
+                            </strong>
+                            .
+                          </>
+                        ) : (
+                          <>
+                            Este cliente está atualmente associado aos seguintes {warning.boundEventsCount} eventos:
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/80 rounded-xl p-2.5 divide-y divide-amber-200/50 max-h-40 overflow-y-auto">
+                    {warning.boundEvents.map((ev) => (
+                      <div key={ev.id} className="py-2 first:pt-0 last:pb-0 flex items-center justify-between text-[11px]">
+                        <div>
+                          <strong className="text-[#111]">{ev.name}</strong>
+                          <div className="text-[10px] text-[#636366]">
+                            Estado: {ev.status || "planeamento"}
+                          </div>
+                        </div>
+                        <span className="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full text-[10px]">
+                          Associado
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-[11px] text-amber-800">
+                    Ao confirmar a eliminação, o cliente será removido da base de contactos e desvinculado deste(s) evento(s), mantendo todo o planeamento e produção intactos.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-[#fafafa] border border-[#ececf0] text-[#3a3a3c] space-y-2">
+                  <p className="text-xs">
+                    Tens a certeza de que desejas eliminar <strong>"{deleteClientModal.client.name}"</strong>?
+                  </p>
+                  <p className="text-[11px] text-[#8e8e93]">
+                    O cliente não se encontra associado a nenhum evento. Esta ação removerá o registo permanentemente da base de contactos.
+                  </p>
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-[#ececf0] flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteClientModal({ isOpen: false, client: null, boundEvents: [] })}
+                  disabled={isDeletingClient}
+                  className="px-4 py-2 rounded-[12px] bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#3a3a3c] font-semibold transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteClient}
+                  disabled={isDeletingClient}
+                  className="px-4 py-2 rounded-[12px] bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  {isDeletingClient ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>A eliminar...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>{warning.hasBoundEvents ? "Eliminar e Desvincular" : "Eliminar Cliente"}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 5.1 RECEIPT SCANNER MODAL (Gemini Receipt Reader) */}
       {showReceiptScanner && (

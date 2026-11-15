@@ -263,7 +263,7 @@ export const quoteTemplates = sqliteTable("quote_templates", {
 // 11. Audit Logs / Histórico de Alterações
 export const auditLogs = sqliteTable("audit_logs", {
   id: text("id").primaryKey(),
-  entityType: text("entity_type", { enum: ["event", "inventory", "quote", "user"] }).notNull(),
+  entityType: text("entity_type", { enum: ["event", "inventory", "quote", "user", "client"] }).notNull(),
   entityId: text("entity_id").notNull(),
   action: text("action").notNull(), // "criado" | "atualizado" | "alterou_estado" | "triagem" | "alocou_material" | "removeu_material" | "tarefa" | "aprovado"
   title: text("title").notNull(),
@@ -286,7 +286,8 @@ export const alerts = sqliteTable("alerts", {
       "damaged_stock", 
       "event_unprepared", 
       "payment_due", 
-      "missing_completed_payment"
+      "missing_completed_payment",
+      "moodboard_comment"
     ] 
   }).notNull(),
   entityType: text("entity_type", { 
