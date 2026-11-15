@@ -185,34 +185,28 @@ export default async function PublicQuotePage({
           </div>
         </div>
 
-        {/* Line Items */}
-        <div className="py-6 overflow-x-auto no-scrollbar">
-          <div className="min-w-[460px] sm:min-w-0">
-            <div className="grid grid-cols-12 text-xs font-semibold text-[#8e8e93] uppercase tracking-wider pb-3 border-b border-[#ececf0]">
-              <div className="col-span-6">Descrição</div>
-              <div className="col-span-2 text-center">Qtd.</div>
-              <div className="col-span-2 text-right">Unitário</div>
-              <div className="col-span-2 text-right">Total</div>
-            </div>
+        {/* Line Items - List of items to be used without individual item pricing */}
+        <div className="py-6">
+          <div className="grid grid-cols-12 text-xs font-semibold text-[#8e8e93] uppercase tracking-wider pb-3 border-b border-[#ececf0]">
+            <div className="col-span-9 sm:col-span-10">Artigo / Serviço a Utilizar</div>
+            <div className="col-span-3 sm:col-span-2 text-right">Qtd.</div>
+          </div>
 
-            <div className="divide-y divide-[#ececf0]">
-              {lines.map((item) => (
-                <div key={item.id} className="grid grid-cols-12 py-3.5 text-sm items-center">
-                  <div className="col-span-6 font-medium text-[#111111]">{item.description}</div>
-                  <div className="col-span-2 text-center text-[#8e8e93]">{item.quantity}</div>
-                  <div className="col-span-2 text-right text-[#8e8e93]">
-                    €{item.unitPrice.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="col-span-2 text-right font-medium text-[#111111]">
-                    €{item.total.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}
-                  </div>
+          <div className="divide-y divide-[#ececf0]">
+            {lines.map((item) => (
+              <div key={item.id} className="grid grid-cols-12 py-3.5 text-sm items-center">
+                <div className="col-span-9 sm:col-span-10 font-medium text-[#111111] pr-4">
+                  {item.description}
                 </div>
-              ))}
-            </div>
+                <div className="col-span-3 sm:col-span-2 text-right font-medium text-[#48484a]">
+                  {item.quantity} un.
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Totals */}
+        {/* Totals - Total amount to be paid at the bottom */}
         <div className="pt-4 border-t border-[#ececf0] flex flex-col items-end gap-1.5 text-sm">
           <div className="flex justify-between w-64 text-[#8e8e93]">
             <span>Subtotal</span>
@@ -223,7 +217,7 @@ export default async function PublicQuotePage({
             <span>€{quote.vatAmount.toLocaleString("pt-PT", { minimumFractionDigits: 2 })}</span>
           </div>
           <div className="flex justify-between items-center w-64 pt-3 mt-2 border-t border-[#ececf0]">
-            <span className="font-bold text-[#111111] text-base">Total</span>
+            <span className="font-bold text-[#111111] text-base">Total a Pagar</span>
             <span
               className="px-3 py-1.5 rounded-lg text-white font-bold text-lg"
               style={{ backgroundColor: template.brandColor }}

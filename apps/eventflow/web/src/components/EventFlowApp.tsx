@@ -5985,6 +5985,10 @@ function QuoteWizardModal({
 
     if (newLines.length > 0) {
       setLines(newLines);
+      const importedSubtotal = newLines.reduce((sum, l) => sum + (l.quantity || 1) * (l.unitPrice || 0), 0);
+      if (importedSubtotal > 0) {
+        setCustomTotalInput((importedSubtotal * 1.23).toFixed(2));
+      }
     }
   };
 
@@ -5996,7 +6000,7 @@ function QuoteWizardModal({
         itemId: activeInv[0]?.id,
         description: activeInv[0]?.name || "Artigo",
         quantity: 10,
-        unitPrice: activeInv[0]?.unitPrice || 5.0,
+        unitPrice: activeInv[0]?.unitPrice || 0,
       },
     ]);
   };
@@ -6011,9 +6015,13 @@ function QuoteWizardModal({
     );
   };
 
-  const subtotal = lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
-  const vatAmount = subtotal * 0.23;
-  const total = subtotal + vatAmount;
+  const initialCalculatedSubtotal = lines.reduce((sum, l) => sum + (l.quantity || 1) * (l.unitPrice || 0), 0);
+  const [customTotalInput, setCustomTotalInput] = useState<string>(
+    initialCalculatedSubtotal > 0 ? (initialCalculatedSubtotal * 1.23).toFixed(2) : "1000.00"
+  );
+  const total = parseFloat(customTotalInput) || 0;
+  const subtotal = total / 1.23;
+  const vatAmount = total - subtotal;
 
   const handleNextStep = (e?: React.MouseEvent) => {
     if (e) {
@@ -6046,6 +6054,8 @@ function QuoteWizardModal({
       formData.set("clientId", clientId);
       formData.set("eventId", eventId);
       formData.set("validityDays", validityDays);
+      formData.set("total", total.toFixed(2));
+      formData.set("subtotal", subtotal.toFixed(2));
       formData.set("lines", JSON.stringify(lines));
 
       const res = await createQuoteAction(formData);
@@ -6175,16 +6185,16 @@ function QuoteWizardModal({
                     key={idx}
                     className="p-3 bg-[#f8f8fa] border border-[#ececf0] rounded-xl grid grid-cols-12 gap-2 items-center"
                   >
-                    <div className="col-span-6">
+                    <div className="col-span-8 sm:col-span-9">
                       <input
                         type="text"
                         value={line.description}
                         onChange={(e) => updateLine(idx, "description", e.target.value)}
-                        placeholder="Descrição"
-                        className="w-full px-2 py-1 bg-white border border-[#ececf0] rounded-lg text-xs"
+                        placeholder="Descrição do artigo ou serviço"
+                        className="w-full px-2 py-1.5 bg-white border border-[#ececf0] rounded-lg text-xs font-medium"
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-3 sm:col-span-2">
                       <input
                         type="number"
                         min="1"
@@ -6192,25 +6202,16 @@ function QuoteWizardModal({
                         onChange={(e) =>
                           updateLine(idx, "quantity", parseInt(e.target.value || "1", 10))
                         }
-                        className="w-full px-2 py-1 bg-white border border-[#ececf0] rounded-lg text-xs text-center"
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={line.unitPrice}
-                        onChange={(e) =>
-                          updateLine(idx, "unitPrice", parseFloat(e.target.value || "0"))
-                        }
-                        className="w-full px-2 py-1 bg-white border border-[#ececf0] rounded-lg text-xs text-right"
+                        className="w-full px-2 py-1.5 bg-white border border-[#ececf0] rounded-lg text-xs text-center font-semibold"
+                        title="Quantidade"
                       />
                     </div>
                     <div className="col-span-1 text-right">
                       <button
                         type="button"
                         onClick={() => removeLine(idx)}
-                        className="text-[#8e8e93] hover:text-rose-600 cursor-pointer"
+                        className="text-[#8e8e93] hover:text-rose-600 cursor-pointer p-1"
+                        title="Remover linha"
                       >
                         ×
                       </button>
@@ -6223,24 +6224,45 @@ function QuoteWizardModal({
 
           {step === 3 && (
             <div className="space-y-4">
-              <div className="p-4 bg-[#f8f8fa] border border-[#ececf0] rounded-xl space-y-2">
-                <div className="flex justify-between text-xs text-[#8e8e93]">
-                  <span>Subtotal</span>
-                  <span>€{subtotal.toFixed(2)}</span>
+              <div className="p-4 bg-[#f8f8fa] border border-[#ececf0] rounded-xl space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#111] mb-1">
+                    Valor Total a Pagar (€ c/ IVA)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[#8e8e93]">
+                      €
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={customTotalInput}
+                      onChange={(e) => setCustomTotalInput(e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 bg-white border border-[#ececf0] rounded-lg text-sm font-bold text-[#111] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                      placeholder="0.00"
+                    />
+                  </div>
                 </div>
-                <div className="flex justify-between text-xs text-[#8e8e93]">
-                  <span>IVA (23%)</span>
-                  <span>€{vatAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm font-bold pt-2 border-t border-[#ececf0] text-[#111111]">
-                  <span>Total da Proposta</span>
-                  <span className="text-[#111111]">€{total.toFixed(2)}</span>
+
+                <div className="space-y-1 pt-1">
+                  <div className="flex justify-between text-xs text-[#8e8e93]">
+                    <span>Subtotal s/ IVA</span>
+                    <span className="font-semibold text-[#111]">€{subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-[#8e8e93]">
+                    <span>IVA (23%)</span>
+                    <span className="font-semibold text-[#111]">€{vatAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-bold pt-2 border-t border-[#ececf0] text-[#111111]">
+                    <span>Total da Proposta a Pagar</span>
+                    <span className="text-[#137333]">€{total.toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="text-[11px] text-[#8e8e93]">
-                Ao gerar este orçamento, será criado um link de aprovação direta para o cliente
-                com assinatura digital.
+              <div className="text-[11px] text-[#8e8e93] leading-relaxed">
+                ℹ Ao emitir esta proposta comercial, os artigos serão apresentados com as respetivas quantidades sem valores unitários por item, constando no fundo o valor total a pagar.
               </div>
             </div>
           )}

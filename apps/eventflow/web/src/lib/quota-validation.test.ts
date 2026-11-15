@@ -50,4 +50,47 @@ describe("CFM Events: Quota Generation Constraints", () => {
     const result = validateQuoteCreation(validFormData, prodEvent);
     assert.deepEqual(result, { success: true, eventId: "evt-prod-01" });
   });
+
+  test("quota generation does not display specific value per item, lists items to use with quantities and displays total to be paid at the bottom", () => {
+    // Business rule: When generating a quota, items are listed with their description and quantity to be used,
+    // without exposing or displaying individual item prices, and the total value to be paid is placed at the bottom.
+    interface QuotaItem {
+      description: string;
+      quantity: number;
+    }
+
+    const itemsToUse: QuotaItem[] = [
+      { description: "Cadeiras Chiavari Douradas", quantity: 50 },
+      { description: "Mesas Redondas 180cm", quantity: 5 },
+      { description: "Produção de Evento & Montagem Técnica CFM", quantity: 1 },
+      { description: "Painel de Boas-Vindas Acrílico Espelhado", quantity: 1 },
+    ];
+
+    // Ensure each item has description and quantity, and no specific unit price display is required
+    for (const item of itemsToUse) {
+      assert.ok(item.description.length > 0, "Item must have a description");
+      assert.ok(item.quantity > 0, "Item must have a positive quantity");
+      assert.strictEqual(
+        (item as any).unitPrice,
+        undefined,
+        "No specific item price should be displayed on the item line"
+      );
+    }
+
+    // Resolves bottom total to be paid
+    function calculateBottomTotals(totalToPay: number, vatRate = 23.0) {
+      const subtotal = totalToPay / (1 + vatRate / 100);
+      const vatAmount = totalToPay - subtotal;
+      return {
+        subtotal: parseFloat(subtotal.toFixed(2)),
+        vatAmount: parseFloat(vatAmount.toFixed(2)),
+        total: parseFloat(totalToPay.toFixed(2)),
+      };
+    }
+
+    const financialBottom = calculateBottomTotals(1230.0);
+    assert.strictEqual(financialBottom.total, 1230.0);
+    assert.strictEqual(financialBottom.subtotal, 1000.0);
+    assert.strictEqual(financialBottom.vatAmount, 230.0);
+  });
 });

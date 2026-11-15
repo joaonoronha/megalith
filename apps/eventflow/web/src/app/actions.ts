@@ -169,16 +169,38 @@ export async function createQuoteAction(formData: FormData) {
   const vatRate = 23.0;
   const linesJson = formData.get("lines") as string;
 
-  let parsedLines: Array<{ itemId?: string; description: string; quantity: number; unitPrice: number; total?: number }> = [];
+  let parsedLines: Array<{ itemId?: string; description: string; quantity: number; unitPrice?: number; total?: number }> = [];
   try {
     parsedLines = JSON.parse(linesJson || "[]");
   } catch {
     parsedLines = [];
   }
 
-  const subtotal = parsedLines.reduce((acc, line) => acc + line.quantity * line.unitPrice, 0);
-  const vatAmount = subtotal * (vatRate / 100);
-  const total = subtotal + vatAmount;
+  // Quotas display items to be used with quantity and a total to be paid at the bottom
+  const manualTotalRaw = formData.get("total") as string | null;
+  const manualSubtotalRaw = formData.get("subtotal") as string | null;
+  const manualTotal = manualTotalRaw ? parseFloat(manualTotalRaw) : null;
+  const manualSubtotal = manualSubtotalRaw ? parseFloat(manualSubtotalRaw) : null;
+
+  let subtotal = 0;
+  let vatAmount = 0;
+  let total = 0;
+
+  if (manualTotal !== null && !isNaN(manualTotal) && manualTotal > 0) {
+    total = manualTotal;
+    subtotal = (manualSubtotal !== null && !isNaN(manualSubtotal) && manualSubtotal > 0)
+      ? manualSubtotal
+      : total / (1 + vatRate / 100);
+    vatAmount = total - subtotal;
+  } else if (manualSubtotal !== null && !isNaN(manualSubtotal) && manualSubtotal > 0) {
+    subtotal = manualSubtotal;
+    vatAmount = subtotal * (vatRate / 100);
+    total = subtotal + vatAmount;
+  } else {
+    subtotal = parsedLines.reduce((acc, line) => acc + (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0), 0);
+    vatAmount = subtotal * (vatRate / 100);
+    total = subtotal + vatAmount;
+  }
 
   const quoteId = generateId("qte");
   const accessToken = `orc-${crypto.randomUUID()}`;
@@ -200,14 +222,16 @@ export async function createQuoteAction(formData: FormData) {
 
   for (let i = 0; i < parsedLines.length; i++) {
     const line = parsedLines[i];
+    const unitPrice = Number(line.unitPrice) || 0;
+    const lineTotal = line.total !== undefined ? Number(line.total) : (Number(line.quantity) || 1) * unitPrice;
     await db.insert(quoteLines).values({
       id: generateId("ql"),
       quoteId,
       itemId: line.itemId || null,
       description: line.description,
-      quantity: line.quantity,
-      unitPrice: line.unitPrice,
-      total: line.quantity * line.unitPrice,
+      quantity: Number(line.quantity) || 1,
+      unitPrice,
+      total: lineTotal,
     });
   }
 

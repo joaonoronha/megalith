@@ -127,7 +127,17 @@ export default function EventQuoteModal({
     );
   }
 
+  const initialCalculatedSubtotal = initialLines.reduce(
+    (sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0),
+    0
+  );
+  const initialCalculatedTotal =
+    initialCalculatedSubtotal > 0
+      ? (initialCalculatedSubtotal * 1.23).toFixed(2)
+      : "1000.00";
+
   const [lines, setLines] = useState<LineItem[]>(initialLines);
+  const [totalToPayInput, setTotalToPayInput] = useState<string>(initialCalculatedTotal);
   const [validityDays, setValidityDays] = useState("15");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -141,12 +151,9 @@ export default function EventQuoteModal({
   } | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  const subtotal = lines.reduce(
-    (sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0),
-    0
-  );
-  const vatAmount = subtotal * 0.23;
-  const total = subtotal + vatAmount;
+  const total = parseFloat(totalToPayInput) || 0;
+  const subtotal = total / 1.23;
+  const vatAmount = total - subtotal;
 
   const handleAddLine = () => {
     setLines((prev) => [
@@ -155,7 +162,7 @@ export default function EventQuoteModal({
         itemId: activeItems[0]?.id,
         description: activeItems[0]?.name || "Artigo / Serviço",
         quantity: 1,
-        unitPrice: activeItems[0]?.unitPrice || 10.0,
+        unitPrice: activeItems[0]?.unitPrice || 0,
       },
     ]);
   };
@@ -186,6 +193,13 @@ export default function EventQuoteModal({
 
     if (importedLines.length > 0) {
       setLines(importedLines);
+      const importedSubtotal = importedLines.reduce(
+        (acc, l) => acc + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0),
+        0
+      );
+      if (importedSubtotal > 0) {
+        setTotalToPayInput((importedSubtotal * 1.23).toFixed(2));
+      }
     }
   };
 
@@ -230,6 +244,8 @@ export default function EventQuoteModal({
         formData.set("clientId", (client?.id || event.clientId) as string);
       }
       formData.set("validityDays", validityDays);
+      formData.set("total", total.toFixed(2));
+      formData.set("subtotal", subtotal.toFixed(2));
       formData.set("lines", JSON.stringify(lines));
 
       const res = await createQuoteAction(formData);
@@ -446,15 +462,15 @@ export default function EventQuoteModal({
               </div>
             </div>
 
-            {/* Line Items List */}
+            {/* Line Items List - Only description and quantity, no individual prices */}
             <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
               {lines.map((line, idx) => (
                 <div
                   key={idx}
-                  className="p-3 bg-[#f8f8fa] border border-[#ececf0] rounded-xl flex flex-col sm:flex-row items-start sm:items-center gap-2"
+                  className="p-3 bg-[#f8f8fa] border border-[#ececf0] rounded-xl flex items-center gap-2.5"
                 >
                   {/* Select or type description */}
-                  <div className="flex-1 w-full sm:w-auto space-y-1">
+                  <div className="flex-1 space-y-1">
                     <input
                       type="text"
                       value={line.description}
@@ -471,7 +487,7 @@ export default function EventQuoteModal({
                         <option value="">Artigo personalizado / serviço técnico...</option>
                         {activeItems.map((it) => (
                           <option key={it.id} value={it.id}>
-                            {it.name} ({it.sku}) — €{it.unitPrice.toFixed(2)}/un
+                            {it.name} ({it.sku})
                           </option>
                         ))}
                       </select>
@@ -480,7 +496,7 @@ export default function EventQuoteModal({
 
                   {/* Quantity */}
                   <div className="w-24 shrink-0">
-                    <label className="text-[10px] text-[#8e8e93] block sm:hidden">Qtd</label>
+                    <label className="text-[10px] text-[#8e8e93] block mb-0.5 font-medium">Qtd.</label>
                     <input
                       type="number"
                       min="1"
@@ -493,34 +509,11 @@ export default function EventQuoteModal({
                     />
                   </div>
 
-                  {/* Unit Price */}
-                  <div className="w-28 shrink-0">
-                    <label className="text-[10px] text-[#8e8e93] block sm:hidden">Preço Unit. (€)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={line.unitPrice}
-                      onChange={(e) =>
-                        handleUpdateLine(idx, "unitPrice", parseFloat(e.target.value || "0"))
-                      }
-                      className="w-full px-2 py-1.5 bg-white border border-[#ececf0] rounded-lg text-xs font-semibold text-right"
-                      title="Preço unitário em Euros"
-                    />
-                  </div>
-
-                  {/* Subtotal */}
-                  <div className="w-24 text-right shrink-0">
-                    <span className="text-xs font-bold text-[#111]">
-                      €{((Number(line.quantity) || 0) * (Number(line.unitPrice) || 0)).toFixed(2)}
-                    </span>
-                  </div>
-
                   {/* Delete Line */}
                   <button
                     type="button"
                     onClick={() => handleRemoveLine(idx)}
-                    className="p-1.5 text-[#8e8e93] hover:text-rose-600 rounded-md hover:bg-rose-50 transition cursor-pointer self-end sm:self-center"
+                    className="p-1.5 text-[#8e8e93] hover:text-rose-600 rounded-md hover:bg-rose-50 transition cursor-pointer self-center mt-3"
                     title="Remover linha"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -529,20 +522,46 @@ export default function EventQuoteModal({
               ))}
             </div>
 
-            {/* Financial Summary */}
-            <div className="p-4 bg-[#f8f8fa] border border-[#ececf0] rounded-[16px] space-y-2">
-              <div className="flex justify-between text-xs text-[#8e8e93]">
-                <span>Subtotal (Artigos & Serviços)</span>
-                <span className="font-semibold text-[#111]">€{subtotal.toFixed(2)}</span>
+            {/* Financial Summary - Total to be paid at the bottom */}
+            <div className="p-4 bg-[#f8f8fa] border border-[#ececf0] rounded-[16px] space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-[#111] mb-1">
+                  Valor Total a Pagar (€ c/ IVA)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[#8e8e93]">
+                    €
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={totalToPayInput}
+                    onChange={(e) => setTotalToPayInput(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-8 pr-3 py-2 bg-white border border-[#ececf0] rounded-xl text-sm font-bold text-[#111] focus:outline-none focus:ring-2 focus:ring-[#007aff]"
+                  />
+                </div>
               </div>
-              <div className="flex justify-between text-xs text-[#8e8e93]">
-                <span>IVA (23% Portugal)</span>
-                <span className="font-semibold text-[#111]">€{vatAmount.toFixed(2)}</span>
+
+              <div className="space-y-1.5 pt-1">
+                <div className="flex justify-between text-xs text-[#8e8e93]">
+                  <span>Subtotal s/ IVA</span>
+                  <span className="font-semibold text-[#111]">€{subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-[#8e8e93]">
+                  <span>IVA (23% Portugal)</span>
+                  <span className="font-semibold text-[#111]">€{vatAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm font-bold pt-2 border-t border-[#ececf0] text-[#111111]">
+                  <span>Total da Proposta a Pagar</span>
+                  <span className="text-[#137333]">€{total.toFixed(2)}</span>
+                </div>
               </div>
-              <div className="flex justify-between text-sm font-bold pt-2 border-t border-[#ececf0] text-[#111111]">
-                <span>Total da Proposta</span>
-                <span className="text-[#137333]">€{total.toFixed(2)}</span>
-              </div>
+
+              <p className="text-[11px] text-[#8e8e93] leading-relaxed">
+                ℹ Na proposta comercial, cada artigo é incluído na listagem com a sua quantidade sem preços discriminados por item, constando no fundo o valor total a pagar.
+              </p>
             </div>
 
             {/* Footer Buttons */}
