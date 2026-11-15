@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useTransition, useMemo, useRef } from "react";
+import React, { useState, useEffect, useTransition, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -79,6 +79,7 @@ import {
   deleteClientAction,
 } from "@/app/actions";
 import { getClientBoundEvents, formatClientDeletionWarning } from "@/lib/customer-deletion";
+import { useRealtimeAlerts, broadcastAlertUpdate } from "@/lib/useRealtimeAlerts";
 
 interface Props {
   currentUser: { id: string; name: string; email: string; role: string; avatarUrl?: string | null } | null;
@@ -258,7 +259,22 @@ export default function EventFlowApp({
   const [locationsList, setLocationsList] = useState<any[]>(initialLocations);
   const [showLocationsModal, setShowLocationsModal] = useState(false);
   const [locationsModalInitialMode, setLocationsModalInitialMode] = useState<"list" | "create">("list");
-  const [alertsList, setAlertsList] = useState<any[]>(initialAlerts || []);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [realtimeToastAlert, setRealtimeToastAlert] = useState<any | null>(null);
+
+  const handleNewAlertArrived = useCallback((alert: any) => {
+    setRealtimeToastAlert(alert);
+    setTimeout(() => {
+      setRealtimeToastAlert((curr: any) => (curr?.id === alert.id ? null : curr));
+    }, 6000);
+  }, []);
+
+  const { alertsList, setAlertsList } = useRealtimeAlerts({
+    initialAlerts,
+    currentUser: user,
+    onNewAlert: handleNewAlertArrived,
+    isLoggingOut,
+  });
   const [showAlertsDrawer, setShowAlertsDrawer] = useState(false);
   const [homeAlertFilter, setHomeAlertFilter] = useState<"all" | "new" | "snoozed">("all");
   const [openHomeSnoozeMenuId, setOpenHomeSnoozeMenuId] = useState<string | null>(null);
@@ -315,10 +331,6 @@ export default function EventFlowApp({
   }, [initialLocations]);
 
   useEffect(() => {
-    setAlertsList(initialAlerts || []);
-  }, [initialAlerts]);
-
-  useEffect(() => {
     setUser(currentUser);
   }, [currentUser]);
 
@@ -354,12 +366,15 @@ export default function EventFlowApp({
   // Dynamic Alerts Computation (New vs Active vs Snoozed, filtered per user)
   const nowMs = Date.now();
   const userVisibleAlerts = useMemo(() => {
+    if (isLoggingOut || !user?.id) return [];
     return alertsList.filter((a) => {
       // If alert has a target userId, only display it to that specific user
-      if (a.userId && user?.id && a.userId !== user.id) return false;
+      if (a.userId) {
+        return a.userId === user.id;
+      }
       return true;
     });
-  }, [alertsList, user]);
+  }, [alertsList, user, isLoggingOut]);
 
   const activeAlerts = useMemo(() => {
     return userVisibleAlerts.filter((a) => {
@@ -399,6 +414,7 @@ export default function EventFlowApp({
     setOpenHomeSnoozeMenuId(null);
     startTransition(async () => {
       await snoozeAlertAction(alertId, hours);
+      broadcastAlertUpdate();
     });
   };
 
@@ -410,6 +426,7 @@ export default function EventFlowApp({
     );
     startTransition(async () => {
       await acknowledgeAlertAction(alertId);
+      broadcastAlertUpdate();
     });
   };
 
@@ -422,6 +439,7 @@ export default function EventFlowApp({
     setOpenHomeSnoozeMenuId(null);
     startTransition(async () => {
       await dismissAlertAction(alertId);
+      broadcastAlertUpdate();
     });
   };
 
@@ -434,6 +452,7 @@ export default function EventFlowApp({
       for (const id of idsToAck) {
         await acknowledgeAlertAction(id);
       }
+      broadcastAlertUpdate();
     });
   };
 
@@ -493,8 +512,6 @@ export default function EventFlowApp({
     }
   };
 
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-
   const handleLogout = async () => {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
@@ -502,7 +519,6 @@ export default function EventFlowApp({
       window.dispatchEvent(new CustomEvent("start-page-progress"));
     }
     try {
-      setUser(null);
       await Promise.race([
         logoutAction(),
         new Promise((resolve) => setTimeout(resolve, 1200)),
@@ -3634,6 +3650,48 @@ export default function EventFlowApp({
         onMarkAllAsRead={handleMarkAllAlertsRead}
         onActionClick={handleAlertActionClick}
       />
+
+      {/* REAL-TIME ALERT TOAST BANNER */}
+      {realtimeToastAlert && (
+        <div className="fixed top-4 inset-x-4 sm:inset-x-auto sm:right-6 sm:max-w-md z-50 animate-in slide-in-from-top-4 duration-300 pointer-events-auto">
+          <div
+            onClick={() => {
+              setShowAlertsDrawer(true);
+              setRealtimeToastAlert(null);
+            }}
+            className="flex items-start gap-3 p-3.5 bg-[#111111]/95 text-white backdrop-blur-md rounded-2xl shadow-2xl border border-white/10 cursor-pointer hover:bg-black transition group"
+          >
+            <div className="p-2 rounded-xl bg-[#007aff] text-white shrink-0 mt-0.5 shadow-xs">
+              <Bell className="w-4 h-4 animate-bounce" />
+            </div>
+            <div className="flex-1 min-w-0 pr-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#007aff]">
+                  Novo Alerta
+                </span>
+                <span className="text-[10px] text-white/50">agora mesmo</span>
+              </div>
+              <h4 className="text-xs font-bold text-white truncate mt-0.5">
+                {realtimeToastAlert.title}
+              </h4>
+              <p className="text-[11px] text-white/80 line-clamp-2 mt-0.5 leading-relaxed">
+                {realtimeToastAlert.message}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setRealtimeToastAlert(null);
+              }}
+              className="p-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition shrink-0"
+              title="Fechar"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 0. CALENDAR DAY POPUP MODAL */}
       {calendarPopupDate && (

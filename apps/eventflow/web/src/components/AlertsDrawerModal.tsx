@@ -17,7 +17,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 
-interface AlertItem {
+export interface AlertItem {
   id: string;
   fingerprint: string;
   type: "low_stock" | "damaged_stock" | "event_unprepared" | "payment_due" | "missing_completed_payment" | "moodboard_comment";
@@ -28,6 +28,7 @@ interface AlertItem {
   severity: "info" | "warning" | "urgent" | "critical";
   status: "active" | "snoozed" | "acknowledged" | "resolved";
   metadata?: string | null;
+  userId?: string | null;
   snoozedUntil?: Date | string | null;
   lastTriggeredAt: Date | string;
   acknowledgedAt?: Date | string | null;

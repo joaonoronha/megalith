@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition, useRef, useMemo, useEffect } from "react";
+import React, { useState, useTransition, useRef, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Calendar,
@@ -59,12 +59,15 @@ import {
   CheckCircle,
   Eye,
   EyeOff,
+  Bell,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AuditLogModal from "@/components/AuditLogModal";
 import EventQuoteModal from "@/components/EventQuoteModal";
 import TimeWindowSlider from "@/components/TimeWindowSlider";
+import AlertsDrawerModal from "@/components/AlertsDrawerModal";
 import { usePresence } from "@/lib/usePresence";
+import { useRealtimeAlerts, broadcastAlertUpdate } from "@/lib/useRealtimeAlerts";
 import { formatRelativeTime, formatUpcomingTime, formatMeetingRange } from "@/lib/date-format";
 import { isMeetingEvent } from "@/lib/events";
 import {
@@ -96,6 +99,9 @@ import {
   uploadEventCoverAction,
   deleteClientAction,
   toggleMoodboardWatchAction,
+  snoozeAlertAction,
+  acknowledgeAlertAction,
+  dismissAlertAction,
 } from "@/app/actions";
 import { formatClientDeletionWarning } from "@/lib/customer-deletion";
 import { parseCommentSegments, type TeamUserItem } from "@/lib/moodboard-watchers";
@@ -859,7 +865,7 @@ function MoodboardCard({
                                 key={sIdx}
                                 className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-semibold bg-[#007aff]/10 text-[#007aff] mr-0.5"
                               >
-                                @{segment.text}
+                                {segment.text.startsWith("@") ? segment.text : `@${segment.text}`}
                               </span>
                             ) : (
                               <React.Fragment key={sIdx}>{segment.text}</React.Fragment>
@@ -1337,7 +1343,7 @@ function LightboxCommentsDrawer({
                         key={sIdx}
                         className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] font-semibold bg-[#007aff]/30 text-[#60a5fa] mr-0.5"
                       >
-                        @{segment.text}
+                        {segment.text.startsWith("@") ? segment.text : `@${segment.text}`}
                       </span>
                     ) : (
                       <React.Fragment key={sIdx}>{segment.text}</React.Fragment>
@@ -1737,6 +1743,106 @@ export default function EventDetailView({
     }
   };
   const [currentUserState, setCurrentUserState] = useState(currentUser);
+
+  // Realtime Alerts Tracking
+  const [realtimeToastAlert, setRealtimeToastAlert] = useState<any | null>(null);
+  const [showAlertsDrawer, setShowAlertsDrawer] = useState(false);
+
+  const handleNewAlertArrived = useCallback((alert: any) => {
+    setRealtimeToastAlert(alert);
+    setTimeout(() => {
+      setRealtimeToastAlert((curr: any) => (curr?.id === alert.id ? null : curr));
+    }, 6000);
+  }, []);
+
+  const { alertsList, setAlertsList } = useRealtimeAlerts({
+    currentUser: currentUserState,
+    onNewAlert: handleNewAlertArrived,
+  });
+
+  const nowMs = Date.now();
+  const userVisibleAlerts = useMemo(() => {
+    if (!currentUserState?.id) return [];
+    return alertsList.filter((a) => {
+      if (a.userId) {
+        return a.userId === currentUserState.id;
+      }
+      return true;
+    });
+  }, [alertsList, currentUserState]);
+
+  const activeAlerts = useMemo(() => {
+    return userVisibleAlerts.filter((a) => {
+      if (a.status === "resolved") return false;
+      if (a.status === "snoozed") {
+        if (a.snoozedUntil && new Date(a.snoozedUntil).getTime() > nowMs) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [userVisibleAlerts, nowMs]);
+
+  const newAlerts = useMemo(() => {
+    return activeAlerts.filter((a) => !a.acknowledgedAt);
+  }, [activeAlerts]);
+
+  const newAlertsCount = newAlerts.length;
+
+  const handleSnoozeAlert = async (alertId: string, hours: number) => {
+    const snoozedUntil = new Date(Date.now() + hours * 60 * 60 * 1000);
+    setAlertsList((prev) =>
+      prev.map((a) =>
+        a.id === alertId ? { ...a, status: "snoozed", snoozedUntil } : a
+      )
+    );
+    startTransition(async () => {
+      await snoozeAlertAction(alertId, hours);
+      broadcastAlertUpdate();
+    });
+  };
+
+  const handleAcknowledgeAlert = async (alertId: string) => {
+    setAlertsList((prev) =>
+      prev.map((a) =>
+        a.id === alertId ? { ...a, acknowledgedAt: new Date() } : a
+      )
+    );
+    startTransition(async () => {
+      await acknowledgeAlertAction(alertId);
+      broadcastAlertUpdate();
+    });
+  };
+
+  const handleDismissAlert = async (alertId: string) => {
+    setAlertsList((prev) =>
+      prev.map((a) =>
+        a.id === alertId ? { ...a, status: "resolved" } : a
+      )
+    );
+    startTransition(async () => {
+      await dismissAlertAction(alertId);
+      broadcastAlertUpdate();
+    });
+  };
+
+  const handleMarkAllAlertsRead = async () => {
+    const idsToAck = newAlerts.map((a) => a.id);
+    setAlertsList((prev) =>
+      prev.map((a) => (idsToAck.includes(a.id) ? { ...a, acknowledgedAt: new Date() } : a))
+    );
+    startTransition(async () => {
+      for (const id of idsToAck) {
+        await acknowledgeAlertAction(id);
+      }
+      broadcastAlertUpdate();
+    });
+  };
+
+  const handleAlertActionClick = (alert: any) => {
+    handleAcknowledgeAlert(alert.id);
+    setShowAlertsDrawer(false);
+  };
 
   // Live Team Presence & Editing Tracker
   const { activeEditors } = usePresence({
@@ -3160,6 +3266,7 @@ export default function EventDetailView({
           };
         });
         router.refresh();
+        broadcastAlertUpdate();
       } else {
         setMediaList((prev) =>
           prev.map((m) => {
@@ -3207,6 +3314,7 @@ export default function EventDetailView({
     try {
       await deleteMoodboardCommentAction(commentId, mediaId, event.id);
       router.refresh();
+      broadcastAlertUpdate();
     } catch (err) {
       console.error("Erro ao eliminar comentário:", err);
     }
@@ -3336,7 +3444,7 @@ export default function EventDetailView({
               </select>
             </div>
 
-            {/* Auditing Log */}
+            {/* Auditing Log & Notification Bell */}
             <div className="flex items-center gap-1.5 pl-1.5 sm:pl-2 border-l border-[#ececf0] flex-shrink-0">
               <button
                 type="button"
@@ -3346,6 +3454,21 @@ export default function EventDetailView({
               >
                 <History className="w-3.5 h-3.5 text-[#8e8e93]" />
                 <span className="hidden sm:inline">Histórico</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowAlertsDrawer(true)}
+                className="relative min-w-[34px] min-h-[34px] p-1.5 rounded-full bg-[#f2f2f5] hover:bg-[#e5e5ea] text-[#636366] hover:text-[#111] transition cursor-pointer flex items-center justify-center flex-shrink-0"
+                title="Centro de Alertas & Notificações"
+                aria-label="Alertas e Notificações"
+              >
+                <Bell className="w-4 h-4" />
+                {newAlertsCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 bg-[#ff3b30] text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-xs animate-in zoom-in-75">
+                    {newAlertsCount}
+                  </span>
+                )}
               </button>
             </div>
 
@@ -6094,6 +6217,60 @@ export default function EventDetailView({
         entityId={event.id}
         entityTitle={event.name}
       />
+
+      {/* Alerts Drawer Modal */}
+      <AlertsDrawerModal
+        isOpen={showAlertsDrawer}
+        onClose={() => setShowAlertsDrawer(false)}
+        alerts={userVisibleAlerts}
+        onSnooze={handleSnoozeAlert}
+        onAcknowledge={handleAcknowledgeAlert}
+        onDismiss={handleDismissAlert}
+        onMarkAllAsRead={handleMarkAllAlertsRead}
+        onActionClick={handleAlertActionClick}
+      />
+
+      {/* REAL-TIME ALERT TOAST BANNER */}
+      {realtimeToastAlert && (
+        <div className="fixed top-4 inset-x-4 sm:inset-x-auto sm:right-6 sm:max-w-md z-50 animate-in slide-in-from-top-4 duration-300 pointer-events-auto">
+          <div
+            onClick={() => {
+              setShowAlertsDrawer(true);
+              setRealtimeToastAlert(null);
+            }}
+            className="flex items-start gap-3 p-3.5 bg-[#111111]/95 text-white backdrop-blur-md rounded-2xl shadow-2xl border border-white/10 cursor-pointer hover:bg-black transition group"
+          >
+            <div className="p-2 rounded-xl bg-[#007aff] text-white shrink-0 mt-0.5 shadow-xs">
+              <Bell className="w-4 h-4 animate-bounce" />
+            </div>
+            <div className="flex-1 min-w-0 pr-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#007aff]">
+                  Novo Alerta
+                </span>
+                <span className="text-[10px] text-white/50">agora mesmo</span>
+              </div>
+              <h4 className="text-xs font-bold text-white truncate mt-0.5">
+                {realtimeToastAlert.title}
+              </h4>
+              <p className="text-[11px] text-white/80 line-clamp-2 mt-0.5 leading-relaxed">
+                {realtimeToastAlert.message}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setRealtimeToastAlert(null);
+              }}
+              className="p-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition shrink-0"
+              title="Fechar"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Create Client Modal */}
       {showCreateClientModal && (
